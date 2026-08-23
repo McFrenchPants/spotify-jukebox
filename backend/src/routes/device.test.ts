@@ -7,13 +7,17 @@ vi.mock("../spotify/device", () => ({
   listDevices: vi.fn(),
 }));
 
-vi.mock("../db", () => ({
-  setSetting: vi.fn(),
-}));
+vi.mock("../db", async () => {
+  const actual = await vi.importActual<typeof import("../db")>("../db");
+  return { ...actual, setSetting: vi.fn(actual.setSetting) };
+});
 
 import { listDevices, resolveDevice } from "../spotify/device";
-import { setSetting } from "../db";
+import { runMigrations, setSetting } from "../db";
+import { issueAdminToken } from "../auth/adminToken";
 import { createApp } from "../app";
+
+const ADMIN_TOKEN_HEADER = "x-admin-token";
 
 const DEVICE_A = {
   id: "device-a",
@@ -36,6 +40,7 @@ let baseUrl: string;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  runMigrations();
   const app = createApp();
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => {
@@ -95,12 +100,24 @@ describe("GET /api/device", () => {
 });
 
 describe("POST /api/device/select", () => {
-  it("persists and returns the device when the given id is currently visible", async () => {
-    vi.mocked(listDevices).mockResolvedValue([DEVICE_A, DEVICE_B]);
-
+  it("returns 401 without a valid admin token", async () => {
     const res = await fetch(`${baseUrl}/api/device/select`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "device-a" }),
+    });
+
+    expect(res.status).toBe(401);
+    expect(listDevices).not.toHaveBeenCalled();
+  });
+
+  it("persists and returns the device when the given id is currently visible", async () => {
+    vi.mocked(listDevices).mockResolvedValue([DEVICE_A, DEVICE_B]);
+    const { token } = issueAdminToken();
+
+    const res = await fetch(`${baseUrl}/api/device/select`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", [ADMIN_TOKEN_HEADER]: token },
       body: JSON.stringify({ deviceId: "device-b" }),
     });
     const body = (await res.json()) as any;
@@ -112,10 +129,11 @@ describe("POST /api/device/select", () => {
 
   it("returns 400 and does not persist when the id isn't in the current device list", async () => {
     vi.mocked(listDevices).mockResolvedValue([DEVICE_A]);
+    const { token } = issueAdminToken();
 
     const res = await fetch(`${baseUrl}/api/device/select`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", [ADMIN_TOKEN_HEADER]: token },
       body: JSON.stringify({ deviceId: "not-visible" }),
     });
     const body = (await res.json()) as any;
@@ -126,9 +144,11 @@ describe("POST /api/device/select", () => {
   });
 
   it("returns 400 when deviceId is missing from the body", async () => {
+    const { token } = issueAdminToken();
+
     const res = await fetch(`${baseUrl}/api/device/select`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", [ADMIN_TOKEN_HEADER]: token },
       body: JSON.stringify({}),
     });
     const body = (await res.json()) as any;
@@ -143,10 +163,11 @@ describe("POST /api/device/select", () => {
     vi.mocked(listDevices).mockRejectedValue(
       new Error("No spotify_refresh_token stored yet — skip refresh until consent is completed.")
     );
+    const { token } = issueAdminToken();
 
     const res = await fetch(`${baseUrl}/api/device/select`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", [ADMIN_TOKEN_HEADER]: token },
       body: JSON.stringify({ deviceId: "device-a" }),
     });
     const body = (await res.json()) as any;

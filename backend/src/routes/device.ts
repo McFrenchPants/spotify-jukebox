@@ -1,5 +1,6 @@
 import { Response, Router } from "express";
 import { setSetting } from "../db";
+import { requireAdminAuth } from "../middleware/adminAuth";
 import { listDevices, resolveDevice } from "../spotify/device";
 
 export const deviceRouter = Router();
@@ -30,7 +31,7 @@ deviceRouter.get("/", async (_req, res) => {
   }
 });
 
-deviceRouter.post("/select", async (req, res) => {
+deviceRouter.post("/select", requireAdminAuth, async (req, res) => {
   const { deviceId } = req.body ?? {};
 
   if (typeof deviceId !== "string" || deviceId.trim() === "") {
