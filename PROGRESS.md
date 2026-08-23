@@ -4,7 +4,7 @@
 
 ## Status: Phase 1 complete
 
-**Next task: P2.2 — Guest session issuance** (P2.1 already done)
+**Next task: P2.3 — Rate limiter**
 
 ## Task Table
 
@@ -23,7 +23,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P1.4 | Device resolution | done | `GET /api/device`, `POST /api/device/select`; 18 new tests (38 total in backend) |
 | P1.5 | Real-time push (SSE) | done | `/api/events`; generic `emitEvent`/`subscribe` bus for P2.5/P2.6/P3.4 to use; now-playing poller (4s) |
 | P2.1 | SQLite schema & migrations | done | `better-sqlite3` pinned to 11.10.0 (13.x segfaults on Windows x64 in this env); tokens stored in `app_settings` k/v |
-| P2.2 | Guest session issuance | todo | |
+| P2.2 | Guest session issuance | done | `POST /api/session`; `resolveGuestSession` middleware (resolve-only, never creates/blocks) for P2.3/P2.5 to build on |
 | P2.3 | Rate limiter | todo | |
 | P2.4 | Content guardrails | todo | |
 | P2.5 | Queue endpoint & analytics write | todo | Also emits `queue-update` SSE event (P1.5) |
@@ -54,6 +54,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P2.2 guest session issuance
+- Added `backend/src/db/guestSessions.ts`: shared helpers `findGuestSession`, `touchGuestSession` (bumps `last_request_at`/`total_requests`, returns `undefined` on no match), `createGuestSession` (new row, `randomUUID()` as `session_id`) — used by both the route and the middleware so the touch-session SQL isn't duplicated.
+- Added `backend/src/middleware/guestSession.ts`: `resolveGuestSession` — reads `x-guest-token` header, attaches resolved session to `req.guestSession` if found, always calls `next()` (resolve-only, never creates a session, never blocks the request). This is the extension point P2.3 (rate limiter) and P2.5 (queue endpoint) should mount/build on.
+- Added `backend/src/routes/session.ts`: `POST /api/session` — valid token → 200 (reuse + touch), missing/unrecognized token → 201 (create new). Response: `{ token, sessionId, createdAt }`.
+- Added `backend/src/types/express.d.ts` augmenting `Express.Request` with optional `guestSession`. Mounted `sessionRouter` in `app.ts` alongside the existing routers.
+- 7 new tests (4 route + 3 middleware) — 62 total passing across the backend. `npx tsc --noEmit` clean. Verified independently.
+- Next: P2.3 (rate limiter) — token-bucket keyed on `guest_sessions.session_id`, will likely mount `resolveGuestSession` on guest-facing routes to get `req.guestSession` for free.
 
 ### 2026-08-23 — P1.5 SSE real-time push (Phase 1 complete)
 - Added `backend/src/events/bus.ts`: generic in-process pub/sub (`emitEvent(name, data)` / `subscribe(listener) -> unsubscribe`, Node `EventEmitter`-backed, domain-agnostic) — this is what P2.5 (queue add), P2.6 (leaderboard), and P3.4 (queue moderation) will call into later to broadcast `queue-update`/`leaderboard-update`.
