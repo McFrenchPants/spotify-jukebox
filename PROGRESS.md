@@ -4,7 +4,7 @@
 
 ## Status: Phase 0 complete
 
-**Next task: P1.2 — Token refresh worker** (P1.1's real end-to-end consent run still needs the user, once `PORT` in `.env` is fixed — see Open Questions)
+**Next task: P1.3 — Search proxy**
 
 ## Task Table
 
@@ -18,7 +18,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P0.4 | Env & secrets template | done | `backend/.env.example`; admin PIN defaults to placeholder `change-me` |
 | P0.5 | Design system & style guide | done | Tailwind v4 `@theme` tokens (no config.js); accent `#2fd66f`; primitives in `frontend/src/components/ui/` |
 | P1.1 | PKCE auth flow | done | Code complete & verified up to the redirect; real browser consent still needed once `PORT` is fixed — see Open Questions |
-| P1.2 | Token refresh worker | todo | |
+| P1.2 | Token refresh worker | done | vitest added; 6 unit tests pass; real refresh still needs P1.1's consent to complete first |
 | P1.3 | Search proxy | todo | |
 | P1.4 | Device resolution | todo | |
 | P1.5 | Real-time push (SSE) | todo | `/api/events`; replaces client-side polling |
@@ -47,14 +47,19 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 ## Open Questions / Blockers
 
-- **`backend/.env` `PORT=80085` is invalid** — TCP ports max out at 65535; the server crashes immediately (`ERR_SOCKET_BAD_PORT`) with this value. Likely a typo (maybe `8085`?). Needs fixing before the server can run normally or P1.1's real consent flow can be completed — update both `PORT` and the port in `SPOTIFY_REDIRECT_URI` to match (and update the redirect URI registered in the Spotify dashboard to match too).
-- **P1.1 real end-to-end run still needed**: code is complete and verified as far as possible without a browser (server starts, `/api/auth/login` redirects to Spotify with correct params, `/api/auth/callback` error-handles correctly). Once `PORT`/`SPOTIFY_REDIRECT_URI` are fixed, start the backend (`npm run dev` in `backend/`) and visit `http://192.168.50.179:<port>/api/auth/login` in a browser to complete the one-time Spotify consent and confirm real tokens get persisted.
+- **`backend/.env` `PORT` fixed to `8085`** (was invalid `80085`, >65535 max); `SPOTIFY_REDIRECT_URI` updated to match. **User still needs to**: (1) update the redirect URI registered in the Spotify dashboard to `http://192.168.50.179:8085/api/auth/callback`, (2) run the backend and visit `http://192.168.50.179:8085/api/auth/login` in a browser to complete the one-time consent — this persists a real `spotify_refresh_token`, which both P1.1 and P1.2 are coded against but haven't been exercised for real yet. Once done, P1.2's refresh worker can be spot-checked for real by calling `refreshAccessToken()` once and confirming `spotify_access_token` changes.
 - **Admin PIN value**: now set (`8282` in `.env`) — resolved.
 - **Process note**: subagent prompts touching `backend/.env` must be told never to overwrite/reset it, and to back it up + restore byte-for-byte if they need to test with different values (a past subagent lost the user's real credentials this way once already; P1.1's subagent handled it correctly by using a shell-level env override instead).
 
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P1.2 token refresh worker; .env PORT fixed
+- Added `backend/src/spotify/tokenRefresh.ts`: `refreshAccessToken()` (reads `spotify_refresh_token` fresh from `app_settings` every call — safe across restarts — exchanges it via Spotify's token endpoint, persists new access token/expiry, only overwrites the stored refresh token if Spotify rotated it), `startTokenRefreshWorker(intervalMs?, refreshFn?)` (default 50 min, catches/logs per-attempt errors so one failure doesn't kill the process, `.unref()`'d), `stopTokenRefreshWorker()`. Wired into `src/index.ts` after `runMigrations()`.
+- Added `vitest` (new devDependency, `npm test` script) — first test framework in the backend. 6 unit tests cover request shape, success persistence, refresh-token rotation, missing-token/HTTP-error rejection paths, and interval scheduling via fake timers. All pass (verified independently).
+- Fixed `backend/.env`: `PORT` was `80085` (invalid, >65535 max) — corrected to `8085`, `SPOTIFY_REDIRECT_URI` updated to match. **User action needed**: update the redirect URI in the Spotify dashboard to match, then complete the one-time consent (see Open Questions) — nothing in P1.1/P1.2 has been exercised against the real Spotify API yet, only unit/mock-verified.
+- Next: P1.3 (search proxy) doesn't depend on the consent flow being done yet (uses the same token machinery once it exists) — can proceed in parallel with the user completing consent whenever convenient.
 
 ### 2026-08-23 — P1.1 PKCE auth flow
 - Added `backend/src/spotify/pkce.ts` (verifier/challenge/state generation via Node `crypto`) and `backend/src/routes/auth.ts` (`GET /api/auth/login`, `GET /api/auth/callback`), mounted at `/api/auth` in `app.ts`.
