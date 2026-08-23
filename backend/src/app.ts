@@ -1,5 +1,6 @@
 import express, { Express } from "express";
 import { adminRouter } from "./routes/admin";
+import { artistRouter } from "./routes/artist";
 import { authRouter } from "./routes/auth";
 import { deviceRouter } from "./routes/device";
 import { eventsRouter } from "./routes/events";
@@ -22,6 +23,7 @@ export function createApp(): Express {
   });
 
   app.use("/api/admin", adminRouter);
+  app.use("/api/artist", artistRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/search", searchRouter);
   app.use("/api/device", deviceRouter);

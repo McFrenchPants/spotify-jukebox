@@ -6,14 +6,15 @@ vi.mock("../spotify/playback", () => ({
   pausePlayback: vi.fn(),
   resumePlayback: vi.fn(),
   skipToNext: vi.fn(),
+  skipToPrevious: vi.fn(),
   setVolume: vi.fn(),
 }));
 
 import { db, runMigrations, setSetting } from "../db";
-import { ACTIVE_MODE_KEY, ALLOW_PAUSE_RESUME_KEY, ALLOW_VOLUME_KEY } from "../db/appSettings";
+import { ACTIVE_MODE_KEY, ALLOW_PAUSE_RESUME_KEY, ALLOW_SKIP_KEY, ALLOW_VOLUME_KEY } from "../db/appSettings";
 import { issueAdminToken } from "../auth/adminToken";
 import { ADMIN_TOKEN_HEADER } from "../middleware/adminAuth";
-import { pausePlayback, setVolume } from "../spotify/playback";
+import { pausePlayback, setVolume, skipToPrevious } from "../spotify/playback";
 import { createApp } from "../app";
 
 const DEVICE_ID = "device-under-test";
@@ -26,13 +27,14 @@ beforeEach(async () => {
   // Real shared-file DB with no per-test reset — reset every setting we
   // touch to a known value, following the pattern in queue.test.ts.
   db.prepare(
-    `DELETE FROM app_settings WHERE key IN (?, ?, ?)`
-  ).run(ACTIVE_MODE_KEY, ALLOW_PAUSE_RESUME_KEY, ALLOW_VOLUME_KEY);
+    `DELETE FROM app_settings WHERE key IN (?, ?, ?, ?)`
+  ).run(ACTIVE_MODE_KEY, ALLOW_PAUSE_RESUME_KEY, ALLOW_SKIP_KEY, ALLOW_VOLUME_KEY);
   setSetting("spotify_device_id", DEVICE_ID);
 
   vi.clearAllMocks();
   vi.mocked(pausePlayback).mockResolvedValue(undefined);
   vi.mocked(setVolume).mockResolvedValue(undefined);
+  vi.mocked(skipToPrevious).mockResolvedValue(undefined);
 
   const app = createApp();
   await new Promise<void>((resolve) => {
@@ -108,6 +110,69 @@ describe("POST /api/playback/pause", () => {
 
     expect(res.status).toBe(502);
     expect(body.error).toBe("spotify_pause_failed");
+  });
+});
+
+describe("POST /api/playback/previous", () => {
+  it("restricted mode + no admin token -> 403", async () => {
+    setSetting(ACTIVE_MODE_KEY, "restricted");
+
+    const res = await fetch(`${baseUrl}/api/playback/previous`, { method: "POST" });
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(403);
+    expect(body.error).toBe("trust_mode_denied");
+    expect(skipToPrevious).not.toHaveBeenCalled();
+  });
+
+  it("restricted mode + valid admin token -> proceeds (admin bypass)", async () => {
+    setSetting(ACTIVE_MODE_KEY, "restricted");
+    const { token } = issueAdminToken();
+
+    const res = await fetch(`${baseUrl}/api/playback/previous`, {
+      method: "POST",
+      headers: { [ADMIN_TOKEN_HEADER]: token },
+    });
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ status: "ok" });
+    expect(skipToPrevious).toHaveBeenCalledTimes(1);
+    expect(skipToPrevious).toHaveBeenCalledWith(DEVICE_ID);
+  });
+
+  it("trusted mode + no admin token -> proceeds", async () => {
+    setSetting(ACTIVE_MODE_KEY, "trusted");
+
+    const res = await fetch(`${baseUrl}/api/playback/previous`, { method: "POST" });
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ status: "ok" });
+    expect(skipToPrevious).toHaveBeenCalledTimes(1);
+  });
+
+  it("device not resolved -> 503", async () => {
+    setSetting(ACTIVE_MODE_KEY, "trusted");
+    db.prepare("DELETE FROM app_settings WHERE key = 'spotify_device_id'").run();
+
+    const res = await fetch(`${baseUrl}/api/playback/previous`, { method: "POST" });
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(503);
+    expect(body.error).toBe("device_not_resolved");
+    expect(skipToPrevious).not.toHaveBeenCalled();
+  });
+
+  it("Spotify call failure -> 502", async () => {
+    setSetting(ACTIVE_MODE_KEY, "trusted");
+    vi.mocked(skipToPrevious).mockRejectedValueOnce(new Error("Spotify previous-track failed: 500"));
+
+    const res = await fetch(`${baseUrl}/api/playback/previous`, { method: "POST" });
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(502);
+    expect(body.error).toBe("spotify_previous_failed");
   });
 });
 

@@ -37,6 +37,22 @@ interface SpotifyTrackResponse {
   explicit: boolean;
 }
 
+export interface ShapedArtist {
+  id: string;
+  name: string;
+  genres: string[];
+  imageUrl: string | null;
+  followers: number;
+}
+
+interface SpotifyArtistResponse {
+  id: string;
+  name: string;
+  genres: string[];
+  images: Array<{ url: string; height: number | null; width: number | null }>;
+  followers: { total: number };
+}
+
 /**
  * Returns a valid Spotify access token, refreshing it first if it's missing
  * or about to expire. Always re-reads the token from app_settings after a
@@ -174,5 +190,55 @@ export async function getTrack(
     albumArt: track.album.images[0]?.url ?? null,
     durationMs: track.duration_ms,
     explicit: track.explicit,
+  };
+}
+
+/**
+ * Fetches a single artist by id from Spotify and shapes it into
+ * { id, name, genres, imageUrl, followers }.
+ *
+ * Used by the public artist-info endpoint (P4.8) to power an "About the
+ * artist" panel on the Now Playing screen.
+ *
+ * `fetchFn` and `getTokenFn` are injectable for testing, following the same
+ * pattern as `searchTracks`/`getTrack`.
+ */
+export async function getArtist(
+  artistId: string,
+  fetchFn: typeof fetch = fetch,
+  getTokenFn: () => Promise<string> = getValidAccessToken
+): Promise<ShapedArtist> {
+  const accessToken = await getTokenFn();
+
+  const response = await fetchFn(`${SPOTIFY_API_BASE}/artists/${encodeURIComponent(artistId)}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    let message = `${response.status}`;
+    try {
+      const errBody = (await response.json()) as {
+        error?: { message?: string };
+      };
+      if (errBody.error?.message) {
+        message = `${response.status} ${errBody.error.message}`;
+      }
+    } catch {
+      // Ignore JSON parse failures on the error body; fall back to status.
+    }
+    throw new Error(`Spotify artist lookup failed: ${message}`);
+  }
+
+  const artist = (await response.json()) as SpotifyArtistResponse;
+
+  return {
+    id: artist.id,
+    name: artist.name,
+    genres: artist.genres,
+    // Spotify returns artist images sorted largest-first; use the first one.
+    imageUrl: artist.images[0]?.url ?? null,
+    followers: artist.followers.total,
   };
 }

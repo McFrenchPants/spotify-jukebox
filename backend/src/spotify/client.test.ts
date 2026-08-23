@@ -15,7 +15,7 @@ vi.mock("./tokenRefresh", () => ({
 
 import { getSetting } from "../db";
 import { refreshAccessToken } from "./tokenRefresh";
-import { getValidAccessToken, searchTracks } from "./client";
+import { getArtist, getValidAccessToken, searchTracks } from "./client";
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return {
@@ -177,6 +177,91 @@ describe("searchTracks", () => {
     const getTokenFn = vi.fn().mockRejectedValue(new Error("No spotify_refresh_token stored"));
 
     await expect(searchTracks("test", 20, fetchMock, getTokenFn)).rejects.toThrow(
+      /No spotify_refresh_token/
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("getArtist", () => {
+  beforeEach(() => {
+    settings.clear();
+    vi.clearAllMocks();
+  });
+
+  it("shapes a Spotify artist response into { id, name, genres, imageUrl, followers }", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        id: "artist-1",
+        name: "Artist One",
+        genres: ["pop", "dance pop"],
+        images: [
+          { url: "https://example.com/large.jpg", height: 640, width: 640 },
+          { url: "https://example.com/small.jpg", height: 160, width: 160 },
+        ],
+        followers: { total: 12345 },
+      })
+    );
+    const getTokenFn = vi.fn().mockResolvedValue("test-access-token");
+
+    const result = await getArtist("artist-1", fetchMock, getTokenFn);
+
+    expect(result).toEqual({
+      id: "artist-1",
+      name: "Artist One",
+      genres: ["pop", "dance pop"],
+      imageUrl: "https://example.com/large.jpg",
+      followers: 12345,
+    });
+  });
+
+  it("shapes imageUrl as null when the artist has no images", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        id: "artist-2",
+        name: "Artist Two",
+        genres: [],
+        images: [],
+        followers: { total: 0 },
+      })
+    );
+    const getTokenFn = vi.fn().mockResolvedValue("test-access-token");
+
+    const result = await getArtist("artist-2", fetchMock, getTokenFn);
+
+    expect(result.imageUrl).toBeNull();
+  });
+
+  it("calls the Spotify artist endpoint with the id and bearer token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ id: "artist-1", name: "A", genres: [], images: [], followers: { total: 0 } })
+    );
+    const getTokenFn = vi.fn().mockResolvedValue("test-access-token");
+
+    await getArtist("artist-1", fetchMock, getTokenFn);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.spotify.com/v1/artists/artist-1");
+    expect(init.headers.Authorization).toBe("Bearer test-access-token");
+  });
+
+  it("throws a clear error when Spotify returns a non-OK response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ error: { status: 404, message: "Not found" } }, false, 404)
+    );
+    const getTokenFn = vi.fn().mockResolvedValue("test-access-token");
+
+    await expect(getArtist("missing-artist", fetchMock, getTokenFn)).rejects.toThrow(
+      /Spotify artist lookup failed: 404/
+    );
+  });
+
+  it("propagates errors from token acquisition without crashing", async () => {
+    const fetchMock = vi.fn();
+    const getTokenFn = vi.fn().mockRejectedValue(new Error("No spotify_refresh_token stored"));
+
+    await expect(getArtist("artist-1", fetchMock, getTokenFn)).rejects.toThrow(
       /No spotify_refresh_token/
     );
     expect(fetchMock).not.toHaveBeenCalled();

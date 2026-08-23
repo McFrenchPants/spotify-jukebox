@@ -3,7 +3,7 @@ import { verifyAdminToken } from "../auth/adminToken";
 import { getSetting } from "../db";
 import { PlaybackCapability, resolveEffectivePermission } from "../guardrails/playbackPermissions";
 import { ADMIN_TOKEN_HEADER } from "../middleware/adminAuth";
-import { pausePlayback, resumePlayback, setVolume, skipToNext } from "../spotify/playback";
+import { pausePlayback, resumePlayback, setVolume, skipToNext, skipToPrevious } from "../spotify/playback";
 
 export const playbackRouter = Router();
 
@@ -107,6 +107,22 @@ playbackRouter.post("/skip", async (req, res) => {
     await skipToNext(deviceId);
   } catch (err) {
     handleSpotifyError(err, res, "spotify_skip_failed");
+    return;
+  }
+
+  res.status(200).json({ status: "ok" });
+});
+
+playbackRouter.post("/previous", async (req, res) => {
+  if (!checkTrustModeGate(req, res, "skip")) return;
+
+  const deviceId = requireDeviceId(res);
+  if (!deviceId) return;
+
+  try {
+    await skipToPrevious(deviceId);
+  } catch (err) {
+    handleSpotifyError(err, res, "spotify_previous_failed");
     return;
   }
 

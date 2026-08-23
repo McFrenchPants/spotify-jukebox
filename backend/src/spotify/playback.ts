@@ -98,6 +98,21 @@ export async function skipToNext(
   );
 }
 
+export async function skipToPrevious(
+  deviceId: string,
+  fetchFn: typeof fetch = fetch,
+  getTokenFn: () => Promise<string> = getValidAccessToken
+): Promise<void> {
+  await callPlaybackEndpoint(
+    "POST",
+    "/me/player/previous",
+    { device_id: deviceId },
+    "Spotify previous-track failed",
+    fetchFn,
+    getTokenFn
+  );
+}
+
 export async function setVolume(
   volumePercent: number,
   deviceId: string,

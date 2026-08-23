@@ -12,6 +12,7 @@ export interface NowPlayingState {
   trackId: string | null;
   name?: string;
   artist?: string;
+  artistId?: string;
   albumArt?: string | null;
   durationMs?: number;
   progressMs?: number;
@@ -23,7 +24,7 @@ interface SpotifyCurrentlyPlayingResponse {
   item?: {
     id: string;
     name: string;
-    artists: Array<{ name: string }>;
+    artists: Array<{ id: string; name: string }>;
     album: { images: Array<{ url: string }> };
     duration_ms: number;
   } | null;
@@ -57,6 +58,7 @@ function shapeResponse(data: SpotifyCurrentlyPlayingResponse | null): NowPlaying
     trackId: data.item.id,
     name: data.item.name,
     artist: data.item.artists.map((a) => a.name).join(", "),
+    artistId: data.item.artists[0]?.id,
     albumArt: data.item.album.images[0]?.url ?? null,
     durationMs: data.item.duration_ms,
     progressMs: data.progress_ms ?? 0,
