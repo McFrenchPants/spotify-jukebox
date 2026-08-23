@@ -59,8 +59,20 @@ export function runMigrations(): void {
       last_allowed_at TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS queue_entries (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      spotify_track_id TEXT NOT NULL,
+      track_name TEXT NOT NULL,
+      artist_name TEXT NOT NULL,
+      album_art_url TEXT,
+      duration_ms INTEGER NOT NULL,
+      added_by_session_id TEXT,
+      added_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);
     CREATE INDEX IF NOT EXISTS idx_play_history_guest_session_id ON play_history(guest_session_id);
+    CREATE INDEX IF NOT EXISTS idx_queue_entries_spotify_track_id ON queue_entries(spotify_track_id);
   `);
 }
 

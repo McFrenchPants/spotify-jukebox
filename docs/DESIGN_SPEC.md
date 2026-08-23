@@ -61,7 +61,19 @@ Underlying settings (rate limit window, explicit filter, duration bounds, active
 | `play_history` | id, spotify_track_id, track_name, artist_name, album_art_url, duration_ms, played_at, guest_session_id | Chronological log of queued/completed playback |
 | `guest_sessions` | session_id, client_ip, user_agent, created_at, last_request_at, total_requests | Rate-limit & anti-abuse state |
 | `track_stats` | spotify_track_id, play_count, last_played_at, is_blacklisted | Leaderboard + blacklist |
-| `app_settings` | key, value, updated_at | Runtime config: trust mode, cooldown, explicit filter, duration bounds, target device id, admin PIN hash |
+| `app_settings` | key, value, updated_at | Runtime config: trust mode, cooldown, explicit filter, duration bounds, target device id, admin PIN hash, blacklisted-artist name list (JSON) |
+| `queue_entries` | id, spotify_track_id, track_name, artist_name, album_art_url, duration_ms, added_by_session_id, added_at | Local mirror of the pending (not-yet-playing) queue — see §6b |
+
+**Artist blacklist storage**: `app_settings` under a single JSON-array key (list of artist names), not a dedicated table — track-level blacklist stays on `track_stats.is_blacklisted`. Chosen over a normalized artist table for shipping speed at party-jukebox scale (added during P3.4).
+
+## 6b. Local Queue Mirror & Spotify Resync
+
+Spotify's Web API has no endpoint to remove a single track from a device's live queue or to clear it — only "add to queue" and "skip to next" exist. Queue moderation (admin remove/clear) is therefore impossible against Spotify's queue directly. Resolution (decided during P3.4):
+
+- The backend keeps `queue_entries` as the authoritative pending-queue mirror. `POST /api/queue` (P2.5) appends to it after a successful Spotify add, same as it appends to Spotify's queue today.
+- As tracks naturally advance (detected by the `now-playing` poller, P1.5), the entry matching the newly-playing track is dequeued from `queue_entries` (oldest/lowest-id match) — best-effort; if Spotify's live queue ever drifts from a source no jukebox admin action caused, this can desync, which is an accepted limitation, not treated as fatal.
+- Any admin queue mutation that Spotify's API can't express directly (remove one entry, clear all) is implemented as: mutate `queue_entries` locally, then **resync** — call Spotify's `PUT /me/player/play` with `uris` = `[currently-playing track, ...remaining queue_entries in order]` and `position_ms` = the currently-playing track's live progress (re-fetched, not assumed), on the pinned `device_id`. This effectively replaces Spotify's queue wholesale with the local copy while preserving playback position of the current track.
+- This makes the local queue the source of truth end-to-end (full sync both directions), rather than feeding Spotify one track at a time — chosen specifically to avoid the app's idea of "what's next" silently diverging from Spotify's if a poll/connection hiccups mid-event.
 
 ## 6a. Real-Time Sync
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { db, runMigrations, setSetting } from "../db";
+import { addBlacklistedArtist } from "../db/artistBlacklist";
 import {
   DEFAULT_EXPLICIT_FILTER_ENABLED,
   DEFAULT_MAX_DURATION_MS,
@@ -38,6 +39,7 @@ afterEach(() => {
     const id = testTrackIds.pop()!;
     db.prepare("DELETE FROM track_stats WHERE spotify_track_id = ?").run(id);
   }
+  db.prepare("DELETE FROM app_settings WHERE key = 'blacklisted_artists'").run();
 });
 
 describe("checkExplicitFilter", () => {
@@ -118,18 +120,30 @@ describe("checkDuplicate", () => {
 describe("checkBlacklist", () => {
   it("blocks a track with is_blacklisted = 1", () => {
     trackStatsRow("bl-track-1", 1);
-    const result = checkBlacklist("bl-track-1");
+    const result = checkBlacklist("bl-track-1", "Some Artist");
     expect(result.allowed).toBe(false);
     if (!result.allowed) expect(result.reason).toBe("blacklisted");
   });
 
   it("allows a track with is_blacklisted = 0", () => {
     trackStatsRow("bl-track-2", 0);
-    expect(checkBlacklist("bl-track-2").allowed).toBe(true);
+    expect(checkBlacklist("bl-track-2", "Some Artist").allowed).toBe(true);
   });
 
   it("allows a track with no track_stats row at all", () => {
-    expect(checkBlacklist("bl-track-nonexistent").allowed).toBe(true);
+    expect(checkBlacklist("bl-track-nonexistent", "Some Artist").allowed).toBe(true);
+  });
+
+  it("blocks a track whose artist is blacklisted, case-insensitively", () => {
+    addBlacklistedArtist("Bad Artist");
+    const result = checkBlacklist("bl-track-artist-1", "bad artist");
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.reason).toBe("blacklisted");
+  });
+
+  it("allows a track whose artist is not blacklisted", () => {
+    addBlacklistedArtist("Bad Artist");
+    expect(checkBlacklist("bl-track-artist-2", "Good Artist").allowed).toBe(true);
   });
 });
 
@@ -139,7 +153,7 @@ describe("runQueueGuardrails", () => {
     // Both explicit filter AND duration bounds would fail here; explicit
     // filter runs first per the documented order, so its reason should win.
     const result = runQueueGuardrails(
-      { id: "combo-track-1", explicit: true, durationMs: 10_000 },
+      { id: "combo-track-1", explicit: true, durationMs: 10_000, artist: "Some Artist" },
       { currentlyPlayingTrackId: null, queuedTrackIds: [] }
     );
     expect(result.allowed).toBe(false);
@@ -149,9 +163,20 @@ describe("runQueueGuardrails", () => {
   it("returns allowed: true when a track passes everything", () => {
     setSetting(EXPLICIT_FILTER_ENABLED_KEY, "true");
     const result = runQueueGuardrails(
-      { id: "combo-track-2", explicit: false, durationMs: 180_000 },
+      { id: "combo-track-2", explicit: false, durationMs: 180_000, artist: "Some Artist" },
       { currentlyPlayingTrackId: "some-other-track", queuedTrackIds: ["yet-another-track"] }
     );
     expect(result).toEqual({ allowed: true });
+  });
+
+  it("rejects when the track's artist is blacklisted", () => {
+    setSetting(EXPLICIT_FILTER_ENABLED_KEY, "true");
+    addBlacklistedArtist("Blocked Artist");
+    const result = runQueueGuardrails(
+      { id: "combo-track-3", explicit: false, durationMs: 180_000, artist: "Blocked Artist" },
+      { currentlyPlayingTrackId: null, queuedTrackIds: [] }
+    );
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) expect(result.reason).toBe("blacklisted");
   });
 });

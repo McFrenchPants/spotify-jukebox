@@ -5,6 +5,8 @@ vi.mock("../events/bus", () => ({
 }));
 
 import { emitEvent } from "../events/bus";
+import { db, runMigrations } from "../db";
+import { listQueueEntries } from "../db/queueEntries";
 import {
   DEFAULT_POLL_INTERVAL_MS,
   pollNowPlaying,
@@ -61,8 +63,31 @@ const TRACK_B = {
 
 describe("pollNowPlaying", () => {
   beforeEach(() => {
+    runMigrations();
+    db.prepare("DELETE FROM queue_entries").run();
     resetNowPlayingState();
     vi.clearAllMocks();
+  });
+
+  it("dequeues the local queue mirror entry for a track that just started playing, but not on an unchanged poll", async () => {
+    db.prepare(
+      `INSERT INTO queue_entries (spotify_track_id, track_name, artist_name, duration_ms)
+       VALUES ('track-a', 'Song A', 'Artist A', 200000)`
+    ).run();
+
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    // Track change -> should dequeue.
+    await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+    expect(listQueueEntries().find((e) => e.spotifyTrackId === "track-a")).toBeUndefined();
+
+    // Re-insert and poll again with no change -> should NOT dequeue.
+    db.prepare(
+      `INSERT INTO queue_entries (spotify_track_id, track_name, artist_name, duration_ms)
+       VALUES ('track-a', 'Song A', 'Artist A', 200000)`
+    ).run();
+    await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+    expect(listQueueEntries().find((e) => e.spotifyTrackId === "track-a")).toBeDefined();
   });
 
   it("emits now-playing when the track id changes", async () => {

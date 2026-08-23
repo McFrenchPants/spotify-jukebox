@@ -69,7 +69,13 @@ describe("issueAdminToken / verifyAdminToken", () => {
   it("rejects a token with a tampered signature", () => {
     const { token } = issueAdminToken();
     const [payloadB64, sigB64] = token.split(".");
-    const flipped = sigB64.slice(0, -1) + (sigB64.at(-1) === "A" ? "B" : "A");
+    // Flip the first character rather than the last: base64url's final
+    // character of a 32-byte digest encodes some unused padding bits, so an
+    // arbitrarily chosen replacement there can occasionally decode to the
+    // exact same signature bytes (flaky false pass). The first character's
+    // bits are never padding, so any replacement is guaranteed to change
+    // the decoded bytes.
+    const flipped = (sigB64[0] === "A" ? "B" : "A") + sigB64.slice(1);
 
     expect(verifyAdminToken(`${payloadB64}.${flipped}`)).toBe(false);
   });

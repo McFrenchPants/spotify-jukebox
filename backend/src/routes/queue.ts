@@ -1,6 +1,7 @@
 import { Response, Router } from "express";
 import { getSetting } from "../db";
 import { insertPlayHistory } from "../db/playHistory";
+import { insertQueueEntry } from "../db/queueEntries";
 import { recordTrackPlay } from "../db/trackStats";
 import { emitEvent } from "../events/bus";
 import { runQueueGuardrails } from "../guardrails/queueGuardrails";
@@ -128,6 +129,14 @@ queueRouter.post("/", resolveGuestSession, rateLimitGuestSession, async (req, re
     guestSessionId: req.guestSession.sessionId,
   });
   recordTrackPlay(track.id);
+  insertQueueEntry({
+    spotifyTrackId: track.id,
+    trackName: track.name,
+    artistName: track.artist,
+    albumArtUrl: track.albumArt,
+    durationMs: track.durationMs,
+    addedBySessionId: req.guestSession.sessionId,
+  });
 
   emitEvent("queue-update", { track, queuedBy: req.guestSession.sessionId });
 

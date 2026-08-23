@@ -63,8 +63,10 @@ Spec ref: DESIGN_SPEC §3, §4.
   - Accept: PUT persists and is reflected in subsequent guardrail behavior (P2.4) without a server restart.
 - **P3.3 — Trust-mode-gated playback controls**: `POST /api/playback/{pause,resume,skip}`, `POST /api/playback/volume`, guarded by current trust mode/toggles (checked for every request, not just at session start).
   - Accept: with Restricted mode active, guest calls are rejected; with Trusted mode (or the specific toggle) active, calls succeed and hit the Spotify player API.
-- **P3.4 — Queue moderation**: admin-only `DELETE /api/admin/queue/:id`, `POST /api/admin/blacklist` (track or artist), `POST /api/admin/queue/clear`.
-  - Accept: blacklist add is immediately enforced by P2.4; clear empties the visible queue state.
+- **P3.4 — Queue moderation**: admin-only `GET /api/admin/queue` (list, needed so an admin can address entries by id), `DELETE /api/admin/queue/:id`, `POST /api/admin/blacklist` (track or artist), `POST /api/admin/queue/clear`.
+  - Since Spotify's API has no remove-single/clear-queue endpoint, this task also introduces the `queue_entries` local queue mirror and the resync-via-replace mechanism described in DESIGN_SPEC §6b — decided with the user 2026-08-23 (hybrid local+Spotify sync, full resync on any moderation action, rejected feeding Spotify one track at a time due to desync risk on disconnect). This revises P2.5's `POST /api/queue` (adds a `queue_entries` insert) and P1.5's now-playing poller (dequeues on track advance) as a side effect — both still keep their original behavior otherwise.
+  - Artist blacklist uses the `app_settings` JSON-array approach (option 2 from the P2.4-era open question), not a dedicated artist table.
+  - Accept: blacklist add is immediately enforced by P2.4; clear empties `queue_entries` and Spotify's live queue via resync; remove-by-id does the same for a single entry.
 
 ## Phase 4 — Frontend PWA
 

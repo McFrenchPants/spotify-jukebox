@@ -1,4 +1,5 @@
 import { getSetting } from "../db";
+import { isArtistBlacklisted } from "../db/artistBlacklist";
 import { isTrackBlacklisted } from "../db/trackStats";
 
 /** app_settings key for the explicit-content filter toggle. */
@@ -93,14 +94,15 @@ export function checkDuplicate(
 
 /**
  * Guardrail 4: blacklist. Rejects a track that an admin has flagged via
- * `track_stats.is_blacklisted`. Note: this is track-level only — the design
- * spec mentions banning by "track or artist", but the schema only has a
- * track-level flag (no artist-level table/column exists). See task report
- * for this gap; not addressed here.
+ * `track_stats.is_blacklisted`, or whose artist has been flagged via the
+ * `blacklisted_artists` app_settings entry (see db/artistBlacklist.ts).
  */
-export function checkBlacklist(trackId: string): GuardrailResult {
+export function checkBlacklist(trackId: string, artistName: string): GuardrailResult {
   if (isTrackBlacklisted(trackId)) {
     return { allowed: false, reason: "blacklisted", message: "This track has been blacklisted by an admin." };
+  }
+  if (isArtistBlacklisted(artistName)) {
+    return { allowed: false, reason: "blacklisted", message: "This artist has been blacklisted by an admin." };
   }
   return ALLOWED;
 }
@@ -114,7 +116,7 @@ export function checkBlacklist(trackId: string): GuardrailResult {
  *   4. blacklist
  */
 export function runQueueGuardrails(
-  track: { id: string; explicit: boolean; durationMs: number },
+  track: { id: string; explicit: boolean; durationMs: number; artist: string },
   context: { currentlyPlayingTrackId: string | null; queuedTrackIds: string[] }
 ): GuardrailResult {
   const explicitResult = checkExplicitFilter(track);
@@ -126,7 +128,7 @@ export function runQueueGuardrails(
   const duplicateResult = checkDuplicate(track.id, context.currentlyPlayingTrackId, context.queuedTrackIds);
   if (!duplicateResult.allowed) return duplicateResult;
 
-  const blacklistResult = checkBlacklist(track.id);
+  const blacklistResult = checkBlacklist(track.id, track.artist);
   if (!blacklistResult.allowed) return blacklistResult;
 
   return ALLOWED;

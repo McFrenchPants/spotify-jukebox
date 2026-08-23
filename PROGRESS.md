@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 3 in progress
+## Status: Phase 3 complete
 
-**Next task: P3.4 — Queue moderation (blocked on blacklist schema decision, see Open Questions)**
+**Next task: P4.1 — App shell & session bootstrap**
 
 ## Task Table
 
@@ -31,7 +31,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P3.1 | Admin PIN auth | done | `POST /api/admin/login`; hand-rolled HMAC token (no JWT dep), `x-admin-token` header, 3h TTL; `requireAdminAuth` middleware ready for P3.2–P3.4 to mount |
 | P3.2 | Settings CRUD | done | `GET/PUT /api/admin/settings`; introduces `active_mode` + `allow_{pause_resume,skip,volume,reorder}` tristate overrides (unset row = inherit from mode) for P3.3 to resolve |
 | P3.3 | Trust-mode-gated playback controls | done | `POST /api/playback/{pause,resume,skip,volume}`; admin token always bypasses; guest permission resolved fresh per-request via `resolveEffectivePermission()` |
-| P3.4 | Queue moderation | todo | Also emits `queue-update`/`leaderboard-update` SSE events |
+| P3.4 | Queue moderation | done | `GET/DELETE /api/admin/queue`, `POST /api/admin/queue/clear`, `POST /api/admin/blacklist`; new `queue_entries` local mirror + Spotify resync (see DESIGN_SPEC §6b) |
 | P4.1 | App shell & session bootstrap | todo | Built on P0.5 design system |
 | P4.2 | Search & queue UI | todo | Skeleton loaders, optimistic UI, toasts |
 | P4.3 | Now playing & queue view (SSE-driven) | todo | Depends on P1.5; no client polling |
@@ -55,6 +55,18 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P3.4 queue moderation (Phase 3 complete)
+- **Design decision with user**: Spotify's Web API has no "remove one queue item" or "clear queue" endpoint. Rejected feeding Spotify one track at a time (risk of the app's "next" silently diverging from Spotify's on a poll/connection hiccup). Went with a hybrid full-sync approach instead — recorded in DESIGN_SPEC.md §6b and IMPLEMENTATION_PLAN.md's P3.4 entry: a local `queue_entries` table is the authoritative pending-queue mirror, kept in sync bidirectionally; any moderation action Spotify can't express directly triggers a full **resync** (`PUT /me/player/play` with `uris` = current track + local queue in order, `position_ms` = live re-fetched progress), replacing Spotify's live queue wholesale.
+- Added `queue_entries` table (`backend/src/db/index.ts`) + `backend/src/db/queueEntries.ts` (insert/list/delete/dequeue/clear helpers).
+- `backend/src/routes/queue.ts` (P2.5) now also writes `queue_entries` on a successful add. `backend/src/spotify/nowPlaying.ts` (P1.5) dequeues the matching local entry when the poller detects a track actually started playing (change-branch only, not every tick) — keeps the mirror in sync as playback advances naturally.
+- Added `backend/src/spotify/queueSync.ts`: `resyncSpotifyQueue(deviceId)` — early-returns if there's nothing to resync (no current track, empty local queue).
+- Added to `backend/src/routes/admin.ts`, all behind `requireAdminAuth`: `GET /queue` (list, needed so an admin has ids to act on — small in-scope addition beyond the original task wording), `DELETE /queue/:id` (404 if unknown, else local delete + resync), `POST /queue/clear` (empties local mirror + resync), `POST /blacklist` (`{type: "track"|"artist", value}`).
+- **Artist blacklist resolved via the app_settings JSON-list approach** (option 2 from the P2.4-era open question, user-approved) — `backend/src/db/artistBlacklist.ts`, trimmed + case-insensitive matching. Track blacklist reuses `track_stats.is_blacklisted` via new `setTrackBlacklisted()` in `trackStats.ts`.
+- `checkBlacklist` (P2.4's `queueGuardrails.ts`) now takes `(trackId, artistName)` and checks both; `runQueueGuardrails`'s track param gained `artist: string`. Existing P2.4 tests updated for the new signature — no behavior change for the track-only path.
+- Found and fixed a genuinely flaky pre-existing test while verifying (`backend/src/auth/adminToken.test.ts`'s tampered-signature test, from P3.1): it flipped the *last* base64url character of a 32-byte HMAC digest, but that character encodes 2 unused padding bits — an unlucky replacement could decode to byte-identical signature bytes, making the "tampered" token verify as valid (~1-in-16 flake). Fixed by flipping the *first* character instead, which always maps to real signature bytes. Confirmed clean across 3 consecutive full `npm test` runs after the fix. Not a security issue (HMAC verification itself was always correct) — purely a test-construction bug.
+- 43 new tests — 191 total passing (verified independently, 3 consecutive clean runs). `npx tsc --noEmit` clean.
+- **Phase 3 (Admin & Trust Mode) is now fully done.** Next: Phase 4 (Frontend PWA), starting at P4.1 (app shell & session bootstrap) — a materially different character of work (React/frontend vs. the backend-only work of Phases 1-3), worth a check-in before diving in.
 
 ### 2026-08-23 — P3.3 trust-mode-gated playback controls
 - Added `backend/src/guardrails/playbackPermissions.ts`: `resolveEffectivePermission(capability)` (`"pause_resume"|"skip"|"volume"`) — per-capability override wins if set, else falls back to `active_mode === "trusted"`; resolved fresh on every call, never cached.

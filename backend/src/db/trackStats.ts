@@ -37,6 +37,20 @@ export function recordTrackPlay(spotifyTrackId: string): void {
   ).run(spotifyTrackId);
 }
 
+/**
+ * Sets (or clears) the is_blacklisted flag on a track_stats row, creating
+ * the row (with play_count starting at 0, unlike recordTrackPlay which
+ * starts at 1) if this track has no row yet. Unlike recordTrackPlay, this
+ * never increments play_count on conflict.
+ */
+export function setTrackBlacklisted(spotifyTrackId: string, blacklisted: boolean): void {
+  db.prepare(
+    `INSERT INTO track_stats (spotify_track_id, play_count, is_blacklisted)
+     VALUES (?, 0, ?)
+     ON CONFLICT(spotify_track_id) DO UPDATE SET is_blacklisted = excluded.is_blacklisted`
+  ).run(spotifyTrackId, blacklisted ? 1 : 0);
+}
+
 export interface LeaderboardEntry {
   spotifyTrackId: string;
   trackName: string;

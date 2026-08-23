@@ -1,3 +1,4 @@
+import { dequeueBySpotifyTrackId } from "../db/queueEntries";
 import { emitEvent } from "../events/bus";
 import { getValidAccessToken } from "./client";
 
@@ -114,6 +115,11 @@ export async function pollNowPlaying(
 
   if (hasChanged(lastState, nextState)) {
     lastState = nextState;
+    if (nextState.trackId) {
+      // Best-effort: the track that just started playing is no longer
+      // "pending," so drop it from the local queue mirror.
+      dequeueBySpotifyTrackId(nextState.trackId);
+    }
     emitEvent("now-playing", nextState);
   } else {
     lastState = nextState;
