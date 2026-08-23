@@ -3,6 +3,8 @@ import { AppShell } from './components/AppShell'
 import { SearchAndQueue } from './components/search/SearchAndQueue'
 import { NowPlaying } from './components/nowplaying/NowPlaying'
 import { QueueList } from './components/queue/QueueList'
+import { Leaderboard } from './components/leaderboard/Leaderboard'
+import { RecentlyPlayed } from './components/recent/RecentlyPlayed'
 import { useEventStream } from './hooks/useEventStream'
 
 function App() {
@@ -45,6 +47,8 @@ function App() {
         <NowPlaying subscribe={subscribe} refreshKey={refreshKey} onAlbumArtChange={setAlbumArt} />
         <QueueList subscribe={subscribe} refreshKey={refreshKey} />
         <SearchAndQueue />
+        <Leaderboard subscribe={subscribe} refreshKey={refreshKey} />
+        <RecentlyPlayed subscribe={subscribe} refreshKey={refreshKey} />
       </div>
     </AppShell>
   )

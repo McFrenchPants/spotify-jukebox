@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 complete
 
-**Next task: P4.4 — Leaderboard & recently played views**
+**Next task: P4.5 — Trust-mode-aware playback controls**
 
 ## Task Table
 
@@ -35,7 +35,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.1 | App shell & session bootstrap | done | `SessionProvider`/`useSession()`, `AppShell` layout with P4.3 background hook point, Vite dev proxy for `/api` → backend:8085 |
 | P4.2 | Search & queue UI | done | `SearchAndQueue` component; optimistic add-to-queue; distinct copy per guardrail/rate-limit; minimal single-slot toast (real host deferred to P4.7) |
 | P4.3 | Now playing & queue view (SSE-driven) | done | `useEventStream` SSE hook; `NowPlaying`/`QueueList`; wired real album art into P4.1's `AppShell` hook point; added `GET /api/now-playing`+`GET /api/queue` backend prereq |
-| P4.4 | Leaderboard & recently played views | todo | Live via SSE |
+| P4.4 | Leaderboard & recently played views | done | `Leaderboard`/`RecentlyPlayed`, both refetch on `leaderboard-update` via the shared `useEventStream`; also fixed a backend gap (queue-add wasn't emitting `leaderboard-update`) |
 | P4.5 | Trust-mode-aware playback controls | todo | |
 | P4.6 | Admin panel UI | todo | |
 | P4.7 | Micro-interactions & motion pass | todo | Polish pass across P4.1–P4.6 |
@@ -55,6 +55,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P4.4 leaderboard & recently played views
+- **Small backend fix found and made directly (not delegated — one line, low risk)**: `POST /api/queue`'s `recordTrackPlay()` changes leaderboard standing on every successful queue-add (the common case), but only `routes/admin.ts`'s blacklist action was emitting `leaderboard-update` — a leaderboard view relying solely on that event would miss normal plays entirely. Added the missing `emitEvent("leaderboard-update", { trackId })` call to `queue.ts`'s existing success path. 195 backend tests passing (extended one existing test rather than adding a new one), `tsc` clean.
+- Added `getLeaderboard(limit?)`/`getRecentlyPlayed(limit?)` to `frontend/src/lib/api.ts` and `formatRelativeTime()` to `frontend/src/lib/format.ts` (hand-rolled "Nm/Nh/Nd ago", no library).
+- Added `frontend/src/components/leaderboard/Leaderboard.tsx` (ranked #1/#2/... rows, art/name/artist/play-count) and `frontend/src/components/recent/RecentlyPlayed.tsx` (art/name/artist/relative-time) — both mirror P4.3's `QueueList.tsx` structure (skeleton/empty/error states, fetch-on-mount + refetch-on-`leaderboard-update`, sharing the single `useEventStream` instance via props rather than opening a second `EventSource`). `RecentlyPlayed` also refetches on `leaderboard-update` even though not strictly required by the acceptance criteria, since a queue-add changes both.
+- Wired both into `App.tsx` below the existing search/queue sections.
+- Verified: `npm run build`/`npm run lint` clean (known pre-existing advisory only). Live-verified against real seeded DB data (rendered correctly, zero console errors) and the **live SSE-update path specifically**: since Spotify still isn't connected in this environment (no way to trigger a real server-side event), located the running `useEventStream` hook's internal listener registry via the React fiber tree and invoked the registered `leaderboard-update` handlers directly (functionally identical to what a real SSE message dispatch does internally) — confirmed the Leaderboard section re-rendered live, in place, with no page reload.
+- **Phase 4 frontend work is now more than halfway through** (P4.1-P4.4 of 7 done). Next: P4.5 (trust-mode-aware playback controls) — first frontend task needing the admin/guest permission distinction (P3.2/P3.3's backend).
 
 ### 2026-08-23 — P4.3 now playing & queue view (SSE-driven)
 - **Backend prerequisite found and built first**: SSE (`/api/events`, P1.5) only pushes deltas on change — a freshly-loaded client had no way to get the *current* state. Added `GET /api/now-playing` (last-seen poller state, new `getNowPlayingState()` export from `spotify/nowPlaying.ts`) and `GET /api/queue` (public unauthenticated read of the `queue_entries` mirror, same data `GET /api/admin/queue` already exposes). 195 backend tests passing (4 new), `tsc` clean. Noted in IMPLEMENTATION_PLAN.md's P4.3 entry.

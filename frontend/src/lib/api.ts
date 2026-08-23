@@ -120,6 +120,60 @@ export async function getQueue(): Promise<QueueEntry[]> {
   return (await res.json()) as QueueEntry[]
 }
 
+/** One entry in the leaderboard returned by GET /api/leaderboard. */
+export interface LeaderboardEntry {
+  spotifyTrackId: string
+  trackName: string
+  artistName: string
+  albumArtUrl: string | null
+  playCount: number
+  lastPlayedAt: string | null
+}
+
+/** One entry in the play history returned by GET /api/recent. */
+export interface RecentlyPlayedEntry {
+  spotifyTrackId: string
+  trackName: string
+  artistName: string
+  albumArtUrl: string | null
+  durationMs: number
+  playedAt: string
+  guestSessionId: string | null
+}
+
+/**
+ * GET /api/leaderboard?limit= — no guest token required (open read). Sorted
+ * by play count descending (ties by most-recent play); blacklisted tracks
+ * excluded. Re-fetched on every `leaderboard-update` SSE event (P4.4).
+ */
+export async function getLeaderboard(limit?: number): Promise<LeaderboardEntry[]> {
+  const qs = limit !== undefined ? `?limit=${encodeURIComponent(limit)}` : ''
+  const res = await fetch(`/api/leaderboard${qs}`)
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load leaderboard: ${res.status}`)
+  }
+
+  return (await res.json()) as LeaderboardEntry[]
+}
+
+/**
+ * GET /api/recent?limit= — no guest token required (open read). Most-recent
+ * first, not blacklist-filtered (it's a historical log).
+ */
+export async function getRecentlyPlayed(limit?: number): Promise<RecentlyPlayedEntry[]> {
+  const qs = limit !== undefined ? `?limit=${encodeURIComponent(limit)}` : ''
+  const res = await fetch(`/api/recent${qs}`)
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load recently played: ${res.status}`)
+  }
+
+  return (await res.json()) as RecentlyPlayedEntry[]
+}
+
 /** POST /api/queue — requires the guest token from useSession(). */
 export async function queueTrack(trackId: string, guestToken: string): Promise<Track> {
   const res = await fetch('/api/queue', {
