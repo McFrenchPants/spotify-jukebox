@@ -13,6 +13,18 @@ eventsRouter.get("/", (req, res) => {
   res.setHeader("Connection", "keep-alive");
   // Disable proxy buffering (e.g. nginx) so events flush immediately.
   res.setHeader("X-Accel-Buffering", "no");
+  // Vite's dev-server proxy doesn't reliably stream this endpoint (observed
+  // hang: the proxy's own 'proxyRes' event fires promptly, but nothing ever
+  // reaches the browser — reproduced on a fresh restart with zero prior
+  // connections, so not a leaked-connection artifact; root cause not fully
+  // isolated, tried extending proxy timeouts and a hand-rolled raw-socket
+  // proxy middleware, neither fixed it). The frontend dev build connects
+  // directly to this backend origin for just this one endpoint instead of
+  // going through the Vite proxy (see frontend/src/hooks/useEventStream.ts),
+  // which needs this CORS header. Safe to leave permissive in production
+  // too: this is an unauthenticated, public, read-only stream carrying no
+  // credentials — anyone who can reach it can already read it directly.
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.flushHeaders?.();
 
   const unsubscribe = subscribe((event) => {

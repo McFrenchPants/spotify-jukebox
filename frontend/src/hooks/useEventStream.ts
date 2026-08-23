@@ -11,6 +11,22 @@ const NAMED_EVENTS = ['now-playing', 'queue-update', 'leaderboard-update'] as co
 const STALE_THRESHOLD_MS = 5000
 const STALE_CHECK_INTERVAL_MS = 1000
 
+/**
+ * Vite's dev-server proxy (server.proxy in vite.config.ts) doesn't reliably
+ * stream this endpoint — the connection hangs and EventSource never opens
+ * (reproduced on a fresh dev-server restart with zero prior connections, so
+ * not a leaked-connection artifact; root cause not fully isolated). Every
+ * other /api/* call goes through the proxy fine — only this long-lived
+ * stream is affected. Worked around by connecting straight to the backend
+ * origin in dev instead of the proxied relative path; the backend allows
+ * this via a permissive CORS header on just this route (see
+ * backend/src/routes/events.ts) since it's an unauthenticated public read
+ * with no credentials involved. Production serves frontend and backend from
+ * the same origin (per DESIGN_SPEC's deployment model), so this only
+ * matters in dev.
+ */
+const DEFAULT_EVENTS_URL = import.meta.env.DEV ? 'http://localhost:8085/api/events' : '/api/events'
+
 export interface EventStream {
   connectionState: ConnectionState
   /** True once the connection has been non-open for more than a few seconds. */
@@ -26,7 +42,7 @@ export interface EventStream {
  * connection has been away from 'open' so callers can show a manual-refresh
  * affordance if the browser's built-in backoff isn't recovering quickly.
  */
-export function useEventStream(url = '/api/events'): EventStream {
+export function useEventStream(url = DEFAULT_EVENTS_URL): EventStream {
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
   const [isStale, setIsStale] = useState(false)
   const listenersRef = useRef(new Map<string, Set<EventHandler>>())
