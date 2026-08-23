@@ -4,7 +4,7 @@
 
 ## Status: Phase 1 complete
 
-**Next task: P2.3 — Rate limiter**
+**Next task: P2.4 — Content guardrails on queue submission**
 
 ## Task Table
 
@@ -24,7 +24,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P1.5 | Real-time push (SSE) | done | `/api/events`; generic `emitEvent`/`subscribe` bus for P2.5/P2.6/P3.4 to use; now-playing poller (4s) |
 | P2.1 | SQLite schema & migrations | done | `better-sqlite3` pinned to 11.10.0 (13.x segfaults on Windows x64 in this env); tokens stored in `app_settings` k/v |
 | P2.2 | Guest session issuance | done | `POST /api/session`; `resolveGuestSession` middleware (resolve-only, never creates/blocks) for P2.3/P2.5 to build on |
-| P2.3 | Rate limiter | todo | |
+| P2.3 | Rate limiter | done | `checkRateLimit`/`recordAllowedRequest` split + `rateLimitGuestSession` middleware; P2.5 must call `recordAllowedRequest` itself after other guardrails pass |
 | P2.4 | Content guardrails | todo | |
 | P2.5 | Queue endpoint & analytics write | todo | Also emits `queue-update` SSE event (P1.5) |
 | P2.6 | Leaderboard & recently-played reads | todo | |
@@ -54,6 +54,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P2.3 rate limiter
+- Added `rate_limit_state` table (`session_id` PK, `last_allowed_at`) to `runMigrations()` in `backend/src/db/index.ts`.
+- Added `backend/src/guardrails/rateLimiter.ts`: `checkRateLimit(sessionId)` (read-only, reads window from `app_settings["rate_limit_window_ms"]`, default `600000`/10min), `recordAllowedRequest(sessionId)` (the only state-mutating call, upserts `last_allowed_at`), and `rateLimitGuestSession` Express middleware (429s with `{error, retryAfterMs}` when limited; passes through if `req.guestSession` absent; deliberately never calls `recordAllowedRequest` itself). **Load-bearing for P2.5**: the route handler must call `recordAllowedRequest` itself, after P2.4's guardrails also pass — not from this middleware — so a request rejected by a later guardrail doesn't consume the rate-limit bucket.
+- Fixed a test-isolation bug found during my own verification pass (not introduced by scope, just needed fixing): `rateLimiter.test.ts`'s "default window" test could read a stale `rate_limit_window_ms` value left in the shared real SQLite file (`data/jukebox.db`, no `:memory:` or per-run reset in this project) by an earlier override test/run. Added an explicit reset of that setting to the default in both `beforeEach` blocks in that file. Worth remembering for future guardrail tests that touch `app_settings`: always reset any setting you override, since the DB file persists across test files and across separate `npm test` invocations.
+- 8 new tests — 70 total passing (verified independently after the isolation fix). `npx tsc --noEmit` clean.
+- Next: P2.4 (content guardrails: explicit filter, duration bounds, duplicate-in-queue, blacklist) — likely lives alongside this in `backend/src/guardrails/`.
 
 ### 2026-08-23 — P2.2 guest session issuance
 - Added `backend/src/db/guestSessions.ts`: shared helpers `findGuestSession`, `touchGuestSession` (bumps `last_request_at`/`total_requests`, returns `undefined` on no match), `createGuestSession` (new row, `randomUUID()` as `session_id`) — used by both the route and the middleware so the touch-session SQL isn't duplicated.

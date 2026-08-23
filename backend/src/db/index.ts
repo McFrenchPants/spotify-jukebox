@@ -54,6 +54,11 @@ export function runMigrations(): void {
       updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
+    CREATE TABLE IF NOT EXISTS rate_limit_state (
+      session_id TEXT PRIMARY KEY,
+      last_allowed_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);
     CREATE INDEX IF NOT EXISTS idx_play_history_guest_session_id ON play_history(guest_session_id);
   `);
