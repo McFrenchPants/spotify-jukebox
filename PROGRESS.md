@@ -4,7 +4,7 @@
 
 ## Status: Phase 0 complete
 
-**Next task: P1.1 — PKCE auth flow** (blocked — user's `backend/.env` credentials were accidentally wiped by the P2.1 subagent and need to be re-entered, see Open Questions)
+**Next task: P1.2 — Token refresh worker** (P1.1's real end-to-end consent run still needs the user, once `PORT` in `.env` is fixed — see Open Questions)
 
 ## Task Table
 
@@ -17,7 +17,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P0.3 | Frontend project init | done | Vite+React+Tailwind v4 (Vite plugin, no config file) |
 | P0.4 | Env & secrets template | done | `backend/.env.example`; admin PIN defaults to placeholder `change-me` |
 | P0.5 | Design system & style guide | done | Tailwind v4 `@theme` tokens (no config.js); accent `#2fd66f`; primitives in `frontend/src/components/ui/` |
-| P1.1 | PKCE auth flow | todo | Needs a real Spotify Developer app (client ID/secret) — see Open Questions |
+| P1.1 | PKCE auth flow | done | Code complete & verified up to the redirect; real browser consent still needed once `PORT` is fixed — see Open Questions |
 | P1.2 | Token refresh worker | todo | |
 | P1.3 | Search proxy | todo | |
 | P1.4 | Device resolution | todo | |
@@ -47,12 +47,22 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 ## Open Questions / Blockers
 
-- **`backend/.env` needs real values re-entered**: user had added Spotify Client ID/Secret and a corrected `SPOTIFY_REDIRECT_URI`/`PORT` (both `http://192.168.50.179:80085/...`), but the P2.1 subagent overwrote `.env` with test values during verification and could not restore the originals (file is gitignored, no git history to recover from). Currently reset to blank placeholders matching `.env.example`. User needs to re-copy the Client ID/Secret from the Spotify dashboard and reset `SPOTIFY_REDIRECT_URI`/`PORT` to `80085`. **Process note**: subagent prompts touching `backend/.env` for verification must be told to back it up first (e.g. copy to `.env.bak`) and restore it exactly afterward, never reconstruct from memory.
-- **Admin PIN value**: not yet chosen — needed before P3.1's first real run (can default to a placeholder in `.env.example`).
+- **`backend/.env` `PORT=80085` is invalid** — TCP ports max out at 65535; the server crashes immediately (`ERR_SOCKET_BAD_PORT`) with this value. Likely a typo (maybe `8085`?). Needs fixing before the server can run normally or P1.1's real consent flow can be completed — update both `PORT` and the port in `SPOTIFY_REDIRECT_URI` to match (and update the redirect URI registered in the Spotify dashboard to match too).
+- **P1.1 real end-to-end run still needed**: code is complete and verified as far as possible without a browser (server starts, `/api/auth/login` redirects to Spotify with correct params, `/api/auth/callback` error-handles correctly). Once `PORT`/`SPOTIFY_REDIRECT_URI` are fixed, start the backend (`npm run dev` in `backend/`) and visit `http://192.168.50.179:<port>/api/auth/login` in a browser to complete the one-time Spotify consent and confirm real tokens get persisted.
+- **Admin PIN value**: now set (`8282` in `.env`) — resolved.
+- **Process note**: subagent prompts touching `backend/.env` must be told never to overwrite/reset it, and to back it up + restore byte-for-byte if they need to test with different values (a past subagent lost the user's real credentials this way once already; P1.1's subagent handled it correctly by using a shell-level env override instead).
 
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P1.1 PKCE auth flow
+- Added `backend/src/spotify/pkce.ts` (verifier/challenge/state generation via Node `crypto`) and `backend/src/routes/auth.ts` (`GET /api/auth/login`, `GET /api/auth/callback`), mounted at `/api/auth` in `app.ts`.
+- One-time admin flow: module-level `pendingAuth` holds the code_verifier/state between login and callback (deliberately no session store — not concurrent/multi-user by design). Callback validates CSRF `state`, exchanges the code for tokens via HTTP Basic auth + PKCE verifier, persists `spotify_access_token`/`spotify_refresh_token`/`spotify_token_expires_at` via the existing `setSetting` helper (P2.1).
+- Verified as far as possible without a browser: server boots, `/api/auth/login` redirects to `accounts.spotify.com/authorize` with correct client_id/scopes/redirect_uri/PKCE challenge sourced from real `.env`, `/api/auth/callback` correctly rejects missing/mismatched state. `.env` was read-only throughout (confirmed byte-identical after) — the subagent used a shell-level env override instead of editing the file, avoiding the P2.1 incident.
+- **Found but out of scope to fix**: `.env`'s `PORT=80085` is an invalid TCP port (>65535), so `npm run dev` crashes without an override. Flagged in Open Questions.
+- Real end-to-end verification (actual Spotify consent screen, confirming tokens land in `app_settings`) requires a human with a browser — see Open Questions for the exact steps once `PORT` is fixed.
+- Next: P1.2 (token refresh worker) can be built now — it just needs the persisted refresh token, which P1.1 already provides a path for, independent of whether the real consent run has happened yet.
 
 ### 2026-08-23 — P2.1 SQLite schema & migrations
 - Added `backend/src/db/index.ts`: `better-sqlite3` singleton, `runMigrations()` (idempotent `CREATE TABLE IF NOT EXISTS` for all 4 spec tables + 2 indexes on `play_history`), called from `src/index.ts` before `app.listen`. WAL mode + foreign keys pragma enabled.
