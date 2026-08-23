@@ -4,7 +4,7 @@
 
 ## Status: Phase 0 in progress
 
-**Next task: P0.4 — Env & secrets template**
+**Next task: P0.5 — Design system & style guide**
 
 ## Task Table
 
@@ -15,7 +15,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P0.1 | Repo skeleton | done | |
 | P0.2 | Backend project init | done | Express+TS, tsx dev server, port 3001 default |
 | P0.3 | Frontend project init | done | Vite+React+Tailwind v4 (Vite plugin, no config file) |
-| P0.4 | Env & secrets template | todo | |
+| P0.4 | Env & secrets template | done | `backend/.env.example`; admin PIN defaults to placeholder `change-me` |
 | P0.5 | Design system & style guide | todo | Dark, album-art-driven theme; tokens + primitives + `/style-guide` route |
 | P1.1 | PKCE auth flow | todo | Needs a real Spotify Developer app (client ID/secret) — see Open Questions |
 | P1.2 | Token refresh worker | todo | |
@@ -53,6 +53,10 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P0.4 env & secrets template
+- Added `backend/.env.example` (Spotify client ID/secret, redirect URI, admin PIN placeholder `change-me`, port, DB path). `backend/.gitignore` already ignored `.env`; added `/data/` too (SQLite file destination). Root `README.md` already referenced it from P0.1.
+- Next: P0.5 (design system/style guide) — last Phase 0 task before Phase 1 backend/auth work can start.
 
 ### 2026-08-23 — P0.2/P0.3 backend & frontend init
 - P0.2: Express/TypeScript backend skeleton (`backend/`) — `createApp()` in `src/app.ts`, entrypoint `src/index.ts`, dotenv loading, `GET /api/health` → `{status:"ok"}`, npm scripts `dev`/`build`/`start` (tsx watch / tsc / node dist). Default port 3001. Verified: build clean, dev server returns 200 on `/api/health`.
