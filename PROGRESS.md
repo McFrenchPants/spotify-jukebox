@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 complete
 
-**Next task: P4.3 — Now playing & queue view (SSE-driven)**
+**Next task: P4.4 — Leaderboard & recently played views**
 
 ## Task Table
 
@@ -34,7 +34,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P3.4 | Queue moderation | done | `GET/DELETE /api/admin/queue`, `POST /api/admin/queue/clear`, `POST /api/admin/blacklist`; new `queue_entries` local mirror + Spotify resync (see DESIGN_SPEC §6b) |
 | P4.1 | App shell & session bootstrap | done | `SessionProvider`/`useSession()`, `AppShell` layout with P4.3 background hook point, Vite dev proxy for `/api` → backend:8085 |
 | P4.2 | Search & queue UI | done | `SearchAndQueue` component; optimistic add-to-queue; distinct copy per guardrail/rate-limit; minimal single-slot toast (real host deferred to P4.7) |
-| P4.3 | Now playing & queue view (SSE-driven) | todo | Depends on P1.5; no client polling |
+| P4.3 | Now playing & queue view (SSE-driven) | done | `useEventStream` SSE hook; `NowPlaying`/`QueueList`; wired real album art into P4.1's `AppShell` hook point; added `GET /api/now-playing`+`GET /api/queue` backend prereq |
 | P4.4 | Leaderboard & recently played views | todo | Live via SSE |
 | P4.5 | Trust-mode-aware playback controls | todo | |
 | P4.6 | Admin panel UI | todo | |
@@ -55,6 +55,15 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P4.3 now playing & queue view (SSE-driven)
+- **Backend prerequisite found and built first**: SSE (`/api/events`, P1.5) only pushes deltas on change — a freshly-loaded client had no way to get the *current* state. Added `GET /api/now-playing` (last-seen poller state, new `getNowPlayingState()` export from `spotify/nowPlaying.ts`) and `GET /api/queue` (public unauthenticated read of the `queue_entries` mirror, same data `GET /api/admin/queue` already exposes). 195 backend tests passing (4 new), `tsc` clean. Noted in IMPLEMENTATION_PLAN.md's P4.3 entry.
+- Added `frontend/src/hooks/useEventStream.ts`: single shared `EventSource('/api/events')` wrapper, `subscribe(eventName, handler)`, tracks `connectionState` and an `isStale` flag (non-open for >5s) — relies on `EventSource`'s native auto-reconnect rather than hand-rolled reconnect logic.
+- Added `frontend/src/components/nowplaying/NowPlaying.tsx` (initial fetch + live SSE updates, crossfade on track change, local 1s progress-tick resynced to each fresh snapshot) and `frontend/src/components/queue/QueueList.tsx` (initial fetch + refetch-on-`queue-update`, deliberately not interpreting the event's delta payload shape since it varies by call site).
+- Extended `frontend/src/components/AppShell.tsx` with an `albumArtUrl` prop — finally wires P4.1's explicit hook-point comment to real data: a blurred/darkened background layer crossfades in above the always-present gradient base.
+- `App.tsx` now owns the single `useEventStream()` instance (passed down to both new components), lifts `albumArt` up to `AppShell`, and renders a small non-blocking "Live updates paused — tap to refresh" banner when `isStale` is true (manual one-shot re-fetch, not a new polling loop).
+- Verified: `npm run build`/`npm run lint` clean (only the known pre-existing advisory). Live-verified against the real backend: initial fetches + SSE connection opening, empty states (Spotify still not connected in this environment, so "nothing playing"/"nothing queued" are the expected real states). **Not live-verified** (code-reviewed only): an actual pushed `now-playing`/`queue-update` event triggering the crossfade/refetch (blocked by Spotify not being connected — queue-add/admin routes 503 before reaching `emitEvent`), and the tab-backgrounding/resume reconnect path (no real OS-level backgrounding available in this tool environment).
+- Next: P4.4 (leaderboard & recently played) — first task to reuse the `leaderboard-update` SSE event `useEventStream` already forwards but P4.3 doesn't consume.
 
 ### 2026-08-23 — P4.2 search & queue UI
 - Added `frontend/src/lib/api.ts`: `searchTracks()`/`queueTrack()` typed fetch helpers, shared `Track` interface, `ApiError` (carries `status`/`code`/`message` plus `retryAfterMs` for 429 and `reason` for 422) so callers can branch on failure type.

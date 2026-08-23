@@ -53,6 +53,29 @@ async function parseErrorBody(res: Response): Promise<{ error?: string; message?
   }
 }
 
+/** Shape shared by GET /api/now-playing and the `now-playing` SSE event payload. */
+export interface NowPlayingState {
+  isPlaying: boolean
+  trackId: string | null
+  name?: string
+  artist?: string
+  albumArt?: string | null
+  durationMs?: number
+  progressMs?: number
+}
+
+/** One entry in the pending-queue mirror returned by GET /api/queue. */
+export interface QueueEntry {
+  id: number
+  spotifyTrackId: string
+  trackName: string
+  artistName: string
+  albumArtUrl: string | null
+  durationMs: number
+  addedBySessionId: string | null
+  addedAt: string
+}
+
 /** GET /api/search?q= — no guest token required (open read). */
 export async function searchTracks(query: string): Promise<Track[]> {
   const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
@@ -63,6 +86,38 @@ export async function searchTracks(query: string): Promise<Track[]> {
   }
 
   return (await res.json()) as Track[]
+}
+
+/**
+ * GET /api/now-playing — no guest token required (open read). Snapshot of
+ * the current playback state; used for the initial paint before the first
+ * `now-playing` SSE event arrives (P4.3).
+ */
+export async function getNowPlaying(): Promise<NowPlayingState> {
+  const res = await fetch('/api/now-playing')
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load now playing: ${res.status}`)
+  }
+
+  return (await res.json()) as NowPlayingState
+}
+
+/**
+ * GET /api/queue — no guest token required (open read). Authoritative
+ * pending-queue list, oldest/next-up first; re-fetched on every
+ * `queue-update` SSE event rather than reconstructed from deltas (P4.3).
+ */
+export async function getQueue(): Promise<QueueEntry[]> {
+  const res = await fetch('/api/queue')
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load queue: ${res.status}`)
+  }
+
+  return (await res.json()) as QueueEntry[]
 }
 
 /** POST /api/queue — requires the guest token from useSession(). */
