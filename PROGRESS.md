@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Not started — spec & plan finalized, no code written yet
+## Status: Phase 0 in progress
 
-**Next task: P0.1 — Repo skeleton**
+**Next task: P0.4 — Env & secrets template**
 
 ## Task Table
 
@@ -12,9 +12,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| P0.1 | Repo skeleton | todo | |
-| P0.2 | Backend project init | todo | |
-| P0.3 | Frontend project init | todo | |
+| P0.1 | Repo skeleton | done | |
+| P0.2 | Backend project init | done | Express+TS, tsx dev server, port 3001 default |
+| P0.3 | Frontend project init | done | Vite+React+Tailwind v4 (Vite plugin, no config file) |
 | P0.4 | Env & secrets template | todo | |
 | P0.5 | Design system & style guide | todo | Dark, album-art-driven theme; tokens + primitives + `/style-guide` route |
 | P1.1 | PKCE auth flow | todo | Needs a real Spotify Developer app (client ID/secret) — see Open Questions |
@@ -53,6 +53,16 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P0.2/P0.3 backend & frontend init
+- P0.2: Express/TypeScript backend skeleton (`backend/`) — `createApp()` in `src/app.ts`, entrypoint `src/index.ts`, dotenv loading, `GET /api/health` → `{status:"ok"}`, npm scripts `dev`/`build`/`start` (tsx watch / tsc / node dist). Default port 3001. Verified: build clean, dev server returns 200 on `/api/health`.
+- P0.3: Vite+React+TS frontend skeleton (`frontend/`) via `npm create vite@latest`, Tailwind CSS v4 wired through `@tailwindcss/vite` (no separate `tailwind.config.js` — v4 style), placeholder page, PWA `public/manifest.json` stub linked from `index.html`. Verified: `npm run build` succeeds, dev server serves HTML + manifest.
+- Note for later phases: Tailwind v4 has no `tailwind.config.js`; theme tokens for P0.5 (design system) go via CSS `@theme` directive in `src/index.css` instead of a JS config file.
+- Next: P0.4 (env/secrets template), then P0.5 (design system) before Phase 4 frontend work.
+
+### 2026-08-23 — P0.1 repo skeleton
+- Added root `.gitignore`, `.editorconfig`, `README.md` (run-instructions stub) and created `backend/`/`frontend/` dirs. Committed (`46b717c`).
+- Next: P0.2 (backend init) and P0.3 (frontend init) in parallel.
 
 ### 2026-08-23 — Design/UX & real-time revision
 - User feedback: plan was engineering-only, missing visual design, kiosk vs. mobile layout consideration, micro-interaction/polish detail, and relied on sluggish 5s client polling.
