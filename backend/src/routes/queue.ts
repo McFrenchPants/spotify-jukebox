@@ -143,6 +143,11 @@ queueRouter.post("/", resolveGuestSession, rateLimitGuestSession, async (req, re
   });
 
   emitEvent("queue-update", { track, queuedBy: req.guestSession.sessionId });
+  // recordTrackPlay() above changes leaderboard standing (play_count) for
+  // every successful queue-add, not just admin blacklist actions (the only
+  // other current emitter of this event, in routes/admin.ts) — a leaderboard
+  // view relying solely on this event to stay live needs it here too.
+  emitEvent("leaderboard-update", { trackId: track.id });
 
   res.status(201).json(track);
 });

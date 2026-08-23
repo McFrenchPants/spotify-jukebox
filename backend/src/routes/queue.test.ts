@@ -195,6 +195,7 @@ describe("POST /api/queue", () => {
       "queue-update",
       expect.objectContaining({ track: TRACK_1, queuedBy: sessionId })
     );
+    expect(emitEvent).toHaveBeenCalledWith("leaderboard-update", { trackId: "track-1" });
   });
 
   it("accumulates play_count across two different tracks queued by two different sessions", async () => {
