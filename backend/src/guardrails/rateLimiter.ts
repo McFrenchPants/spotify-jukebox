@@ -45,7 +45,11 @@ export function checkRateLimit(sessionId: string): RateLimitResult {
   }
 
   const lastAllowedAt = new Date(row.last_allowed_at).getTime();
-  const elapsed = Date.now() - lastAllowedAt;
+  // Clamp to >= 0: SQLite's stored timestamp string can round up by a
+  // fraction of a millisecond relative to Date.now(), which would otherwise
+  // occasionally produce a negative "elapsed" (and thus a retryAfterMs
+  // slightly over windowMs) on a check made immediately after recording.
+  const elapsed = Math.max(0, Date.now() - lastAllowedAt);
 
   if (elapsed >= windowMs) {
     return { allowed: true };
