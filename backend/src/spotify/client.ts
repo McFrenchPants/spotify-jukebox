@@ -1,0 +1,117 @@
+import { getSetting } from "../db";
+import { refreshAccessToken } from "./tokenRefresh";
+
+const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
+
+/** Refresh proactively if the token expires within this many ms. */
+const EXPIRY_SAFETY_MARGIN_MS = 60 * 1000;
+
+export interface ShapedTrack {
+  id: string;
+  name: string;
+  artist: string;
+  albumArt: string | null;
+  durationMs: number;
+  explicit: boolean;
+}
+
+interface SpotifySearchResponse {
+  tracks?: {
+    items?: Array<{
+      id: string;
+      name: string;
+      artists: Array<{ name: string }>;
+      album: { images: Array<{ url: string }> };
+      duration_ms: number;
+      explicit: boolean;
+    }>;
+  };
+}
+
+/**
+ * Returns a valid Spotify access token, refreshing it first if it's missing
+ * or about to expire. Always re-reads the token from app_settings after a
+ * refresh rather than relying on any in-memory state.
+ *
+ * Throws (propagating refreshAccessToken's error) if there's no refresh
+ * token stored yet — i.e. the one-time PKCE consent flow hasn't been
+ * completed. Callers should let that propagate as a clear error to the
+ * caller rather than crashing the process.
+ */
+export async function getValidAccessToken(
+  refreshFn: () => Promise<void> = refreshAccessToken
+): Promise<string> {
+  const accessToken = getSetting("spotify_access_token");
+  const expiresAt = Number(getSetting("spotify_token_expires_at") ?? 0);
+
+  const needsRefresh = !accessToken || Date.now() >= expiresAt - EXPIRY_SAFETY_MARGIN_MS;
+
+  if (needsRefresh) {
+    await refreshFn();
+  }
+
+  const freshToken = getSetting("spotify_access_token");
+  if (!freshToken) {
+    throw new Error("Failed to obtain a Spotify access token after refresh.");
+  }
+
+  return freshToken;
+}
+
+/**
+ * Searches Spotify for tracks matching `query` and shapes the results into
+ * a simplified array of { id, name, artist, albumArt, durationMs, explicit }.
+ *
+ * This is a raw, unfiltered proxy — explicit-content and blacklist filtering
+ * are out of scope here (see P2.4). Does not drop any tracks.
+ *
+ * `fetchFn` and `getTokenFn` are injectable for testing.
+ */
+export async function searchTracks(
+  query: string,
+  limit = 20,
+  fetchFn: typeof fetch = fetch,
+  getTokenFn: () => Promise<string> = getValidAccessToken
+): Promise<ShapedTrack[]> {
+  const accessToken = await getTokenFn();
+
+  const params = new URLSearchParams({
+    q: query,
+    type: "track",
+    limit: String(limit),
+  });
+
+  const response = await fetchFn(`${SPOTIFY_API_BASE}/search?${params.toString()}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    let message = `${response.status}`;
+    try {
+      const errBody = (await response.json()) as {
+        error?: { message?: string };
+      };
+      if (errBody.error?.message) {
+        message = `${response.status} ${errBody.error.message}`;
+      }
+    } catch {
+      // Ignore JSON parse failures on the error body; fall back to status.
+    }
+    throw new Error(`Spotify search failed: ${message}`);
+  }
+
+  const data = (await response.json()) as SpotifySearchResponse;
+  const items = data.tracks?.items ?? [];
+
+  return items.map((track) => ({
+    id: track.id,
+    name: track.name,
+    artist: track.artists.map((a) => a.name).join(", "),
+    // Spotify returns album images sorted largest-first; use the first one.
+    albumArt: track.album.images[0]?.url ?? null,
+    durationMs: track.duration_ms,
+    explicit: track.explicit,
+  }));
+}

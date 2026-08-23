@@ -4,7 +4,7 @@
 
 ## Status: Phase 0 complete
 
-**Next task: P1.3 — Search proxy**
+**Next task: P1.4 — Device resolution**
 
 ## Task Table
 
@@ -19,7 +19,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P0.5 | Design system & style guide | done | Tailwind v4 `@theme` tokens (no config.js); accent `#2fd66f`; primitives in `frontend/src/components/ui/` |
 | P1.1 | PKCE auth flow | done | Code complete & verified up to the redirect; real browser consent still needed once `PORT` is fixed — see Open Questions |
 | P1.2 | Token refresh worker | done | vitest added; 6 unit tests pass; real refresh still needs P1.1's consent to complete first |
-| P1.3 | Search proxy | todo | |
+| P1.3 | Search proxy | done | `GET /api/search?q=`; unfiltered raw proxy (P2.4 does filtering); 20 tests pass |
 | P1.4 | Device resolution | todo | |
 | P1.5 | Real-time push (SSE) | todo | `/api/events`; replaces client-side polling |
 | P2.1 | SQLite schema & migrations | done | `better-sqlite3` pinned to 11.10.0 (13.x segfaults on Windows x64 in this env); tokens stored in `app_settings` k/v |
@@ -54,6 +54,12 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P1.3 search proxy
+- Added `backend/src/spotify/client.ts`: `getValidAccessToken()` (reads access token/expiry from `app_settings`, refreshes via `refreshAccessToken()` if missing or expiring within 60s) and `searchTracks(query, limit, fetchFn?, getTokenFn?)` (calls Spotify `/v1/search?type=track`, shapes to `{id, name, artist, albumArt, durationMs, explicit}` — artists joined with ", ", largest album image used, no filtering applied). Both take injectable deps for testing.
+- Added `backend/src/routes/search.ts`: `GET /api/search?q=` — 400 on missing/empty `q`, 503 "Spotify not connected yet" if no refresh token stored, 502 on other Spotify errors, 200 with shaped array otherwise. Mounted at `/api/search` in `app.ts`.
+- 14 new tests (`client.test.ts` + `search.test.ts`, on top of P1.2's 6) — 20 total passing; explicitly asserts explicit-flagged tracks are NOT filtered (that's P2.4's job). `npx tsc --noEmit` clean. Verified independently.
+- Next: P1.4 (device resolution) — same token-acquisition pattern (`getValidAccessToken`) will likely be reused for `/v1/me/player/devices` calls.
 
 ### 2026-08-23 — P1.2 token refresh worker; .env PORT fixed
 - Added `backend/src/spotify/tokenRefresh.ts`: `refreshAccessToken()` (reads `spotify_refresh_token` fresh from `app_settings` every call — safe across restarts — exchanges it via Spotify's token endpoint, persists new access token/expiry, only overwrites the stored refresh token if Spotify rotated it), `startTokenRefreshWorker(intervalMs?, refreshFn?)` (default 50 min, catches/logs per-attempt errors so one failure doesn't kill the process, `.unref()`'d), `stopTokenRefreshWorker()`. Wired into `src/index.ts` after `runMigrations()`.

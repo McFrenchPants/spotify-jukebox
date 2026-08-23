@@ -1,5 +1,6 @@
 import express, { Express } from "express";
 import { authRouter } from "./routes/auth";
+import { searchRouter } from "./routes/search";
 
 export function createApp(): Express {
   const app = express();
@@ -11,6 +12,7 @@ export function createApp(): Express {
   });
 
   app.use("/api/auth", authRouter);
+  app.use("/api/search", searchRouter);
 
   return app;
 }
