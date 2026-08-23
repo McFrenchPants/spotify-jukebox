@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Skeleton } from '../ui/Skeleton'
-import { Toast } from '../ui/Toast'
 import {
   ApiError,
   clearAdminQueue,
@@ -13,7 +12,7 @@ import {
   type QueueEntry,
 } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
-import { useSimpleToast } from '../../hooks/useSimpleToast'
+import { useToast } from '../../context/ToastContext'
 
 export interface QueueModerationProps {
   token: string
@@ -64,7 +63,7 @@ export function QueueModeration({ token }: QueueModerationProps) {
   const [blacklistType, setBlacklistType] = useState<BlacklistType>('artist')
   const [blacklistValue, setBlacklistValue] = useState('')
   const [submittingBlacklist, setSubmittingBlacklist] = useState(false)
-  const { toast, showToast, dismiss } = useSimpleToast()
+  const { showToast } = useToast()
 
   const load = useCallback(() => {
     getAdminQueue(token)
@@ -176,7 +175,7 @@ export function QueueModeration({ token }: QueueModerationProps) {
           <select
             value={blacklistType}
             onChange={(e) => setBlacklistType(e.target.value as BlacklistType)}
-            className="h-10 shrink-0 rounded-md border border-border bg-surface-raised px-2 text-body text-text-primary outline-none focus-visible:border-accent"
+            className="h-11 shrink-0 rounded-md border border-border bg-surface-raised px-2 text-body text-text-primary outline-none focus-visible:border-accent"
           >
             <option value="artist">Artist</option>
             <option value="track">Track</option>
@@ -186,19 +185,13 @@ export function QueueModeration({ token }: QueueModerationProps) {
             value={blacklistValue}
             onChange={(e) => setBlacklistValue(e.target.value)}
             placeholder={blacklistType === 'artist' ? 'Artist name' : 'Spotify track id'}
-            className="h-10 min-w-0 flex-1 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+            className="h-11 min-w-0 flex-1 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
           />
         </div>
         <Button type="submit" variant="secondary" disabled={blacklistValue.trim() === '' || submittingBlacklist}>
           {submittingBlacklist ? 'Blacklisting…' : 'Blacklist'}
         </Button>
       </form>
-
-      {toast && (
-        <div className="fixed inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
-          <Toast variant={toast.variant} title={toast.title} description={toast.description} onDismiss={dismiss} />
-        </div>
-      )}
     </Card>
   )
 }

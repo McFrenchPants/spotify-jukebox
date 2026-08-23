@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
 
 export interface AppShellProps {
   children: ReactNode
@@ -36,6 +37,14 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
   // NowPlaying for the foreground content, so both layers animate in sync.
   const [displayedArt, setDisplayedArt] = useState<string | null>(null)
   const [artVisible, setArtVisible] = useState(false)
+  const prefersReducedMotion = usePrefersReducedMotion()
+  // The CSS opacity transition already collapses to ~0ms under
+  // prefers-reduced-motion (index.css's global media query), but the JS
+  // timer that decides *when* to swap the underlying content does not
+  // shorten on its own — without this, a reduced-motion user would still
+  // sit through a fixed 320ms hold before the new art appears, even though
+  // the fade itself is now instant.
+  const swapDelayMs = prefersReducedMotion ? 0 : CROSSFADE_MS
 
   useEffect(() => {
     const nextArt = albumArtUrl ?? null
@@ -43,7 +52,7 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
 
     if (!nextArt) {
       setArtVisible(false)
-      const timer = setTimeout(() => setDisplayedArt(null), CROSSFADE_MS)
+      const timer = setTimeout(() => setDisplayedArt(null), swapDelayMs)
       return () => clearTimeout(timer)
     }
 
@@ -62,10 +71,10 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
     const timer = setTimeout(() => {
       setDisplayedArt(nextArt)
       requestAnimationFrame(() => setArtVisible(true))
-    }, CROSSFADE_MS)
+    }, swapDelayMs)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [albumArtUrl])
+  }, [albumArtUrl, swapDelayMs])
 
   return (
     <div className="relative min-h-screen bg-bg text-text-primary">

@@ -9,25 +9,28 @@ import { HistoryPage } from './pages/HistoryPage.tsx'
 import { SettingsPage } from './pages/SettingsPage.tsx'
 import StyleGuide from './pages/StyleGuide.tsx'
 import { SessionProvider } from './context/SessionContext.tsx'
+import { ToastProvider } from './context/ToastContext.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route
-          element={
-            <SessionProvider>
-              <RootLayout />
-            </SessionProvider>
-          }
-        >
-          <Route path="/" element={<NowPlayingPage />} />
-          <Route path="/search" element={<SearchPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-        </Route>
-        <Route path="/style-guide" element={<StyleGuide />} />
-      </Routes>
-    </BrowserRouter>
+    <ToastProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route
+            element={
+              <SessionProvider>
+                <RootLayout />
+              </SessionProvider>
+            }
+          >
+            <Route path="/" element={<NowPlayingPage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/history" element={<HistoryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+          </Route>
+          <Route path="/style-guide" element={<StyleGuide />} />
+        </Routes>
+      </BrowserRouter>
+    </ToastProvider>
   </StrictMode>,
 )

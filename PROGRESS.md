@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 3 complete
+## Status: Phase 4 complete
 
-**Next task: P4.7 — Micro-interactions & motion pass** (last Phase 4 task)
+**Next task: Phase 5 — Deployment & Resilience, starting at P5.1 (bridge phone setup runbook)**
 
 ## Task Table
 
@@ -38,7 +38,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.4 | Leaderboard & recently played views | done | `Leaderboard`/`RecentlyPlayed`, both refetch on `leaderboard-update` via the shared `useEventStream`; also fixed a backend gap (queue-add wasn't emitting `leaderboard-update`) |
 | P4.5 | Trust-mode-aware playback controls | done | `PlaybackControls`; shown-but-disabled in Restricted mode; no live SSE push for trust-mode changes yet (known gap, fetched once on mount) |
 | P4.6 | Admin panel UI | done | PIN login (`AdminAuthContext`), settings form, queue moderation, device selector, QR/guest-link card; fills in P4.8's Settings tab placeholder |
-| P4.7 | Micro-interactions & motion pass | todo | Polish pass across P4.1–P4.6/P4.8 |
+| P4.7 | Micro-interactions & motion pass | done | Shared `ToastContext` (stacking, replaces 5 separate `useSimpleToast` instances); `usePrefersReducedMotion` fixes JS-timed crossfade delays; `Button` md size bumped to 44px, several form controls bumped to match |
 | P4.8 | Navigation restructure to 4-tab IA | done | Bottom nav via `RootLayout`/`Outlet` context; icon transport controls incl. previous-track; `ArtistInfoPanel`; renamed to "French's Jukebox". Settings tab is a placeholder pending P4.6 |
 | P5.1 | Bridge phone setup runbook | todo | |
 | P5.2 | Dockerfile & Compose | todo | |
@@ -56,6 +56,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P4.7 micro-interactions & motion pass (Phase 4 complete)
+- **Fixed the known toast-stacking gap** (flagged since P4.2's `useSimpleToast` doc comment): that hook was instantiated separately in 5 components (`SearchAndQueue`, `PlaybackControls`, `SettingsForm`, `QueueModeration`, `DeviceSelector`), each rendering its own toast at the same fixed screen position — two firing near-simultaneously would overlap unreadably. Replaced with `frontend/src/context/ToastContext.tsx`: a single `ToastProvider` (wraps the whole app in `main.tsx`) holding an array of active toasts, each with its own independent auto-dismiss timer; the stack renders once at the root, newest toast at the bottom. All 5 call sites migrated; `useSimpleToast.ts` deleted. Live-verified: firing two admin actions ~100ms apart produced two visibly stacked, non-overlapping toasts (confirmed via `getBoundingClientRect()`).
+- Added `frontend/src/hooks/usePrefersReducedMotion.ts` (matchMedia + live `change` listener) and used it in `AppShell.tsx`/`NowPlaying.tsx` to fix a real gap: their crossfade content-swap used a JS `setTimeout(fn, 320ms)` that didn't shorten under reduced-motion even though the CSS opacity fade itself did — reduced-motion users still waited a fixed 320ms before content updated. Now uses a near-zero delay when `usePrefersReducedMotion()` is true.
+- Touch-target audit: `Button.tsx`'s default `size="md"` bumped `h-10`→`h-11` (40px→44px, the standard mobile minimum) — a token-level fix that raised every default-size button app-wide at once. Also bumped `Toast`'s dismiss button (added an explicit 44×44 hit box), the volume range input, and several admin form inputs/selects that were still `h-10`. Left already-correct sizes alone (icon playback buttons, bottom nav, PIN entry, device-row buttons).
+- Motion-token audit: no ad hoc timing violations found beyond the two already-correct, already-documented `CROSSFADE_MS` constants; all other transitions already used the established `.transition-fast/base/slow` tokens.
+- Verified: `npm run build`/`npm run lint` clean (3 expected `only-export-components` advisories total — 2 pre-existing plus one new on `ToastContext.tsx`, same established co-exported-hook-and-provider pattern). Live: manual pass through every screen clean, toast-stacking demo confirmed, touch-target minimum confirmed (44px) via direct DOM measurement. Reduced-motion timing fix verified correct by code review only — this sandbox's browser tooling has no way to emulate `prefers-reduced-motion` for an already-mounted page's live `matchMedia` listener, a tooling gap not a code gap.
+- **Phase 4 (Frontend PWA) is now fully done — all 8 tasks (P4.1–P4.8) complete.** Next: Phase 5 (Deployment & Resilience) — bridge phone setup runbook, Dockerfile/Compose, LAN discovery, resilience pass, and the end-to-end smoke test (which needs real hardware + user sign-off, a natural stopping point for autonomous work).
 
 ### 2026-08-23 — P4.6 admin panel UI
 - **Small backend fix found and made directly**: `POST /api/device/select` (P1.4) was a mutating admin action with no auth gate — predates P3.1's admin auth. Added `requireAdminAuth`; `GET /api/device` stays public (read-only). Updated `device.test.ts` (needed real `getSetting`/token-secret persistence instead of a full `../db` mock, plus a missing `runMigrations()` call this file never previously needed). 213 backend tests passing (1 new: 401 without a token), `tsc` clean.

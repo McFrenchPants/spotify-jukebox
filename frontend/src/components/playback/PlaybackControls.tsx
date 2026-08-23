@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Card } from '../ui/Card'
-import { Toast } from '../ui/Toast'
 import { Button } from '../ui/Button'
 import {
   ApiError,
@@ -12,7 +11,7 @@ import {
   setVolume,
   type TrustModeState,
 } from '../../lib/api'
-import { useSimpleToast } from '../../hooks/useSimpleToast'
+import { useToast } from '../../context/ToastContext'
 
 const VOLUME_DEBOUNCE_MS = 300
 
@@ -104,7 +103,7 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
     volume: false,
   })
   const [volumeValue, setVolumeValue] = useState(50)
-  const { toast, showToast, dismiss } = useSimpleToast()
+  const { showToast } = useToast()
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
@@ -206,7 +205,7 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
           value={volumeValue}
           disabled={!volumeAllowed || pending.volume}
           onChange={(e) => handleVolumeChange(Number(e.target.value))}
-          className="h-2 w-full accent-accent disabled:opacity-40"
+          className="h-11 w-full accent-accent disabled:opacity-40"
         />
       </label>
 
@@ -217,12 +216,6 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
         <p className="text-caption text-text-muted">
           Playback controls are restricted right now — ask the host to enable them.
         </p>
-      )}
-
-      {toast && (
-        <div className="fixed inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
-          <Toast variant={toast.variant} title={toast.title} description={toast.description} onDismiss={dismiss} />
-        </div>
       )}
     </Card>
   )

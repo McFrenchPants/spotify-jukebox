@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { Card } from '../ui/Card'
 import { Skeleton } from '../ui/Skeleton'
-import { Toast } from '../ui/Toast'
 import { TrackRow, type QueueRowStatus } from './TrackRow'
 import { ApiError, queueTrack, searchTracks, type Track } from '../../lib/api'
 import { useDebouncedValue } from '../../hooks/useDebouncedValue'
-import { useSimpleToast } from '../../hooks/useSimpleToast'
+import { useToast } from '../../context/ToastContext'
 import { useSession } from '../../context/SessionContext'
 
 const DEBOUNCE_MS = 380
@@ -82,7 +81,7 @@ export function SearchAndQueue() {
   // synchronously inside the effect that kicks off the fetch.
   const [outcome, setOutcome] = useState<SearchOutcome | null>(null)
   const [rowStatus, setRowStatus] = useState<Record<string, QueueRowStatus>>({})
-  const { toast, showToast, dismiss } = useSimpleToast()
+  const { showToast } = useToast()
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -190,12 +189,6 @@ export function SearchAndQueue() {
             ))}
           </div>
         )}
-
-      {toast && (
-        <div className="fixed inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
-          <Toast variant={toast.variant} title={toast.title} description={toast.description} onDismiss={dismiss} />
-        </div>
-      )}
     </div>
   )
 }

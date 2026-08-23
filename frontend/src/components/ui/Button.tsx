@@ -16,7 +16,10 @@ const base =
   'focus-visible:outline-accent'
 
 const sizes: Record<ButtonSize, string> = {
-  md: 'h-10 px-4 text-body',
+  // 44px minimum comfortable touch target (iOS HIG / Material baseline) —
+  // this app is touch-only, so `md` (the default, used everywhere from
+  // "Add to queue" rows to admin actions) must clear it, not just `lg`.
+  md: 'h-11 px-4 text-body',
   lg: 'h-12 px-6 text-title',
 }
 

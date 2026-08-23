@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card } from '../ui/Card'
 import { Skeleton } from '../ui/Skeleton'
-import { Toast } from '../ui/Toast'
 import { ApiError, getDevice, selectDevice, type Device } from '../../lib/api'
-import { useSimpleToast } from '../../hooks/useSimpleToast'
+import { useToast } from '../../context/ToastContext'
 
 export interface DeviceSelectorProps {
   token: string
@@ -20,7 +19,7 @@ export function DeviceSelector({ token }: DeviceSelectorProps) {
   const [devices, setDevices] = useState<Device[]>([])
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectingId, setSelectingId] = useState<string | null>(null)
-  const { toast, showToast, dismiss } = useSimpleToast()
+  const { showToast } = useToast()
 
   const load = useCallback(() => {
     getDevice()
@@ -112,12 +111,6 @@ export function DeviceSelector({ token }: DeviceSelectorProps) {
             </div>
           )}
         </>
-      )}
-
-      {toast && (
-        <div className="fixed inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
-          <Toast variant={toast.variant} title={toast.title} description={toast.description} onDismiss={dismiss} />
-        </div>
       )}
     </Card>
   )

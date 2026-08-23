@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
 import { Skeleton } from '../ui/Skeleton'
-import { Toast } from '../ui/Toast'
 import {
   AdminSettingsValidationError,
   ApiError,
@@ -10,7 +9,7 @@ import {
   updateAdminSettings,
   type AdminSettings,
 } from '../../lib/api'
-import { useSimpleToast } from '../../hooks/useSimpleToast'
+import { useToast } from '../../context/ToastContext'
 
 export interface SettingsFormProps {
   token: string
@@ -52,7 +51,7 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [validationErrors, setValidationErrors] = useState<string[] | null>(null)
   const [saving, setSaving] = useState(false)
-  const { toast, showToast, dismiss } = useSimpleToast()
+  const { showToast } = useToast()
 
   useEffect(() => {
     let cancelled = false
@@ -130,7 +129,7 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
           onChange={(e) =>
             setForm({ ...form, activeMode: e.target.value as AdminSettings['activeMode'] })
           }
-          className="h-10 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+          className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
         >
           <option value="restricted">Restricted</option>
           <option value="trusted">Trusted</option>
@@ -157,7 +156,7 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
           onChange={(e) =>
             setForm({ ...form, rateLimitWindowMs: Math.round(Number(e.target.value) * MS_PER_MINUTE) })
           }
-          className="h-10 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+          className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
         />
       </label>
 
@@ -172,7 +171,7 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
             onChange={(e) =>
               setForm({ ...form, minDurationMs: Math.round(Number(e.target.value) * MS_PER_SECOND) })
             }
-            className="h-10 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+            className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
           />
         </label>
         <label className="flex flex-col gap-1">
@@ -185,7 +184,7 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
             onChange={(e) =>
               setForm({ ...form, maxDurationMs: Math.round(Number(e.target.value) * MS_PER_SECOND) })
             }
-            className="h-10 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+            className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
           />
         </label>
       </div>
@@ -203,7 +202,7 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
                 const v = e.target.value
                 setOverride(key, v === 'inherit' ? null : v === 'allow')
               }}
-              className="h-10 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+              className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
             >
               <option value="inherit">Inherit from mode</option>
               <option value="allow">Always allow</option>
@@ -226,12 +225,6 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
       <Button onClick={() => void handleSubmit()} disabled={saving}>
         {saving ? 'Saving…' : 'Save settings'}
       </Button>
-
-      {toast && (
-        <div className="fixed inset-x-0 bottom-0 z-20 flex justify-center px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)]">
-          <Toast variant={toast.variant} title={toast.title} description={toast.description} onDismiss={dismiss} />
-        </div>
-      )}
     </Card>
   )
 }

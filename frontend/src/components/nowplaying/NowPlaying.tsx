@@ -3,6 +3,7 @@ import { Card } from '../ui/Card'
 import { getNowPlaying, type NowPlayingState } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
+import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 
 /** Matches --duration-slow in index.css — the crossfade should ride the same token. */
 const CROSSFADE_MS = 320
@@ -55,6 +56,11 @@ export function NowPlaying({
   const [progressMs, setProgressMs] = useState(0)
   const pendingRef = useRef<NowPlayingState | null>(null)
   const syncRef = useRef<{ progressMs: number; at: number } | null>(null)
+  const prefersReducedMotion = usePrefersReducedMotion()
+  // See AppShell.tsx's identical comment: the CSS fade shortens under
+  // reduced-motion on its own, but this JS timer gating the content swap
+  // does not, so it needs its own near-zero delay in that case.
+  const swapDelayMs = prefersReducedMotion ? 0 : CROSSFADE_MS
 
   useEffect(() => {
     let cancelled = false
@@ -112,12 +118,12 @@ export function NowPlaying({
     const timer = setTimeout(() => {
       setDisplaySnapshot(pendingRef.current)
       setVisible(true)
-    }, CROSSFADE_MS)
+    }, swapDelayMs)
     return () => clearTimeout(timer)
-    // Intentionally keyed only on `snapshot` — `displaySnapshot` is read for
-    // comparison but must not retrigger this effect on its own.
+    // Intentionally keyed only on `snapshot`/`swapDelayMs` — `displaySnapshot`
+    // is read for comparison but must not retrigger this effect on its own.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot])
+  }, [snapshot, swapDelayMs])
 
   // Resync the local progress clock whenever the displayed snapshot changes.
   useEffect(() => {

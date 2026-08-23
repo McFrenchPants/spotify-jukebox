@@ -42,7 +42,7 @@ export function Toast({ variant = 'info', title, description, onDismiss }: Toast
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="shrink-0 rounded-sm text-text-muted transition-fast hover:text-text-primary active:scale-90"
+          className="-m-2.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-sm text-text-muted transition-fast hover:text-text-primary active:scale-90"
         >
           ✕
         </button>
