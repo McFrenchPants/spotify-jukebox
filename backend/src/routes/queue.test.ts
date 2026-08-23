@@ -18,6 +18,7 @@ vi.mock("../events/bus", async () => {
 });
 
 import { db, runMigrations, setSetting } from "../db";
+import { insertQueueEntry } from "../db/queueEntries";
 import {
   DEFAULT_EXPLICIT_FILTER_ENABLED,
   DEFAULT_MAX_DURATION_MS,
@@ -100,6 +101,7 @@ beforeEach(async () => {
 
   db.prepare("DELETE FROM play_history WHERE spotify_track_id LIKE 'track-%'").run();
   db.prepare("DELETE FROM track_stats WHERE spotify_track_id LIKE 'track-%'").run();
+  db.prepare("DELETE FROM queue_entries").run();
 
   vi.clearAllMocks();
   vi.mocked(getQueueState).mockResolvedValue(EMPTY_QUEUE_STATE);
@@ -283,5 +285,37 @@ describe("POST /api/queue", () => {
     });
     expect(allowedRes.status).toBe(201);
     expect(addTrackToQueue).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("GET /api/queue", () => {
+  it("returns an empty array when there are no queue entries", async () => {
+    const res = await fetch(`${baseUrl}/api/queue`);
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual([]);
+  });
+
+  it("reflects existing queue entries", async () => {
+    insertQueueEntry({
+      spotifyTrackId: "track-1",
+      trackName: TRACK_1.name,
+      artistName: TRACK_1.artist,
+      albumArtUrl: TRACK_1.albumArt,
+      durationMs: TRACK_1.durationMs,
+      addedBySessionId: null,
+    });
+
+    const res = await fetch(`${baseUrl}/api/queue`);
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toHaveLength(1);
+    expect(body[0]).toMatchObject({
+      spotifyTrackId: "track-1",
+      trackName: TRACK_1.name,
+      artistName: TRACK_1.artist,
+    });
   });
 });

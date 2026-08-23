@@ -42,6 +42,11 @@ export function resetNowPlayingState(): void {
   lastState = NOTHING_PLAYING_STATE;
 }
 
+/** Returns the last-seen now-playing state (same data the SSE now-playing event carries). */
+export function getNowPlayingState(): NowPlayingState {
+  return lastState;
+}
+
 function shapeResponse(data: SpotifyCurrentlyPlayingResponse | null): NowPlayingState {
   if (!data || !data.item) {
     return NOTHING_PLAYING_STATE;

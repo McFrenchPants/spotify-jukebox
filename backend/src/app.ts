@@ -4,6 +4,7 @@ import { authRouter } from "./routes/auth";
 import { deviceRouter } from "./routes/device";
 import { eventsRouter } from "./routes/events";
 import { leaderboardRouter } from "./routes/leaderboard";
+import { nowPlayingRouter } from "./routes/nowPlaying";
 import { playbackRouter } from "./routes/playback";
 import { queueRouter } from "./routes/queue";
 import { recentRouter } from "./routes/recent";
@@ -25,6 +26,7 @@ export function createApp(): Express {
   app.use("/api/device", deviceRouter);
   app.use("/api/events", eventsRouter);
   app.use("/api/leaderboard", leaderboardRouter);
+  app.use("/api/now-playing", nowPlayingRouter);
   app.use("/api/playback", playbackRouter);
   app.use("/api/queue", queueRouter);
   app.use("/api/recent", recentRouter);

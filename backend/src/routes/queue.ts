@@ -1,7 +1,7 @@
 import { Response, Router } from "express";
 import { getSetting } from "../db";
 import { insertPlayHistory } from "../db/playHistory";
-import { insertQueueEntry } from "../db/queueEntries";
+import { insertQueueEntry, listQueueEntries } from "../db/queueEntries";
 import { recordTrackPlay } from "../db/trackStats";
 import { emitEvent } from "../events/bus";
 import { runQueueGuardrails } from "../guardrails/queueGuardrails";
@@ -11,6 +11,10 @@ import { getTrack } from "../spotify/client";
 import { addTrackToQueue, getQueueState } from "../spotify/queue";
 
 export const queueRouter = Router();
+
+queueRouter.get("/", (_req, res) => {
+  res.status(200).json(listQueueEntries());
+});
 
 /**
  * Shapes a Spotify-call failure into an HTTP response, following the same
