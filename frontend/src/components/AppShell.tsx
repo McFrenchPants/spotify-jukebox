@@ -4,12 +4,18 @@ export interface AppShellProps {
   children: ReactNode
   /**
    * Current track's album art URL, once known (P4.3, sourced from the
-   * now-playing SSE stream via App.tsx). Layers a blurred, darkened
+   * now-playing SSE stream via RootLayout.tsx). Layers a blurred, darkened
    * background image above the static gradient fallback, crossfading in/out
    * and between different URLs — the gradient stays as the always-present
    * base so a slow-loading or absent image never shows a blank background.
    */
   albumArtUrl?: string | null
+  /**
+   * Fixed bottom navigation bar (P4.8's BottomNav), rendered above page
+   * content in stacking order and above the safe-area inset. When present,
+   * `main`'s bottom padding grows so content never sits underneath it.
+   */
+  bottomBar?: ReactNode
 }
 
 /** Matches --duration-slow in index.css — the crossfade rides the same token. */
@@ -24,7 +30,7 @@ const CROSSFADE_MS = 320
  * current track's album art, falling back to a static dark gradient when
  * nothing is playing / no art is available (P4.3).
  */
-export function AppShell({ children, albumArtUrl }: AppShellProps) {
+export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
   // The art URL currently painted (may lag `albumArtUrl` mid-crossfade) and
   // whether it's faded in. Mirrors the crossfade technique used by
   // NowPlaying for the foreground content, so both layers animate in sync.
@@ -91,16 +97,22 @@ export function AppShell({ children, albumArtUrl }: AppShellProps) {
           className="px-4 pb-2"
           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
         >
-          <p className="text-title text-text-primary">Guest Jukebox</p>
+          <p className="text-title text-text-primary">French&rsquo;s Jukebox</p>
         </header>
 
         <main
           className="mx-auto w-full max-w-lg flex-1 px-4 pb-6"
-          style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)' }}
+          style={{
+            paddingBottom: bottomBar
+              ? 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)'
+              : 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)',
+          }}
         >
           {children}
         </main>
       </div>
+
+      {bottomBar}
     </div>
   )
 }

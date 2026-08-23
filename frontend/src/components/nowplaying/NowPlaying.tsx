@@ -12,10 +12,12 @@ export interface NowPlayingProps {
   subscribe: EventStream['subscribe']
   /** Bumped by the manual-refresh fallback affordance to force a re-fetch. */
   refreshKey: number
-  /** Reports the current track's art URL up so App.tsx can thread it into AppShell's background. */
+  /** Reports the current track's art URL up so RootLayout.tsx can thread it into AppShell's background. */
   onAlbumArtChange?: (albumArt: string | null) => void
-  /** Reports the current play state up so App.tsx can thread it into PlaybackControls (P4.5). */
+  /** Reports the current play state up so RootLayout.tsx can thread it into PlaybackControls (P4.5). */
   onIsPlayingChange?: (isPlaying: boolean) => void
+  /** Reports the current track's primary artist id up (P4.8), for ArtistInfoPanel. */
+  onArtistIdChange?: (artistId: string | null) => void
 }
 
 function PlaceholderArt({ className }: { className: string }) {
@@ -40,7 +42,13 @@ function PlaceholderArt({ className }: { className: string }) {
  * crossfade rather than cutting hard; progress ticks forward locally every
  * second between server updates, resynced whenever a fresh snapshot arrives.
  */
-export function NowPlaying({ subscribe, refreshKey, onAlbumArtChange, onIsPlayingChange }: NowPlayingProps) {
+export function NowPlaying({
+  subscribe,
+  refreshKey,
+  onAlbumArtChange,
+  onIsPlayingChange,
+  onArtistIdChange,
+}: NowPlayingProps) {
   const [snapshot, setSnapshot] = useState<NowPlayingState | null>(null)
   const [displaySnapshot, setDisplaySnapshot] = useState<NowPlayingState | null>(null)
   const [visible, setVisible] = useState(true)
@@ -75,6 +83,10 @@ export function NowPlaying({ subscribe, refreshKey, onAlbumArtChange, onIsPlayin
   useEffect(() => {
     onIsPlayingChange?.(snapshot?.isPlaying ?? false)
   }, [snapshot, onIsPlayingChange])
+
+  useEffect(() => {
+    onArtistIdChange?.(snapshot?.artistId || null)
+  }, [snapshot, onArtistIdChange])
 
   // Crossfade the displayed content whenever the underlying track (or
   // play/pause state) changes, rather than cutting hard to the new data.

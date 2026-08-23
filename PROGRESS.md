@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 complete
 
-**Next task: P4.8 — Navigation restructure to 4-tab IA** (build the tab shell before filling in Settings content in P4.6)
+**Next task: P4.6 — Admin panel UI** (fill in the Settings tab's placeholder built in P4.8)
 
 ## Task Table
 
@@ -39,7 +39,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.5 | Trust-mode-aware playback controls | done | `PlaybackControls`; shown-but-disabled in Restricted mode; no live SSE push for trust-mode changes yet (known gap, fetched once on mount) |
 | P4.6 | Admin panel UI | todo | Lives behind the Settings tab (P4.8) |
 | P4.7 | Micro-interactions & motion pass | todo | Polish pass across P4.1–P4.6/P4.8 |
-| P4.8 | Navigation restructure to 4-tab IA | todo | Added after user review of the working build — see DESIGN_SPEC §9b. Bottom nav (Now Playing/Find Music/Playback History/Settings), icon transport controls, previous-track, artist info panel, app rename |
+| P4.8 | Navigation restructure to 4-tab IA | done | Bottom nav via `RootLayout`/`Outlet` context; icon transport controls incl. previous-track; `ArtistInfoPanel`; renamed to "French's Jukebox". Settings tab is a placeholder pending P4.6 |
 | P5.1 | Bridge phone setup runbook | todo | |
 | P5.2 | Dockerfile & Compose | todo | |
 | P5.3 | LAN discovery | todo | |
@@ -56,6 +56,15 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P4.8 navigation restructure to 4-tab IA
+- Backend prereq: `POST /api/playback/previous` (mirrors skip, reuses the `skip` trust-mode capability — no new capability added) and public `GET /api/artist/:id` (genres/image/follower count via Spotify's `GET /v1/artists/{id}`); `GET /api/now-playing`/the `now-playing` SSE event now also carry the primary artist's Spotify id. 212 backend tests passing, `tsc` clean.
+- Frontend: replaced the single stacked page with a real 4-tab app — `RootLayout.tsx` owns the one `useEventStream()` instance + shared album-art/isPlaying/artistId/refreshKey state, threaded to routed pages via React Router's `useOutletContext()` (not a new global Context provider). `BottomNav.tsx` (Now Playing/Find Music/History/Settings, hand-drawn SVG icons, active-tab highlighting) renders via a new `AppShell` `bottomBar` prop. Four pages: `NowPlayingPage` (art/progress + icon transport controls incl. new previous-track + volume + Up Next + `ArtistInfoPanel`, and nothing else), `SearchPage`, `HistoryPage` (leaderboard+recent), `SettingsPage` (placeholder — real admin panel is P4.6, not built yet).
+- `PlaybackControls.tsx` rewritten with icon buttons (inline SVG media-transport glyphs, reusing `Button` for pressed/touch-feedback styling rather than a new component) replacing the old text "Resume"/"Skip" buttons; added a previous-track icon button.
+- Old `App.tsx` deleted (fully absorbed into `RootLayout` + the four pages). App display name changed to "French's Jukebox" (`AppShell` header, `index.html` title, PWA manifest) — project/repo identity (package.json, docs) unchanged, this was a display-name-only change.
+- **Lyrics feature considered and declined by the user** (no official Spotify API support — would need an unofficial/ToS-risky endpoint or a separate third-party service) — recorded in DESIGN_SPEC §9b, not built.
+- Verified: `npm run build`/`npm run lint` clean. Live-verified by the supervisor directly in a real browser across all 4 routes plus `/style-guide` (confirmed untouched, still shows the old "Guest Jukebox" branding as intended — that's the project reference page, not the app) — bottom nav persists and highlights correctly, each tab shows exactly its scoped content, no console errors beyond the expected/known Spotify-not-connected 503.
+- Next: P4.6 (admin panel UI) — fills in the `SettingsPage` placeholder with real PIN login/settings-form/queue-moderation/device-selector/QR-code content.
 
 ### 2026-08-23 — fix: SSE (/api/events) never connects through the Vite dev proxy
 - User asked to run the app locally and see it — while doing so, found the frontend showed "Live updates paused" immediately on every load. Root cause: Vite 8.2.2's dev-server proxy (`server.proxy` in `vite.config.ts`, added P4.1) never delivers a streamed response to the browser for `/api/events` — confirmed the backend itself responds instantly (direct curl to :8085 works), and the proxy library's own internal `proxyRes` event fires promptly with 200, but nothing ever reaches the client; reproduced on a completely fresh dev-server restart with zero prior connections, ruling out a leaked-connection artifact. Tried extending `proxyTimeout`/`timeout` (no effect) and a hand-rolled raw-socket proxy middleware for just this route (also failed — a plain `http.request` to the same backend from within the same Node process got "socket hang up" even though the *existing* http-proxy-based proxying of ordinary request/response routes works fine in the same process) — root cause not fully isolated beyond "Vite 8.2.2's proxy doesn't stream this correctly."

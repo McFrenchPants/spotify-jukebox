@@ -6,6 +6,7 @@ import {
   ApiError,
   getTrustMode,
   pausePlayback,
+  previousPlayback,
   resumePlayback,
   skipPlayback,
   setVolume,
@@ -16,11 +17,50 @@ import { useSimpleToast } from '../../hooks/useSimpleToast'
 const VOLUME_DEBOUNCE_MS = 300
 
 export interface PlaybackControlsProps {
-  /** Current play state, lifted up from NowPlaying via App.tsx — mirrors the albumArt precedent. */
+  /** Current play state, lifted up from NowPlaying via RootLayout.tsx — mirrors the albumArt precedent. */
   isPlaying: boolean
 }
 
-type ActionKey = 'pauseResume' | 'skip' | 'volume'
+type ActionKey = 'previous' | 'pauseResume' | 'skip' | 'volume'
+
+/** Filled triangle pointing right — play. */
+function PlayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+      <path d="M8 5.5v13l11-6.5z" />
+    </svg>
+  )
+}
+
+/** Two vertical bars — pause. */
+function PauseIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+      <rect x="6.5" y="5" width="4" height="14" rx="1" />
+      <rect x="13.5" y="5" width="4" height="14" rx="1" />
+    </svg>
+  )
+}
+
+/** Triangle-against-a-bar — skip forward. */
+function SkipNextIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+      <path d="M6 5.5v13l9-6.5z" />
+      <rect x="16" y="5" width="3" height="14" rx="1" />
+    </svg>
+  )
+}
+
+/** Triangle-against-a-bar, mirrored — skip back / previous. */
+function SkipPreviousIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+      <path d="M18 5.5v13l-9-6.5z" />
+      <rect x="5" y="5" width="3" height="14" rx="1" />
+    </svg>
+  )
+}
 
 /**
  * Maps a playback-action failure to distinct, guest-facing copy. Mirrors
@@ -58,6 +98,7 @@ function describePlaybackError(err: unknown): string {
 export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
   const [permissions, setPermissions] = useState<TrustModeState | null>(null)
   const [pending, setPending] = useState<Record<ActionKey, boolean>>({
+    previous: false,
     pauseResume: false,
     skip: false,
     volume: false,
@@ -98,6 +139,10 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
     }
   }
 
+  function handlePrevious() {
+    void runAction('previous', () => previousPlayback())
+  }
+
   function handlePauseResume() {
     void runAction('pauseResume', () => (isPlaying ? pausePlayback() : resumePlayback()))
   }
@@ -120,16 +165,34 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
 
   return (
     <Card className="flex flex-col gap-4">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-center gap-3">
         <Button
           variant="secondary"
+          className="h-12 w-12 p-0"
+          onClick={handlePrevious}
+          disabled={!skipAllowed || pending.previous}
+          aria-label="Previous track"
+        >
+          <SkipPreviousIcon />
+        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          className="h-14 w-14 p-0"
           onClick={handlePauseResume}
           disabled={!pauseResumeAllowed || pending.pauseResume}
+          aria-label={isPlaying ? 'Pause' : 'Resume'}
         >
-          {isPlaying ? 'Pause' : 'Resume'}
+          {isPlaying ? <PauseIcon /> : <PlayIcon />}
         </Button>
-        <Button variant="secondary" onClick={handleSkip} disabled={!skipAllowed || pending.skip}>
-          Skip
+        <Button
+          variant="secondary"
+          className="h-12 w-12 p-0"
+          onClick={handleSkip}
+          disabled={!skipAllowed || pending.skip}
+          aria-label="Skip to next track"
+        >
+          <SkipNextIcon />
         </Button>
       </div>
 

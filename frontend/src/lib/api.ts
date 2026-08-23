@@ -62,6 +62,8 @@ export interface NowPlayingState {
   albumArt?: string | null
   durationMs?: number
   progressMs?: number
+  /** Primary/first artist's Spotify id — empty/absent when nothing is playing (P4.8). */
+  artistId?: string
 }
 
 /** One entry in the pending-queue mirror returned by GET /api/queue. */
@@ -233,6 +235,11 @@ export function skipPlayback(): Promise<void> {
   return postPlaybackAction('/api/playback/skip')
 }
 
+/** POST /api/playback/previous (P4.8) — identical contract to skip, gated by the same `skip` trust-mode capability. */
+export function previousPlayback(): Promise<void> {
+  return postPlaybackAction('/api/playback/previous')
+}
+
 /** POST /api/playback/volume (P3.3) — volumePercent is an integer 0-100. */
 export function setVolume(volumePercent: number): Promise<void> {
   return postPlaybackAction('/api/playback/volume', { volumePercent })
@@ -267,4 +274,25 @@ export async function queueTrack(trackId: string, guestToken: string): Promise<T
   }
 
   return (await res.json()) as Track
+}
+
+/** GET /api/artist/:id response shape (P4.8). */
+export interface ArtistInfo {
+  id: string
+  name: string
+  genres: string[]
+  imageUrl: string | null
+  followers: number
+}
+
+/** GET /api/artist/:id — public, unauthenticated. */
+export async function getArtist(artistId: string): Promise<ArtistInfo> {
+  const res = await fetch(`/api/artist/${encodeURIComponent(artistId)}`)
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load artist: ${res.status}`)
+  }
+
+  return (await res.json()) as ArtistInfo
 }
