@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 1 complete
+## Status: Phase 2 complete
 
-**Next task: P2.6 — Leaderboard & recently-played reads**
+**Next task: P3.1 — Admin PIN auth**
 
 ## Task Table
 
@@ -27,7 +27,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P2.3 | Rate limiter | done | `checkRateLimit`/`recordAllowedRequest` split + `rateLimitGuestSession` middleware; P2.5 must call `recordAllowedRequest` itself after other guardrails pass |
 | P2.4 | Content guardrails | done | `runQueueGuardrails()` in `guardrails/queueGuardrails.ts`; duplicate check takes now-playing/queue state as injected params (P2.5 supplies); blacklist is track-level only, see Open Questions |
 | P2.5 | Queue endpoint & analytics write | done | `POST /api/queue`; re-fetches track+queue state from Spotify server-side (never trusts client metadata); emits `queue-update` SSE event |
-| P2.6 | Leaderboard & recently-played reads | todo | |
+| P2.6 | Leaderboard & recently-played reads | done | `GET /api/leaderboard`, `GET /api/recent`; leaderboard excludes blacklisted, recent does not |
 | P3.1 | Admin PIN auth | todo | |
 | P3.2 | Settings CRUD | todo | |
 | P3.3 | Trust-mode-gated playback controls | todo | |
@@ -55,6 +55,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P2.6 leaderboard & recent reads (Phase 2 complete)
+- Added `getLeaderboard(limit=10)` (`db/trackStats.ts`) and `getRecentlyPlayed(limit=20)` (`db/playHistory.ts`), plus `GET /api/leaderboard` / `GET /api/recent` routers (`?limit=`, clamped 1–100, non-numeric falls back to default rather than erroring). Leaderboard: `track_stats` (excluding blacklisted) joined to its latest `play_history` row via `MAX(id)` (not `MAX(played_at)` — millisecond timestamp ties from fast successive test inserts were producing duplicate rows keyed on the latter; `id` is always unique). Recent: plain `play_history` DESC by `played_at`, deliberately not blacklist-filtered (historical log, not discovery surface).
+- 10 new tests — 104 total passing.
+- **Found and fixed a separate, real off-by-one-millisecond bug in `checkRateLimit`** (`guardrails/rateLimiter.ts`, from P2.3): `Date.now() - lastAllowedAt` could go slightly negative because SQLite's stored timestamp string can round up a fraction of a millisecond relative to `Date.now()`, occasionally producing `retryAfterMs` 1ms over the configured window on a check made immediately after recording — surfaced as a ~1-in-5 flake in `rateLimiter.test.ts`'s default-window test once enough consecutive `npm test` runs were done to hit the boundary. Fixed by clamping elapsed time to `>= 0`. Confirmed clean across 8 consecutive full test runs after the fix (this was unrelated to the earlier `:memory:` DB isolation fix — that one is still correct and necessary, this was a distinct pre-existing logic bug just never run enough times to surface before).
+- Phase 2 (Database & Guardrails) is now fully done: guest sessions, rate limiting, content guardrails, queue endpoint, leaderboard/recent reads — 104 backend tests passing, `tsc --noEmit` clean throughout.
+- Next: Phase 3 (Admin & Trust Mode), starting at P3.1 (admin PIN auth). Different character of work (auth/session tokens for the admin role, distinct from guest sessions) — worth a check-in before diving in per the admin PIN value already being resolved (see Open Questions — `8282` in `.env`, no blocker).
 
 ### 2026-08-23 — P2.5 queue endpoint; test-suite isolation fix
 - Added `backend/src/spotify/queue.ts`: `getQueueState()` (`GET /v1/me/player/queue`, shaped to `{currentlyPlayingTrackId, queuedTrackIds}`) and `addTrackToQueue(trackId, deviceId)` (`POST /v1/me/player/queue?uri=...&device_id=...`).

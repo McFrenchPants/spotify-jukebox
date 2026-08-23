@@ -2,7 +2,9 @@ import express, { Express } from "express";
 import { authRouter } from "./routes/auth";
 import { deviceRouter } from "./routes/device";
 import { eventsRouter } from "./routes/events";
+import { leaderboardRouter } from "./routes/leaderboard";
 import { queueRouter } from "./routes/queue";
+import { recentRouter } from "./routes/recent";
 import { searchRouter } from "./routes/search";
 import { sessionRouter } from "./routes/session";
 
@@ -19,7 +21,9 @@ export function createApp(): Express {
   app.use("/api/search", searchRouter);
   app.use("/api/device", deviceRouter);
   app.use("/api/events", eventsRouter);
+  app.use("/api/leaderboard", leaderboardRouter);
   app.use("/api/queue", queueRouter);
+  app.use("/api/recent", recentRouter);
   app.use("/api/session", sessionRouter);
 
   return app;
