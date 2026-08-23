@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 in progress
 
-**Next task: P3.3 — Trust-mode-gated playback controls**
+**Next task: P3.4 — Queue moderation (blocked on blacklist schema decision, see Open Questions)**
 
 ## Task Table
 
@@ -30,7 +30,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P2.6 | Leaderboard & recently-played reads | done | `GET /api/leaderboard`, `GET /api/recent`; leaderboard excludes blacklisted, recent does not |
 | P3.1 | Admin PIN auth | done | `POST /api/admin/login`; hand-rolled HMAC token (no JWT dep), `x-admin-token` header, 3h TTL; `requireAdminAuth` middleware ready for P3.2–P3.4 to mount |
 | P3.2 | Settings CRUD | done | `GET/PUT /api/admin/settings`; introduces `active_mode` + `allow_{pause_resume,skip,volume,reorder}` tristate overrides (unset row = inherit from mode) for P3.3 to resolve |
-| P3.3 | Trust-mode-gated playback controls | todo | |
+| P3.3 | Trust-mode-gated playback controls | done | `POST /api/playback/{pause,resume,skip,volume}`; admin token always bypasses; guest permission resolved fresh per-request via `resolveEffectivePermission()` |
 | P3.4 | Queue moderation | todo | Also emits `queue-update`/`leaderboard-update` SSE events |
 | P4.1 | App shell & session bootstrap | todo | Built on P0.5 design system |
 | P4.2 | Search & queue UI | todo | Skeleton loaders, optimistic UI, toasts |
@@ -55,6 +55,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P3.3 trust-mode-gated playback controls
+- Added `backend/src/guardrails/playbackPermissions.ts`: `resolveEffectivePermission(capability)` (`"pause_resume"|"skip"|"volume"`) — per-capability override wins if set, else falls back to `active_mode === "trusted"`; resolved fresh on every call, never cached.
+- Added `backend/src/spotify/playback.ts`: `pausePlayback`/`resumePlayback`/`skipToNext`/`setVolume`, same injectable `fetchFn`/`getTokenFn` pattern as `queue.ts`. Spotify calls: `PUT /me/player/pause`, `PUT /me/player/play`, `POST /me/player/next`, `PUT /me/player/volume?volume_percent=`, all device_id-pinned.
+- Added `backend/src/routes/playback.ts`: `POST /api/playback/{pause,resume,skip,volume}`. Shared `checkTrustModeGate()` — a valid `x-admin-token` always bypasses the mode check (per spec: admin can always act); otherwise gated by `resolveEffectivePermission`, 403 `trust_mode_denied` on denial. No guest-session/identity check — the gate is the single global mode, not per-guest. `/volume` validates `volumePercent` (integer 0-100) before the trust-mode check so malformed requests always 400 regardless of caller identity.
+- 13 new tests — 148 total passing. `npx tsc --noEmit` clean.
+- Phase 3 admin/trust-mode work (P3.1-P3.3) is now done. **P3.4 (queue moderation) is next but blocked**: its scope includes `POST /api/admin/blacklist (track or artist)`, and the track-vs-artist blacklist schema gap flagged back in P2.4 (see Open Questions) needs a decision before that can be built — `track_stats` only has a track-level flag, no artist table/column exists yet.
+- Stopping here for a check-in: Phase 3's admin-auth/trust-mode character is done, and the one remaining Phase 3 task needs a schema decision only the user can make (add an artist-level table, or a simpler `app_settings`-stored name list?).
 
 ### 2026-08-23 — P3.2 settings CRUD
 - Added `backend/src/db/appSettings.ts`: `getAllAppSettings()`/`validateAppSettingsUpdate(body)`/`applyAppSettingsUpdate(update)`. Reuses existing exported key constants from `rateLimiter.ts`/`queueGuardrails.ts` rather than redefining them. Introduces trust-mode settings: `active_mode` (`"restricted"`/`"trusted"`, default `"restricted"`) plus four tristate override keys (`allow_pause_resume`, `allow_skip`, `allow_volume`, `allow_reorder`) — "unset" is represented by the row being absent from `app_settings` (not a sentinel string), meaning "inherit from mode". Added `deleteSetting(key)` to `backend/src/db/index.ts` to support clearing an override. P3.3 still needs to write the actual `resolveEffectivePermissions()`-style consumer of these — this task only built the storage/shape.
