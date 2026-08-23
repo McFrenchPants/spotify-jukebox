@@ -4,7 +4,7 @@
 
 ## Status: Phase 0 complete
 
-**Next task: P1.4 — Device resolution**
+**Next task: P1.5 — Real-time push (SSE)** (last Phase 1 task)
 
 ## Task Table
 
@@ -20,7 +20,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P1.1 | PKCE auth flow | done | Code complete & verified up to the redirect; real browser consent still needed once `PORT` is fixed — see Open Questions |
 | P1.2 | Token refresh worker | done | vitest added; 6 unit tests pass; real refresh still needs P1.1's consent to complete first |
 | P1.3 | Search proxy | done | `GET /api/search?q=`; unfiltered raw proxy (P2.4 does filtering); 20 tests pass |
-| P1.4 | Device resolution | todo | |
+| P1.4 | Device resolution | done | `GET /api/device`, `POST /api/device/select`; 18 new tests (38 total in backend) |
 | P1.5 | Real-time push (SSE) | todo | `/api/events`; replaces client-side polling |
 | P2.1 | SQLite schema & migrations | done | `better-sqlite3` pinned to 11.10.0 (13.x segfaults on Windows x64 in this env); tokens stored in `app_settings` k/v |
 | P2.2 | Guest session issuance | todo | |
@@ -54,6 +54,12 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P1.4 device resolution
+- Added `backend/src/spotify/device.ts`: `listDevices()` (fetches `/v1/me/player/devices`, drops any device with a null id), `resolveDevice()` — prefers a previously-selected `spotify_device_id` if still present in the live list (returns live info, not stale stored copy); else auto-resolves and persists if exactly one device is visible; else returns `resolved: null` with the full list for ambiguous (0 or 2+ device) cases.
+- Added `backend/src/routes/device.ts`: `GET /api/device` (200 resolution result, 503 if not connected, 502 on other Spotify errors), `POST /api/device/select` (validates the given id against a fresh live fetch, not stale state; 400 if not found; persists + 200 on success).
+- 18 new tests (10 resolution logic + 8 route) — 38 total passing across the backend. `npx tsc --noEmit` clean. Verified independently.
+- Next: P1.5 (SSE) is the last Phase 1 task — after that, real playback-control endpoints (Phase 3) will pin `device_id` from this resolution into their calls.
 
 ### 2026-08-23 — P1.3 search proxy
 - Added `backend/src/spotify/client.ts`: `getValidAccessToken()` (reads access token/expiry from `app_settings`, refreshes via `refreshAccessToken()` if missing or expiring within 60s) and `searchTracks(query, limit, fetchFn?, getTokenFn?)` (calls Spotify `/v1/search?type=track`, shapes to `{id, name, artist, albumArt, durationMs, explicit}` — artists joined with ", ", largest album image used, no filtering applied). Both take injectable deps for testing.
