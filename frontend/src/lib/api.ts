@@ -1,4 +1,5 @@
 const GUEST_TOKEN_HEADER = 'x-guest-token'
+const ADMIN_TOKEN_HEADER = 'x-admin-token'
 
 export interface Track {
   id: string
@@ -295,4 +296,202 @@ export async function getArtist(artistId: string): Promise<ArtistInfo> {
   }
 
   return (await res.json()) as ArtistInfo
+}
+
+/* -------------------------------------------------------------------- */
+/* P4.6 — Admin panel: PIN login, settings, queue moderation, devices.  */
+/* -------------------------------------------------------------------- */
+
+/** POST /api/admin/login response shape. */
+export interface AdminLoginResult {
+  token: string
+  expiresAt: string
+}
+
+/** POST /api/admin/login — public (this is the auth entry point itself). */
+export async function adminLogin(pin: string): Promise<AdminLoginResult> {
+  const res = await fetch('/api/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pin }),
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Login failed: ${res.status}`)
+  }
+
+  return (await res.json()) as AdminLoginResult
+}
+
+/** GET/PUT /api/admin/settings response shape. */
+export interface AdminSettings {
+  rateLimitWindowMs: number
+  explicitFilterEnabled: boolean
+  minDurationMs: number
+  maxDurationMs: number
+  activeMode: 'restricted' | 'trusted'
+  allowPauseResume: boolean | null
+  allowSkip: boolean | null
+  allowVolume: boolean | null
+  allowReorder: boolean | null
+  spotifyDeviceId: string | null
+}
+
+/** Editable subset accepted by PUT /api/admin/settings (spotifyDeviceId is read-only via this endpoint). */
+export type AdminSettingsUpdate = Omit<AdminSettings, 'spotifyDeviceId'>
+
+/** GET /api/admin/settings — requires the admin token from adminLogin(). */
+export async function getAdminSettings(token: string): Promise<AdminSettings> {
+  const res = await fetch('/api/admin/settings', {
+    headers: { [ADMIN_TOKEN_HEADER]: token },
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load settings: ${res.status}`)
+  }
+
+  return (await res.json()) as AdminSettings
+}
+
+/**
+ * Thrown by updateAdminSettings on a 400 validation failure, whose body
+ * carries `{error: "invalid_settings", details: string[]}` — the `details`
+ * list of human-readable messages doesn't fit ApiError's generic shape, so
+ * it's exposed via this dedicated field for SettingsForm to render.
+ */
+export class AdminSettingsValidationError extends ApiError {
+  details: string[]
+  constructor(details: string[]) {
+    super(400, 'invalid_settings', details.join(' '))
+    this.name = 'AdminSettingsValidationError'
+    this.details = details
+  }
+}
+
+export async function updateAdminSettings(
+  token: string,
+  partial: Partial<AdminSettingsUpdate>
+): Promise<AdminSettings> {
+  const res = await fetch('/api/admin/settings', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      [ADMIN_TOKEN_HEADER]: token,
+    },
+    body: JSON.stringify(partial),
+  })
+
+  if (!res.ok) {
+    const body = (await parseErrorBody(res)) as { error?: string; message?: string; details?: string[] }
+    if (res.status === 400 && Array.isArray(body.details)) {
+      throw new AdminSettingsValidationError(body.details)
+    }
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to update settings: ${res.status}`)
+  }
+
+  return (await res.json()) as AdminSettings
+}
+
+/** GET /api/admin/queue — requires the admin token. Same entry shape as GET /api/queue. */
+export async function getAdminQueue(token: string): Promise<QueueEntry[]> {
+  const res = await fetch('/api/admin/queue', {
+    headers: { [ADMIN_TOKEN_HEADER]: token },
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load queue: ${res.status}`)
+  }
+
+  return (await res.json()) as QueueEntry[]
+}
+
+/** DELETE /api/admin/queue/:id — requires the admin token. */
+export async function deleteAdminQueueEntry(token: string, id: number): Promise<void> {
+  const res = await fetch(`/api/admin/queue/${id}`, {
+    method: 'DELETE',
+    headers: { [ADMIN_TOKEN_HEADER]: token },
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to remove queue entry: ${res.status}`)
+  }
+}
+
+/** POST /api/admin/queue/clear — requires the admin token. */
+export async function clearAdminQueue(token: string): Promise<void> {
+  const res = await fetch('/api/admin/queue/clear', {
+    method: 'POST',
+    headers: { [ADMIN_TOKEN_HEADER]: token },
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to clear queue: ${res.status}`)
+  }
+}
+
+export type BlacklistType = 'track' | 'artist'
+
+/** POST /api/admin/blacklist — requires the admin token. */
+export async function postBlacklist(
+  token: string,
+  body: { type: BlacklistType; value: string }
+): Promise<void> {
+  const res = await fetch('/api/admin/blacklist', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      [ADMIN_TOKEN_HEADER]: token,
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!res.ok) {
+    const errBody = await parseErrorBody(res)
+    throw new ApiError(res.status, errBody.error, errBody.message ?? `Failed to blacklist: ${res.status}`)
+  }
+}
+
+/** Spotify playback device, as returned by GET /api/device and POST /api/device/select. */
+export interface Device {
+  id: string
+  name: string
+  type: string
+  is_active: boolean
+  volume_percent: number | null
+}
+
+/** GET /api/device — public, no admin token needed. */
+export async function getDevice(): Promise<{ resolved: Device | null; devices: Device[] }> {
+  const res = await fetch('/api/device')
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load devices: ${res.status}`)
+  }
+
+  return (await res.json()) as { resolved: Device | null; devices: Device[] }
+}
+
+/** POST /api/device/select — requires the admin token. */
+export async function selectDevice(token: string, deviceId: string): Promise<Device> {
+  const res = await fetch('/api/device/select', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      [ADMIN_TOKEN_HEADER]: token,
+    },
+    body: JSON.stringify({ deviceId }),
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to select device: ${res.status}`)
+  }
+
+  return (await res.json()) as Device
 }

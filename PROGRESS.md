@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 complete
 
-**Next task: P4.6 — Admin panel UI** (fill in the Settings tab's placeholder built in P4.8)
+**Next task: P4.7 — Micro-interactions & motion pass** (last Phase 4 task)
 
 ## Task Table
 
@@ -37,7 +37,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.3 | Now playing & queue view (SSE-driven) | done | `useEventStream` SSE hook; `NowPlaying`/`QueueList`; wired real album art into P4.1's `AppShell` hook point; added `GET /api/now-playing`+`GET /api/queue` backend prereq |
 | P4.4 | Leaderboard & recently played views | done | `Leaderboard`/`RecentlyPlayed`, both refetch on `leaderboard-update` via the shared `useEventStream`; also fixed a backend gap (queue-add wasn't emitting `leaderboard-update`) |
 | P4.5 | Trust-mode-aware playback controls | done | `PlaybackControls`; shown-but-disabled in Restricted mode; no live SSE push for trust-mode changes yet (known gap, fetched once on mount) |
-| P4.6 | Admin panel UI | todo | Lives behind the Settings tab (P4.8) |
+| P4.6 | Admin panel UI | done | PIN login (`AdminAuthContext`), settings form, queue moderation, device selector, QR/guest-link card; fills in P4.8's Settings tab placeholder |
 | P4.7 | Micro-interactions & motion pass | todo | Polish pass across P4.1–P4.6/P4.8 |
 | P4.8 | Navigation restructure to 4-tab IA | done | Bottom nav via `RootLayout`/`Outlet` context; icon transport controls incl. previous-track; `ArtistInfoPanel`; renamed to "French's Jukebox". Settings tab is a placeholder pending P4.6 |
 | P5.1 | Bridge phone setup runbook | todo | |
@@ -56,6 +56,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P4.6 admin panel UI
+- **Small backend fix found and made directly**: `POST /api/device/select` (P1.4) was a mutating admin action with no auth gate — predates P3.1's admin auth. Added `requireAdminAuth`; `GET /api/device` stays public (read-only). Updated `device.test.ts` (needed real `getSetting`/token-secret persistence instead of a full `../db` mock, plus a missing `runMigrations()` call this file never previously needed). 213 backend tests passing (1 new: 401 without a token), `tsc` clean.
+- Added `frontend/src/context/AdminAuthContext.tsx` (parallel to `SessionContext` but PIN-initiated, `x-admin-token` header, 3h TTL checked against stored `expiresAt` on mount, scoped locally to the Settings tab rather than app-wide).
+- Added `frontend/src/components/admin/{PinEntry,SettingsForm,QueueModeration,DeviceSelector,GuestUrlCard}.tsx`, filling in P4.8's `SettingsPage` placeholder. Settings form converts ms fields to admin-friendly units (rate-limit window in minutes, duration bounds in seconds) for display, converting back on save. Guest URL card renders a real client-side QR code (new `qrcode` npm dependency, `QRCode.toDataURL()` — no external QR web service, keeping the LAN-only/no-WAN-dependency design intact) plus the plain URL and a print button.
+- Verified: `npm run build`/`npm run lint` clean. **Completed the full acceptance-criteria walkthrough live**: PIN login (wrong PIN rejected inline, correct PIN admits), flipped `activeMode` to `"trusted"` via the settings form, confirmed `GET /api/trust-mode` reflected it and the guest-facing playback controls became enabled — then reverted the setting back to `"restricted"` and confirmed the revert stuck (independently re-confirmed by the supervisor via a direct `GET /api/trust-mode` check after the fact). Device selector and queue-moderation mutation paths verified by code review only (Spotify still not connected in this environment); both panels' loading/error states render correctly.
+- **Phase 4 is now 6 of 7 tasks done.** Only P4.7 (micro-interactions/motion pass) remains.
 
 ### 2026-08-23 — P4.8 navigation restructure to 4-tab IA
 - Backend prereq: `POST /api/playback/previous` (mirrors skip, reuses the `skip` trust-mode capability — no new capability added) and public `GET /api/artist/:id` (genres/image/follower count via Spotify's `GET /v1/artists/{id}`); `GET /api/now-playing`/the `now-playing` SSE event now also carry the primary artist's Spotify id. 212 backend tests passing, `tsc` clean.
