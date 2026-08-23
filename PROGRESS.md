@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 complete
 
-**Next task: P4.2 — Search & queue UI**
+**Next task: P4.3 — Now playing & queue view (SSE-driven)**
 
 ## Task Table
 
@@ -33,7 +33,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P3.3 | Trust-mode-gated playback controls | done | `POST /api/playback/{pause,resume,skip,volume}`; admin token always bypasses; guest permission resolved fresh per-request via `resolveEffectivePermission()` |
 | P3.4 | Queue moderation | done | `GET/DELETE /api/admin/queue`, `POST /api/admin/queue/clear`, `POST /api/admin/blacklist`; new `queue_entries` local mirror + Spotify resync (see DESIGN_SPEC §6b) |
 | P4.1 | App shell & session bootstrap | done | `SessionProvider`/`useSession()`, `AppShell` layout with P4.3 background hook point, Vite dev proxy for `/api` → backend:8085 |
-| P4.2 | Search & queue UI | todo | Skeleton loaders, optimistic UI, toasts |
+| P4.2 | Search & queue UI | done | `SearchAndQueue` component; optimistic add-to-queue; distinct copy per guardrail/rate-limit; minimal single-slot toast (real host deferred to P4.7) |
 | P4.3 | Now playing & queue view (SSE-driven) | todo | Depends on P1.5; no client polling |
 | P4.4 | Leaderboard & recently played views | todo | Live via SSE |
 | P4.5 | Trust-mode-aware playback controls | todo | |
@@ -55,6 +55,15 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P4.2 search & queue UI
+- Added `frontend/src/lib/api.ts`: `searchTracks()`/`queueTrack()` typed fetch helpers, shared `Track` interface, `ApiError` (carries `status`/`code`/`message` plus `retryAfterMs` for 429 and `reason` for 422) so callers can branch on failure type.
+- Added `frontend/src/hooks/useDebouncedValue.ts` (generic, 380ms used here) and `frontend/src/hooks/useSimpleToast.ts` — a deliberately minimal single-slot toast (setTimeout auto-dismiss) scoped to just this task; a real stacking/queueing toast host is still P4.7's job, not built here.
+- Added `frontend/src/components/search/TrackRow.tsx` (art/fallback, name, artist, `m:ss` duration, explicit badge, Add button with idle/adding/added states) and `SearchAndQueue.tsx` (search box, empty/loading/error/no-results/results states, optimistic add-to-queue flow). Loading state is *derived* (comparing the debounced query against the last-completed outcome) rather than set synchronously inside the search effect, to satisfy oxlint's `set-state-in-effect` rule.
+- Guardrail copy: 422 rejections reuse the backend's own guardrail `message` (each of the 5 reasons already has distinct wording, see `queueGuardrails.ts`); 429 composes "try again in Xs/Xm Ys" from `retryAfterMs`; 503/404/other get their own generic-but-distinct copy.
+- `frontend/src/App.tsx` now renders `SearchAndQueue` instead of the "Coming soon" placeholder, still inside P4.1's `AppShell`.
+- Verified: `npm run build`/`npm run lint` clean (only the known pre-existing `SessionContext.tsx` fast-refresh advisory). Live in-browser: search-error state confirmed against the real backend (**Spotify is still not connected in this environment** — 503 `spotify_not_connected`, the same unresolved Phase-1 item, not addressed here); result rendering, optimistic add/revert, and one real guardrail rejection (duplicate) verified live via a temporary `window.fetch` mock (test-only, not app code) driving the real React app. The other 4 guardrail reasons + rate-limit were verified by code review only, not live-triggered.
+- Next: P4.3 (now playing & queue view, SSE-driven) — first task to consume `/api/events`; also the real point where the AppShell's P4.3 background hook gets wired to actual album art.
 
 ### 2026-08-23 — P4.1 app shell & session bootstrap (Phase 4 started)
 - Added `frontend/src/lib/session.ts` (`bootstrapSession()` — reads/writes `localStorage["jukebox_guest_token"]`, calls `POST /api/session` with `x-guest-token` header when a token is already stored) and `frontend/src/context/SessionContext.tsx` (`SessionProvider`/`useSession()` — bootstraps once on mount, renders a loading state then an error state or `children`).
