@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 complete
 
-**Next task: P4.5 — Trust-mode-aware playback controls**
+**Next task: P4.6 — Admin panel UI**
 
 ## Task Table
 
@@ -36,7 +36,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.2 | Search & queue UI | done | `SearchAndQueue` component; optimistic add-to-queue; distinct copy per guardrail/rate-limit; minimal single-slot toast (real host deferred to P4.7) |
 | P4.3 | Now playing & queue view (SSE-driven) | done | `useEventStream` SSE hook; `NowPlaying`/`QueueList`; wired real album art into P4.1's `AppShell` hook point; added `GET /api/now-playing`+`GET /api/queue` backend prereq |
 | P4.4 | Leaderboard & recently played views | done | `Leaderboard`/`RecentlyPlayed`, both refetch on `leaderboard-update` via the shared `useEventStream`; also fixed a backend gap (queue-add wasn't emitting `leaderboard-update`) |
-| P4.5 | Trust-mode-aware playback controls | todo | |
+| P4.5 | Trust-mode-aware playback controls | done | `PlaybackControls`; shown-but-disabled in Restricted mode; no live SSE push for trust-mode changes yet (known gap, fetched once on mount) |
 | P4.6 | Admin panel UI | todo | |
 | P4.7 | Micro-interactions & motion pass | todo | Polish pass across P4.1–P4.6 |
 | P5.1 | Bridge phone setup runbook | todo | |
@@ -55,6 +55,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P4.5 trust-mode-aware playback controls
+- **Backend prerequisite**: added public (unauthenticated) `GET /api/trust-mode` — returns *resolved* effective permissions (`{pauseResume, skip, volume}`, via P3.3's `resolveEffectivePermission()`) rather than raw mode/override state, since guests can't call the admin-only `GET /api/admin/settings`. Pure UI hint — enforcement is unchanged, still server-side per playback call. 198 backend tests passing, `tsc` clean. The subagent doing this also rewrote `README.md` out of scope (setup instructions, architecture notes) — reviewed for accuracy against everything verified this session and kept rather than reverted, but noting the scope deviation here for the record.
+- Added `frontend/src/components/playback/PlaybackControls.tsx`: fetches `GET /api/trust-mode` once on mount (no live-push exists yet for trust-mode changes — only `queue-update`/`leaderboard-update`/`now-playing` events exist — so an admin toggling mode mid-session won't reflect here without a refresh; accepted known gap, flagged for a future task once P4.6's admin panel actually exists to trigger such a change from). Controls are **shown but disabled** (not hidden) in Restricted mode, with an explanatory caption — chosen over hiding since it communicates more to a curious guest.
+- Single Pause/Resume toggle `Button` (state driven by `isPlaying`, lifted up from `NowPlaying` into `App.tsx` via a new `onIsPlayingChange` callback prop, mirroring the existing `albumArt` lift-up precedent from P4.3), Skip `Button`, and a native volume range input (300ms debounce on change, own in-flight `pending` flag per control — no optimistic UI here, unlike P4.2's queue-add, since these directly control shared party audio in real time).
+- Verified live end-to-end including the Trusted-mode path: obtained an admin token via `POST /api/admin/login`, flipped `activeMode` to `"trusted"` via `PUT /api/admin/settings`, confirmed controls became enabled, exercised Skip/volume (both correctly 503'd with the "not ready yet" message — Spotify still not connected in this environment), then flipped the mode back to `"restricted"` and confirmed the reset — **confirmed independently**, settings were left exactly as found. `npm run build`/`npm run lint` clean.
+- **Phase 4 is now 5 of 7 tasks done.** Remaining: P4.6 (admin panel UI — PIN login, settings form, queue moderation, device selector, QR code) and P4.7 (micro-interactions/motion polish pass). P4.6 is a substantially larger, more self-contained task (its own auth flow) — worth tackling as its own dispatch.
 
 ### 2026-08-23 — P4.4 leaderboard & recently played views
 - **Small backend fix found and made directly (not delegated — one line, low risk)**: `POST /api/queue`'s `recordTrackPlay()` changes leaderboard standing on every successful queue-add (the common case), but only `routes/admin.ts`'s blacklist action was emitting `leaderboard-update` — a leaderboard view relying solely on that event would miss normal plays entirely. Added the missing `emitEvent("leaderboard-update", { trackId })` call to `queue.ts`'s existing success path. 195 backend tests passing (extended one existing test rather than adding a new one), `tsc` clean.

@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { AppShell } from './components/AppShell'
 import { SearchAndQueue } from './components/search/SearchAndQueue'
 import { NowPlaying } from './components/nowplaying/NowPlaying'
+import { PlaybackControls } from './components/playback/PlaybackControls'
 import { QueueList } from './components/queue/QueueList'
 import { Leaderboard } from './components/leaderboard/Leaderboard'
 import { RecentlyPlayed } from './components/recent/RecentlyPlayed'
@@ -10,6 +11,7 @@ import { useEventStream } from './hooks/useEventStream'
 function App() {
   const { subscribe, isStale } = useEventStream()
   const [albumArt, setAlbumArt] = useState<string | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
   // Bumped to force NowPlaying/QueueList to re-fetch — used by the manual
   // "tap to refresh" fallback below, not a polling loop.
   const [refreshKey, setRefreshKey] = useState(0)
@@ -44,7 +46,13 @@ function App() {
           </button>
         )}
 
-        <NowPlaying subscribe={subscribe} refreshKey={refreshKey} onAlbumArtChange={setAlbumArt} />
+        <NowPlaying
+          subscribe={subscribe}
+          refreshKey={refreshKey}
+          onAlbumArtChange={setAlbumArt}
+          onIsPlayingChange={setIsPlaying}
+        />
+        <PlaybackControls isPlaying={isPlaying} />
         <QueueList subscribe={subscribe} refreshKey={refreshKey} />
         <SearchAndQueue />
         <Leaderboard subscribe={subscribe} refreshKey={refreshKey} />

@@ -174,6 +174,70 @@ export async function getRecentlyPlayed(limit?: number): Promise<RecentlyPlayedE
   return (await res.json()) as RecentlyPlayedEntry[]
 }
 
+/** Resolved effective permissions returned by GET /api/trust-mode. */
+export interface TrustModeState {
+  pauseResume: boolean
+  skip: boolean
+  volume: boolean
+}
+
+/**
+ * GET /api/trust-mode — no guest token required (public/no-auth). A
+ * public-safe subset of admin settings: the already-resolved
+ * mode+override booleans for each playback capability, used purely as a UI
+ * hint for show/enable state. The actual enforcement happens again
+ * server-side on every playback call below (P3.3), so this is fetched once
+ * on mount rather than polled/pushed — there's no live-update event for it
+ * yet (known gap, see PlaybackControls.tsx).
+ */
+export async function getTrustMode(): Promise<TrustModeState> {
+  const res = await fetch('/api/trust-mode')
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load trust mode: ${res.status}`)
+  }
+
+  return (await res.json()) as TrustModeState
+}
+
+/**
+ * Shared by the four playback control endpoints below. No guest-session
+ * header — the gate is the global trust mode, not per-guest identity.
+ */
+async function postPlaybackAction(path: string, body?: unknown): Promise<void> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  })
+
+  if (!res.ok) {
+    const errBody = await parseErrorBody(res)
+    throw new ApiError(res.status, errBody.error, errBody.message ?? `Playback action failed: ${res.status}`)
+  }
+}
+
+/** POST /api/playback/pause (P3.3). */
+export function pausePlayback(): Promise<void> {
+  return postPlaybackAction('/api/playback/pause')
+}
+
+/** POST /api/playback/resume (P3.3). */
+export function resumePlayback(): Promise<void> {
+  return postPlaybackAction('/api/playback/resume')
+}
+
+/** POST /api/playback/skip (P3.3). */
+export function skipPlayback(): Promise<void> {
+  return postPlaybackAction('/api/playback/skip')
+}
+
+/** POST /api/playback/volume (P3.3) — volumePercent is an integer 0-100. */
+export function setVolume(volumePercent: number): Promise<void> {
+  return postPlaybackAction('/api/playback/volume', { volumePercent })
+}
+
 /** POST /api/queue — requires the guest token from useSession(). */
 export async function queueTrack(trackId: string, guestToken: string): Promise<Track> {
   const res = await fetch('/api/queue', {
