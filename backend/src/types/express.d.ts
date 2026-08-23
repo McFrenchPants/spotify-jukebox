@@ -11,6 +11,13 @@ declare global {
        * middleware only resolves, it never creates or rejects.
        */
       guestSession?: GuestSession;
+
+      /**
+       * Set to true by `requireAdminAuth` middleware when the request carries
+       * a valid, unexpired `x-admin-token` header. Absent/undefined on any
+       * request that hasn't passed admin auth.
+       */
+      isAdmin?: boolean;
     }
   }
 }

@@ -1,4 +1,5 @@
 import express, { Express } from "express";
+import { adminRouter } from "./routes/admin";
 import { authRouter } from "./routes/auth";
 import { deviceRouter } from "./routes/device";
 import { eventsRouter } from "./routes/events";
@@ -17,6 +18,7 @@ export function createApp(): Express {
     res.status(200).json({ status: "ok" });
   });
 
+  app.use("/api/admin", adminRouter);
   app.use("/api/auth", authRouter);
   app.use("/api/search", searchRouter);
   app.use("/api/device", deviceRouter);

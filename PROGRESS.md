@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 2 complete
+## Status: Phase 3 in progress
 
-**Next task: P3.1 — Admin PIN auth**
+**Next task: P3.2 — Settings CRUD**
 
 ## Task Table
 
@@ -28,7 +28,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P2.4 | Content guardrails | done | `runQueueGuardrails()` in `guardrails/queueGuardrails.ts`; duplicate check takes now-playing/queue state as injected params (P2.5 supplies); blacklist is track-level only, see Open Questions |
 | P2.5 | Queue endpoint & analytics write | done | `POST /api/queue`; re-fetches track+queue state from Spotify server-side (never trusts client metadata); emits `queue-update` SSE event |
 | P2.6 | Leaderboard & recently-played reads | done | `GET /api/leaderboard`, `GET /api/recent`; leaderboard excludes blacklisted, recent does not |
-| P3.1 | Admin PIN auth | todo | |
+| P3.1 | Admin PIN auth | done | `POST /api/admin/login`; hand-rolled HMAC token (no JWT dep), `x-admin-token` header, 3h TTL; `requireAdminAuth` middleware ready for P3.2–P3.4 to mount |
 | P3.2 | Settings CRUD | todo | |
 | P3.3 | Trust-mode-gated playback controls | todo | |
 | P3.4 | Queue moderation | todo | Also emits `queue-update`/`leaderboard-update` SSE events |
@@ -55,6 +55,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P3.1 admin PIN auth (Phase 3 started)
+- Added `backend/src/auth/adminToken.ts`: `ensureAdminPinHash()`/`verifyAdminPin()` (scrypt + random salt, `salt:hash` hex stored in `app_settings["admin_pin_hash"]`, lazily initialized from `.env`'s `ADMIN_PIN` on first use, `timingSafeEqual` comparison) and `issueAdminToken()`/`verifyAdminToken()` — a hand-rolled `base64url(json{exp}).base64url(hmac-sha256)` token (no JWT dependency added; HMAC secret is a random 32-byte value generated once and persisted in `app_settings["admin_token_secret"]`, independent of the PIN so it survives PIN changes). Token TTL 3 hours.
+- Added `backend/src/middleware/adminAuth.ts`: `requireAdminAuth` — reads `x-admin-token` header (mirrors the existing `x-guest-token` stateless-header pattern rather than cookies), verifies signature+expiry, sets `req.isAdmin = true` or 401s. This is the extension point P3.2/P3.3/P3.4 should mount on `/api/admin/*` routes.
+- Added `backend/src/routes/admin.ts`: `POST /api/admin/login` (`{pin}` → `200 {token, expiresAt}` / `401 invalid_pin` / `400` missing pin), mounted at `/api/admin` in `app.ts`. No other `/api/admin/*` routes exist yet.
+- Extended `backend/src/types/express.d.ts` with `isAdmin?: boolean`.
+- 18 new tests — 122 total passing (verified independently). `npx tsc --noEmit` clean.
+- Next: P3.2 (Settings CRUD) — will mount `requireAdminAuth` on new `/api/admin/settings` routes; will also need to resolve the track-vs-artist blacklist gap (see Open Questions) since settings CRUD is expected to expose blacklist management.
 
 ### 2026-08-23 — P2.6 leaderboard & recent reads (Phase 2 complete)
 - Added `getLeaderboard(limit=10)` (`db/trackStats.ts`) and `getRecentlyPlayed(limit=20)` (`db/playHistory.ts`), plus `GET /api/leaderboard` / `GET /api/recent` routers (`?limit=`, clamped 1–100, non-numeric falls back to default rather than erroring). Leaderboard: `track_stats` (excluding blacklisted) joined to its latest `play_history` row via `MAX(id)` (not `MAX(played_at)` — millisecond timestamp ties from fast successive test inserts were producing duplicate rows keyed on the latter; `id` is always unique). Recent: plain `play_history` DESC by `played_at`, deliberately not blacklist-filtered (historical log, not discovery surface).
