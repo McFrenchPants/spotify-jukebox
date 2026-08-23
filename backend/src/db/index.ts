@@ -88,3 +88,14 @@ export function setSetting(key: string, value: string): void {
      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`
   ).run(key, value);
 }
+
+/**
+ * Removes a key from app_settings entirely (as opposed to setSetting, which
+ * always writes a value). Used to represent "unset" for settings where a
+ * missing row has a distinct meaning from any stored value — e.g. P3.2's
+ * trust-mode override toggles, where "unset" means "inherit from active_mode"
+ * rather than any particular true/false.
+ */
+export function deleteSetting(key: string): void {
+  db.prepare("DELETE FROM app_settings WHERE key = ?").run(key);
+}

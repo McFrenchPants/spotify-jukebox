@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 in progress
 
-**Next task: P3.2 — Settings CRUD**
+**Next task: P3.3 — Trust-mode-gated playback controls**
 
 ## Task Table
 
@@ -29,7 +29,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P2.5 | Queue endpoint & analytics write | done | `POST /api/queue`; re-fetches track+queue state from Spotify server-side (never trusts client metadata); emits `queue-update` SSE event |
 | P2.6 | Leaderboard & recently-played reads | done | `GET /api/leaderboard`, `GET /api/recent`; leaderboard excludes blacklisted, recent does not |
 | P3.1 | Admin PIN auth | done | `POST /api/admin/login`; hand-rolled HMAC token (no JWT dep), `x-admin-token` header, 3h TTL; `requireAdminAuth` middleware ready for P3.2–P3.4 to mount |
-| P3.2 | Settings CRUD | todo | |
+| P3.2 | Settings CRUD | done | `GET/PUT /api/admin/settings`; introduces `active_mode` + `allow_{pause_resume,skip,volume,reorder}` tristate overrides (unset row = inherit from mode) for P3.3 to resolve |
 | P3.3 | Trust-mode-gated playback controls | todo | |
 | P3.4 | Queue moderation | todo | Also emits `queue-update`/`leaderboard-update` SSE events |
 | P4.1 | App shell & session bootstrap | todo | Built on P0.5 design system |
@@ -55,6 +55,12 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P3.2 settings CRUD
+- Added `backend/src/db/appSettings.ts`: `getAllAppSettings()`/`validateAppSettingsUpdate(body)`/`applyAppSettingsUpdate(update)`. Reuses existing exported key constants from `rateLimiter.ts`/`queueGuardrails.ts` rather than redefining them. Introduces trust-mode settings: `active_mode` (`"restricted"`/`"trusted"`, default `"restricted"`) plus four tristate override keys (`allow_pause_resume`, `allow_skip`, `allow_volume`, `allow_reorder`) — "unset" is represented by the row being absent from `app_settings` (not a sentinel string), meaning "inherit from mode". Added `deleteSetting(key)` to `backend/src/db/index.ts` to support clearing an override. P3.3 still needs to write the actual `resolveEffectivePermissions()`-style consumer of these — this task only built the storage/shape.
+- Added `GET /api/admin/settings` / `PUT /api/admin/settings` to `backend/src/routes/admin.ts`, each individually gated by `requireAdminAuth` (not via `adminRouter.use`, so `/login` stays unauthenticated). PUT validates the whole partial body before persisting anything (collects all errors into one 400 rather than failing fast on the first bad field); `spotifyDeviceId` is read-only in the response — device selection stays owned by `POST /api/device/select`.
+- 13 new tests — 135 total passing. `npx tsc --noEmit` clean.
+- Next: P3.3 (trust-mode-gated playback controls) — first consumer of `active_mode`/`allow_*`; will need to write the override-then-mode-fallback resolution logic that P3.2 deliberately left unbuilt.
 
 ### 2026-08-23 — P3.1 admin PIN auth (Phase 3 started)
 - Added `backend/src/auth/adminToken.ts`: `ensureAdminPinHash()`/`verifyAdminPin()` (scrypt + random salt, `salt:hash` hex stored in `app_settings["admin_pin_hash"]`, lazily initialized from `.env`'s `ADMIN_PIN` on first use, `timingSafeEqual` comparison) and `issueAdminToken()`/`verifyAdminToken()` — a hand-rolled `base64url(json{exp}).base64url(hmac-sha256)` token (no JWT dependency added; HMAC secret is a random 32-byte value generated once and persisted in `app_settings["admin_token_secret"]`, independent of the PIN so it survives PIN changes). Token TTL 3 hours.
