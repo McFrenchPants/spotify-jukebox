@@ -82,6 +82,7 @@ Spec ref: DESIGN_SPEC §3–§5.
 - **P4.4 — Leaderboard & recently played views**: two list views wired to P2.6 endpoints, updating live from `leaderboard-update` SSE events rather than requiring a manual reload.
   - Accept: renders seeded data correctly; a new queue event visibly updates the leaderboard without a page refresh.
 - **P4.5 — Trust-mode-aware playback controls**: pause/resume/skip/volume buttons, shown/enabled based on current mode (fetched from a public-safe subset of settings), calling P3.3 endpoints, with pressed/active touch feedback states from P0.5.
+  - The "public-safe subset of settings" endpoint doesn't exist yet — `GET /api/admin/settings` (P3.2) is admin-only. Adds `GET /api/trust-mode` (public, unauthenticated) returning just the *resolved* effective permissions (`{pauseResume, skip, volume}`, via P3.3's existing `resolveEffectivePermission()`) rather than raw mode+override state — a pure UI hint; actual enforcement still happens server-side on every P3.3 call regardless of what this returns.
   - Accept: controls hidden/disabled in Restricted mode, functional in Trusted mode.
 - **P4.6 — Admin panel UI**: PIN entry screen, settings form (P3.2), queue moderation actions (P3.4), device selector (P1.4), QR code display/print view for the guest URL.
   - Accept: manual walkthrough of PIN login → change a setting → see it take effect on the guest side.

@@ -10,6 +10,7 @@ import { queueRouter } from "./routes/queue";
 import { recentRouter } from "./routes/recent";
 import { searchRouter } from "./routes/search";
 import { sessionRouter } from "./routes/session";
+import { trustModeRouter } from "./routes/trustMode";
 
 export function createApp(): Express {
   const app = express();
@@ -31,6 +32,7 @@ export function createApp(): Express {
   app.use("/api/queue", queueRouter);
   app.use("/api/recent", recentRouter);
   app.use("/api/session", sessionRouter);
+  app.use("/api/trust-mode", trustModeRouter);
 
   return app;
 }
