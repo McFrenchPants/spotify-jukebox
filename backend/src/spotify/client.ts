@@ -28,6 +28,15 @@ interface SpotifySearchResponse {
   };
 }
 
+interface SpotifyTrackResponse {
+  id: string;
+  name: string;
+  artists: Array<{ name: string }>;
+  album: { images: Array<{ url: string }> };
+  duration_ms: number;
+  explicit: boolean;
+}
+
 /**
  * Returns a valid Spotify access token, refreshing it first if it's missing
  * or about to expire. Always re-reads the token from app_settings after a
@@ -114,4 +123,56 @@ export async function searchTracks(
     durationMs: track.duration_ms,
     explicit: track.explicit,
   }));
+}
+
+/**
+ * Fetches a single track by id from Spotify and shapes it identically to
+ * how `searchTracks` shapes each item.
+ *
+ * Used by the queue route (P2.5) to re-fetch authoritative track metadata
+ * server-side rather than trusting anything a client might also send in the
+ * request body — that metadata feeds the content guardrails, so trusting a
+ * client-supplied value would let a guest bypass them.
+ *
+ * `fetchFn` and `getTokenFn` are injectable for testing, following the same
+ * pattern as `searchTracks`.
+ */
+export async function getTrack(
+  trackId: string,
+  fetchFn: typeof fetch = fetch,
+  getTokenFn: () => Promise<string> = getValidAccessToken
+): Promise<ShapedTrack> {
+  const accessToken = await getTokenFn();
+
+  const response = await fetchFn(`${SPOTIFY_API_BASE}/tracks/${encodeURIComponent(trackId)}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    let message = `${response.status}`;
+    try {
+      const errBody = (await response.json()) as {
+        error?: { message?: string };
+      };
+      if (errBody.error?.message) {
+        message = `${response.status} ${errBody.error.message}`;
+      }
+    } catch {
+      // Ignore JSON parse failures on the error body; fall back to status.
+    }
+    throw new Error(`Spotify track lookup failed: ${message}`);
+  }
+
+  const track = (await response.json()) as SpotifyTrackResponse;
+
+  return {
+    id: track.id,
+    name: track.name,
+    artist: track.artists.map((a) => a.name).join(", "),
+    albumArt: track.album.images[0]?.url ?? null,
+    durationMs: track.duration_ms,
+    explicit: track.explicit,
+  };
 }

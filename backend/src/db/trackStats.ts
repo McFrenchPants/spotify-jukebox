@@ -21,3 +21,18 @@ export function isTrackBlacklisted(spotifyTrackId: string): boolean {
 
   return row ? row.is_blacklisted !== 0 : false;
 }
+
+/**
+ * Records a successful queue-add for analytics: upserts the track_stats row,
+ * incrementing play_count and stamping last_played_at to now. Creates the
+ * row (with play_count starting at 1) if this is the track's first play.
+ */
+export function recordTrackPlay(spotifyTrackId: string): void {
+  db.prepare(
+    `INSERT INTO track_stats (spotify_track_id, play_count, last_played_at)
+     VALUES (?, 1, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+     ON CONFLICT(spotify_track_id) DO UPDATE SET
+       play_count = play_count + 1,
+       last_played_at = excluded.last_played_at`
+  ).run(spotifyTrackId);
+}

@@ -4,7 +4,7 @@
 
 ## Status: Phase 1 complete
 
-**Next task: P2.5 — Queue endpoint & analytics write**
+**Next task: P2.6 — Leaderboard & recently-played reads**
 
 ## Task Table
 
@@ -26,7 +26,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P2.2 | Guest session issuance | done | `POST /api/session`; `resolveGuestSession` middleware (resolve-only, never creates/blocks) for P2.3/P2.5 to build on |
 | P2.3 | Rate limiter | done | `checkRateLimit`/`recordAllowedRequest` split + `rateLimitGuestSession` middleware; P2.5 must call `recordAllowedRequest` itself after other guardrails pass |
 | P2.4 | Content guardrails | done | `runQueueGuardrails()` in `guardrails/queueGuardrails.ts`; duplicate check takes now-playing/queue state as injected params (P2.5 supplies); blacklist is track-level only, see Open Questions |
-| P2.5 | Queue endpoint & analytics write | todo | Also emits `queue-update` SSE event (P1.5) |
+| P2.5 | Queue endpoint & analytics write | done | `POST /api/queue`; re-fetches track+queue state from Spotify server-side (never trusts client metadata); emits `queue-update` SSE event |
 | P2.6 | Leaderboard & recently-played reads | todo | |
 | P3.1 | Admin PIN auth | todo | |
 | P3.2 | Settings CRUD | todo | |
@@ -55,6 +55,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P2.5 queue endpoint; test-suite isolation fix
+- Added `backend/src/spotify/queue.ts`: `getQueueState()` (`GET /v1/me/player/queue`, shaped to `{currentlyPlayingTrackId, queuedTrackIds}`) and `addTrackToQueue(trackId, deviceId)` (`POST /v1/me/player/queue?uri=...&device_id=...`).
+- Extended `backend/src/spotify/client.ts` with `getTrack(trackId)` (`GET /v1/tracks/{id}`, shaped to the existing `ShapedTrack`) and `backend/src/db/trackStats.ts` with `recordTrackPlay(spotifyTrackId)` (upsert incrementing `play_count`).
+- Added `backend/src/db/playHistory.ts` (`insertPlayHistory`) and `backend/src/routes/queue.ts` (`POST /api/queue`, mounted in `app.ts`): resolves guest session → rate-limit check (`rateLimitGuestSession` middleware) → re-fetches track + live queue state from Spotify server-side (deliberately never trusts client-supplied `explicit`/`durationMs`, so a guest can't spoof past the guardrails) → `runQueueGuardrails` → only on full pass, `recordAllowedRequest` (consumes the rate-limit bucket) → calls Spotify's queue-add → writes `play_history` + `track_stats` → emits `queue-update` SSE event → `201`.
+- 7 new tests — 94 total passing. `npx tsc --noEmit` clean.
+- **Test-suite isolation fix (supervisor-level, not part of P2.5's scope)**: the shared real SQLite file (`data/jukebox.db`) that all prior tests wrote to directly turned out to still cause a rare cross-file race even after P2.3/P2.4's per-test setting resets (~1-in-4 runs failing `rateLimiter.test.ts`'s default-window test with a polluted value) once P2.5 added a 7th settings-touching test file. Root-caused and fixed properly instead of patching another symptom: added `backend/vitest.config.ts` + `backend/vitest.setup.ts` pointing `DB_PATH` at `:memory:` during tests, so every test file gets its own fresh, fully isolated in-memory database — eliminates the whole class of shared-state bugs (the individual per-test `setSetting` resets added in P2.3/P2.4 are now just harmless redundant belt-and-braces, not load-bearing). Verified clean across 5 consecutive full `npm test` runs at unchanged (~5s) speed.
+- Next: P2.6 (leaderboard/recently-played reads) — read-only, should be the simplest remaining Phase 2 task, no new guardrail/integration concerns.
 
 ### 2026-08-23 — P2.4 content guardrails
 - Added `backend/src/db/trackStats.ts`: `isTrackBlacklisted(spotifyTrackId)` — first code to read `track_stats`.
