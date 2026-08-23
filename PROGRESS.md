@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 complete
 
-**Next task: P4.6 — Admin panel UI**
+**Next task: P4.8 — Navigation restructure to 4-tab IA** (build the tab shell before filling in Settings content in P4.6)
 
 ## Task Table
 
@@ -37,8 +37,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.3 | Now playing & queue view (SSE-driven) | done | `useEventStream` SSE hook; `NowPlaying`/`QueueList`; wired real album art into P4.1's `AppShell` hook point; added `GET /api/now-playing`+`GET /api/queue` backend prereq |
 | P4.4 | Leaderboard & recently played views | done | `Leaderboard`/`RecentlyPlayed`, both refetch on `leaderboard-update` via the shared `useEventStream`; also fixed a backend gap (queue-add wasn't emitting `leaderboard-update`) |
 | P4.5 | Trust-mode-aware playback controls | done | `PlaybackControls`; shown-but-disabled in Restricted mode; no live SSE push for trust-mode changes yet (known gap, fetched once on mount) |
-| P4.6 | Admin panel UI | todo | |
-| P4.7 | Micro-interactions & motion pass | todo | Polish pass across P4.1–P4.6 |
+| P4.6 | Admin panel UI | todo | Lives behind the Settings tab (P4.8) |
+| P4.7 | Micro-interactions & motion pass | todo | Polish pass across P4.1–P4.6/P4.8 |
+| P4.8 | Navigation restructure to 4-tab IA | todo | Added after user review of the working build — see DESIGN_SPEC §9b. Bottom nav (Now Playing/Find Music/Playback History/Settings), icon transport controls, previous-track, artist info panel, app rename |
 | P5.1 | Bridge phone setup runbook | todo | |
 | P5.2 | Dockerfile & Compose | todo | |
 | P5.3 | LAN discovery | todo | |

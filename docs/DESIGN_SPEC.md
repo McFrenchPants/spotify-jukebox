@@ -1,6 +1,6 @@
 # Guest Jukebox — Design Specification
 
-Version: 1.2.0 (Finalized)
+Version: 1.3.0 (Finalized)
 Status: Finalized for implementation
 Supersedes: "Guest Jukebox Web Application — Preliminary Design Specification" v1.0.0 (source doc)
 
@@ -119,6 +119,23 @@ Layout target for v1 is **guest phones only** — no dedicated kiosk/TV display 
 
 **Component primitives** (built once in P0.5, reused everywhere): button (primary/secondary/danger, with a pressed/active state for touch feedback), card, toast, skeleton loader, modal/sheet (used by the admin panel and track-detail views).
 
+## 9b. Navigation & Screen Layout (added v1.3.0)
+
+Revised after seeing the working P4.1–P4.5 build (single stacked page) — the guest client is now a **4-tab app** with a persistent bottom navigation bar (standard mobile media-app pattern), not one long scrolling page:
+
+| Tab | Icon | Content |
+|---|---|---|
+| **Now Playing** (home/default) | note/play icon | Album art + track title/artist (crossfades on change), elapsed/remaining progress; media transport controls as **icons** (previous / play-pause / next — standard media-player iconography, not text buttons), volume slider; "Up Next" queue list. This is the *entire* screen — no search box or leaderboard on it. |
+| **Find Music** | search icon | Search box + results + add-to-queue (the existing P4.2 UI, moved here) |
+| **Playback History** | clock/list icon | Leaderboard + recently-played (the existing P4.4 UI, moved here) |
+| **Settings** | gear icon | Admin panel (P4.6): PIN entry, settings form, queue moderation, device selector, QR code |
+
+Transport controls gain a **previous track** action (mirrors the existing skip/next endpoint) alongside pause/resume/skip, all icon-based per the table above.
+
+**Artist info** (added v1.3.0): the Now Playing screen shows a small "About the artist" panel (genres, image, follower count) for the currently-playing track, sourced from Spotify's `GET /v1/artists/{id}` — genuinely available via the official Web API, unlike lyrics (see below).
+
+**Lyrics — explicitly out of scope.** Spotify has no public Web API endpoint for lyrics; only unofficial/reverse-engineered endpoints or a separate third-party lyrics service could provide this, both with real tradeoffs (ToS risk, or an added dependency/cost). Decided with the user 2026-08-23: skip for v1, revisit later if it turns out to matter.
+
 **Micro-interactions & polish** (scoped as their own pass, P4.7, so "make it work" and "make it feel good" aren't conflated):
 - Search: debounced input shows a skeleton-loader state (not a blank screen) while a query is in flight; empty/no-results states are designed, not default browser blankness.
 - Queue submission: optimistic UI (track appears in the queue immediately) with a toast confirming success, or a toast + inline reason on guardrail rejection (rate-limited / explicit / duplicate / too short / too long / blacklisted — distinct copy per reason, per IMPLEMENTATION_PLAN P4.2).
@@ -151,3 +168,4 @@ Layout target for v1 is **guest phones only** — no dedicated kiosk/TV display 
 | 1.0.0 | Original preliminary draft (source doc) |
 | 1.1.0 | Finalized after requirements review: access model, trust model, hosting, audio bridge, admin auth (§10) |
 | 1.2.0 | Added §6a (real-time sync via SSE, replacing client-side polling) and §9a (UI/UX design system: dark album-art-driven theme, design tokens, micro-interactions); added kiosk non-goal to §11. Prompted by feedback that the plan was engineering-only and under-specified visual/UX design and live-sync latency. |
+| 1.3.0 | Added §9b (4-tab bottom-nav IA replacing the single stacked page; icon-based transport controls; previous-track control; artist info panel). Prompted by user feedback after reviewing the working P4.1–P4.5 build. Lyrics considered and explicitly deferred (no official Spotify API support). |
