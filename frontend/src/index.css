@@ -1,1 +1,115 @@
 @import "tailwindcss";
+
+/*
+ * Guest Jukebox design tokens.
+ * See docs/DESIGN_SYSTEM.md for the human-readable reference.
+ * Tailwind v4 has no tailwind.config.js — tokens live here in @theme and
+ * become utility classes automatically (e.g. --color-accent -> bg-accent,
+ * text-accent, border-accent, etc).
+ */
+@theme {
+  /* ---- Color: dark neutral scale (background/surface/border tiers) ---- */
+  --color-bg: #0a0a0b;
+  --color-surface: #151517;
+  --color-surface-raised: #1e1e21;
+  --color-surface-overlay: #26262a;
+  --color-border: #2c2c30;
+  --color-border-strong: #3f3f45;
+
+  --color-text-primary: #f5f5f7;
+  --color-text-secondary: #a8a8ae;
+  --color-text-muted: #6c6c73;
+
+  /* ---- Color: accent (distinct green, not Spotify's #1DB954) ---- */
+  --color-accent: #2fd66f;
+  --color-accent-hover: #29bd62;
+  --color-accent-active: #22a354;
+  --color-accent-muted: #163821;
+
+  /* ---- Color: semantic (toasts, guardrail-rejection messages) ---- */
+  --color-success: #34d399;
+  --color-success-muted: #123527;
+  --color-error: #f87171;
+  --color-error-muted: #3a1a1a;
+  --color-warning: #fbbf24;
+  --color-warning-muted: #3a2e0f;
+
+  /* ---- Typography: single system font stack (no custom font loading) ---- */
+  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+    sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+
+  /* Type scale: display / title / body / caption. Tailwind v4 pairs a
+     font-size token with its line-height via the `--text-{name}--line-height`
+     key, exposed as text-display / text-title / text-body / text-caption. */
+  --text-display: 2.25rem;
+  --text-display--line-height: 2.5rem;
+  --text-display--font-weight: 700;
+
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-title--font-weight: 600;
+
+  --text-body: 1rem;
+  --text-body--line-height: 1.5rem;
+  --text-body--font-weight: 400;
+
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.125rem;
+  --text-caption--font-weight: 400;
+
+  /* ---- Spacing scale ----
+     Tailwind's default --spacing base (0.25rem) already gives a full
+     numeric scale (p-1, p-2, p-4, gap-6, ...); this app uses that scale
+     exclusively rather than introducing a second one. Kept explicit here
+     so it's documented as an intentional token, not an accident. */
+  --spacing: 0.25rem;
+
+  /* ---- Corner-radius scale (cards, buttons, sheets) ---- */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* ---- Motion: one easing curve, 2-3 durations ---- */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+}
+
+/* Motion tokens are exposed as duration-* utilities via arbitrary values
+   (e.g. `duration-[var(--duration-base)]`) plus these convenience classes
+   used by the primitives, so every transition in the app shares the same
+   handful of timings instead of ad hoc per-component values. */
+.transition-fast {
+  transition-duration: var(--duration-fast);
+  transition-timing-function: var(--ease-standard);
+}
+.transition-base {
+  transition-duration: var(--duration-base);
+  transition-timing-function: var(--ease-standard);
+}
+.transition-slow {
+  transition-duration: var(--duration-slow);
+  transition-timing-function: var(--ease-standard);
+}
+
+/* Respect prefers-reduced-motion for every transition/animation in the app.
+   Primitives should not need to special-case this themselves. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+}

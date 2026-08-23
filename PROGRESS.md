@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 0 in progress
+## Status: Phase 0 complete
 
-**Next task: P0.5 — Design system & style guide**
+**Next task: P1.1 — PKCE auth flow** (blocked — needs Spotify Developer credentials, see Open Questions)
 
 ## Task Table
 
@@ -16,7 +16,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P0.2 | Backend project init | done | Express+TS, tsx dev server, port 3001 default |
 | P0.3 | Frontend project init | done | Vite+React+Tailwind v4 (Vite plugin, no config file) |
 | P0.4 | Env & secrets template | done | `backend/.env.example`; admin PIN defaults to placeholder `change-me` |
-| P0.5 | Design system & style guide | todo | Dark, album-art-driven theme; tokens + primitives + `/style-guide` route |
+| P0.5 | Design system & style guide | done | Tailwind v4 `@theme` tokens (no config.js); accent `#2fd66f`; primitives in `frontend/src/components/ui/` |
 | P1.1 | PKCE auth flow | todo | Needs a real Spotify Developer app (client ID/secret) — see Open Questions |
 | P1.2 | Token refresh worker | todo | |
 | P1.3 | Search proxy | todo | |
@@ -53,6 +53,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P0.5 design system & style guide (Phase 0 complete)
+- Tailwind v4 tokens defined via `@theme` block in `frontend/src/index.css` (no `tailwind.config.js` — v4 doesn't use one): dark neutral scale (`bg`/`surface`/`surface-raised`/`surface-overlay`/`border` tiers), accent `#2fd66f` (distinct from Spotify's `#1DB954`), semantic success/error/warning colors, 4-step type scale (display/title/body/caption), radius scale (sm/md/lg/xl/full), one easing + 3 duration tokens (fast/base/slow, exposed as `.transition-fast/base/slow` utility classes since Tailwind v4 has no themeable duration namespace). Spacing scale: deliberately reused Tailwind's default numeric scale rather than a parallel custom one.
+- Primitives in `frontend/src/components/ui/`: `Button` (primary/secondary/danger × md/lg, strong pressed state via scale+color since touch-only), `Card`, `Toast` (success/error/warning/info), `Skeleton` (line/circle/block), `Modal` (modal/sheet, portal-rendered, closes on backdrop/Escape). Global `prefers-reduced-motion` handling in `index.css`.
+- Added `react-router-dom`; `/style-guide` route (`frontend/src/pages/StyleGuide.tsx`) renders all tokens/primitives — registered always-on (not `import.meta.env.DEV`-gated), noted as an easy-to-revisit simplicity choice. `docs/DESIGN_SYSTEM.md` documents tokens + primitive usage.
+- `App.tsx` placeholder at `/` left untouched (still uses ad hoc `neutral-*` classes) — flagged in DESIGN_SYSTEM.md that Phase 4 should switch it to tokens when building the real UI.
+- Phase 0 (scaffolding) is now fully done. Next: Phase 1 backend core, starting with P1.1 (PKCE auth flow) — **blocked** on Spotify Developer app credentials from the user (see Open Questions).
 
 ### 2026-08-23 — P0.4 env & secrets template
 - Added `backend/.env.example` (Spotify client ID/secret, redirect URI, admin PIN placeholder `change-me`, port, DB path). `backend/.gitignore` already ignored `.env`; added `/data/` too (SQLite file destination). Root `README.md` already referenced it from P0.1.
