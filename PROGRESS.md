@@ -4,7 +4,7 @@
 
 ## Status: Phase 1 complete
 
-**Next task: P2.4 — Content guardrails on queue submission**
+**Next task: P2.5 — Queue endpoint & analytics write**
 
 ## Task Table
 
@@ -25,7 +25,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P2.1 | SQLite schema & migrations | done | `better-sqlite3` pinned to 11.10.0 (13.x segfaults on Windows x64 in this env); tokens stored in `app_settings` k/v |
 | P2.2 | Guest session issuance | done | `POST /api/session`; `resolveGuestSession` middleware (resolve-only, never creates/blocks) for P2.3/P2.5 to build on |
 | P2.3 | Rate limiter | done | `checkRateLimit`/`recordAllowedRequest` split + `rateLimitGuestSession` middleware; P2.5 must call `recordAllowedRequest` itself after other guardrails pass |
-| P2.4 | Content guardrails | todo | |
+| P2.4 | Content guardrails | done | `runQueueGuardrails()` in `guardrails/queueGuardrails.ts`; duplicate check takes now-playing/queue state as injected params (P2.5 supplies); blacklist is track-level only, see Open Questions |
 | P2.5 | Queue endpoint & analytics write | todo | Also emits `queue-update` SSE event (P1.5) |
 | P2.6 | Leaderboard & recently-played reads | todo | |
 | P3.1 | Admin PIN auth | todo | |
@@ -47,6 +47,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 ## Open Questions / Blockers
 
+- **Track-vs-artist blacklist gap**: DESIGN_SPEC §7 says admins can ban a "track or artist," but `track_stats` (P2.1 schema) only has a track-level `is_blacklisted` flag — no artist table/column exists. P2.4 implemented track-level blacklist only. Needs a decision before P3.2 (Settings CRUD) / P4.6 (admin panel UI) expose blacklist management: either add an artist-level table (join against track's artist on check) or do artist blacklisting via a simple `app_settings`-stored name list. Flagging for the user/a future session to decide, not blocking current work.
 - **`backend/.env` `PORT` fixed to `8085`** (was invalid `80085`, >65535 max); `SPOTIFY_REDIRECT_URI` updated to match. **User still needs to**: (1) update the redirect URI registered in the Spotify dashboard to `http://192.168.50.179:8085/api/auth/callback`, (2) run the backend and visit `http://192.168.50.179:8085/api/auth/login` in a browser to complete the one-time consent — this persists a real `spotify_refresh_token`, which both P1.1 and P1.2 are coded against but haven't been exercised for real yet. Once done, P1.2's refresh worker can be spot-checked for real by calling `refreshAccessToken()` once and confirming `spotify_access_token` changes.
 - **Admin PIN value**: now set (`8282` in `.env`) — resolved.
 - **Process note**: subagent prompts touching `backend/.env` must be told never to overwrite/reset it, and to back it up + restore byte-for-byte if they need to test with different values (a past subagent lost the user's real credentials this way once already; P1.1's subagent handled it correctly by using a shell-level env override instead).
@@ -54,6 +55,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P2.4 content guardrails
+- Added `backend/src/db/trackStats.ts`: `isTrackBlacklisted(spotifyTrackId)` — first code to read `track_stats`.
+- Added `backend/src/guardrails/queueGuardrails.ts`: four pure guardrail functions — `checkExplicitFilter` (`app_settings["explicit_filter_enabled"]`, default `"true"`, fail-restrictive), `checkDurationBounds` (`min_duration_ms`/`max_duration_ms`, defaults 60000/480000), `checkDuplicate` (takes `currentlyPlayingTrackId`/`queuedTrackIds` as injected params — does NOT fetch Spotify state itself; P2.5 must supply these), `checkBlacklist` (track-level only, see Open Questions) — plus `runQueueGuardrails(track, context)` combining runner that short-circuits in that order (explicit → duration → duplicate → blacklist, cheapest/no-DB first).
+- 17 new tests — 87 total passing, confirmed deterministic across two consecutive `npm test` runs (the shared-DB isolation issue P2.3 hit was avoided here — settings reset per test). `npx tsc --noEmit` clean. Verified independently.
+- Flagged track-vs-artist blacklist schema gap in Open Questions — needs a decision before admin panel (P3.2/P4.6) exposes blacklist management.
+- Next: P2.5 (queue endpoint) — `POST /api/queue` will be the first thing to actually wire together P2.2 (session)/P2.3 (rate limiter)/P2.4 (guardrails) plus the real Spotify queue call and `play_history`/`track_stats` writes. It will need to supply `checkDuplicate`'s now-playing/queue context somehow — likely via `nowPlaying.ts`'s state (may need a small exported getter added, or a fresh `GET /v1/me/player/queue` call) and will need to call P2.3's `recordAllowedRequest` only after guardrails pass.
 
 ### 2026-08-23 — P2.3 rate limiter
 - Added `rate_limit_state` table (`session_id` PK, `last_allowed_at`) to `runMigrations()` in `backend/src/db/index.ts`.
