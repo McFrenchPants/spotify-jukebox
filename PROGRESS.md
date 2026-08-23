@@ -4,7 +4,7 @@
 
 ## Status: Phase 3 complete
 
-**Next task: P4.1 — App shell & session bootstrap**
+**Next task: P4.2 — Search & queue UI**
 
 ## Task Table
 
@@ -32,7 +32,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P3.2 | Settings CRUD | done | `GET/PUT /api/admin/settings`; introduces `active_mode` + `allow_{pause_resume,skip,volume,reorder}` tristate overrides (unset row = inherit from mode) for P3.3 to resolve |
 | P3.3 | Trust-mode-gated playback controls | done | `POST /api/playback/{pause,resume,skip,volume}`; admin token always bypasses; guest permission resolved fresh per-request via `resolveEffectivePermission()` |
 | P3.4 | Queue moderation | done | `GET/DELETE /api/admin/queue`, `POST /api/admin/queue/clear`, `POST /api/admin/blacklist`; new `queue_entries` local mirror + Spotify resync (see DESIGN_SPEC §6b) |
-| P4.1 | App shell & session bootstrap | todo | Built on P0.5 design system |
+| P4.1 | App shell & session bootstrap | done | `SessionProvider`/`useSession()`, `AppShell` layout with P4.3 background hook point, Vite dev proxy for `/api` → backend:8085 |
 | P4.2 | Search & queue UI | todo | Skeleton loaders, optimistic UI, toasts |
 | P4.3 | Now playing & queue view (SSE-driven) | todo | Depends on P1.5; no client polling |
 | P4.4 | Leaderboard & recently played views | todo | Live via SSE |
@@ -55,6 +55,15 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P4.1 app shell & session bootstrap (Phase 4 started)
+- Added `frontend/src/lib/session.ts` (`bootstrapSession()` — reads/writes `localStorage["jukebox_guest_token"]`, calls `POST /api/session` with `x-guest-token` header when a token is already stored) and `frontend/src/context/SessionContext.tsx` (`SessionProvider`/`useSession()` — bootstraps once on mount, renders a loading state then an error state or `children`).
+- Added `frontend/src/components/AppShell.tsx`: mobile-first layout (`--color-bg` root, safe-area-aware padding, minimal header) with a `.app-shell__bg` background layer showing the spec's static-dark-gradient fallback — explicitly commented as the **P4.3 hook point** for wiring in the real blurred-album-art background later, so that task shouldn't need to restructure this component.
+- `frontend/src/App.tsx` now renders inside `AppShell`/`SessionProvider` (wired in `main.tsx`) using real design tokens instead of the placeholder's ad hoc `neutral-*` classes; `/style-guide` route deliberately left outside both wrappers (reference page, not part of the guest flow).
+- Added a Vite dev-server proxy (`/api` → `http://localhost:8085`) in `vite.config.ts` so frontend code calls relative `/api/...` paths — avoids CORS in dev and matches the single-origin production deployment model. Updated `manifest.json`/`index.html` PWA meta (`theme-color`, `apple-mobile-web-app-*`) to match the real `--color-bg` token instead of a stale placeholder hex.
+- Added `.claude/launch.json` (frontend dev-server preview config, dev tooling only, not app code).
+- Verified: `npm run build` clean, `npm run lint` clean (one standard fast-refresh advisory on the context+hook file, not an error). Live round-trip confirmed in a real browser at mobile viewport (375×812) — page loads with no console errors, `localStorage.jukebox_guest_token` populated after load.
+- Next: P4.2 (search & queue UI) — first task to actually call `POST /api/queue` using the token from `useSession()`.
 
 ### 2026-08-23 — P3.4 queue moderation (Phase 3 complete)
 - **Design decision with user**: Spotify's Web API has no "remove one queue item" or "clear queue" endpoint. Rejected feeding Spotify one track at a time (risk of the app's "next" silently diverging from Spotify's on a poll/connection hiccup). Went with a hybrid full-sync approach instead — recorded in DESIGN_SPEC.md §6b and IMPLEMENTATION_PLAN.md's P3.4 entry: a local `queue_entries` table is the authoritative pending-queue mirror, kept in sync bidirectionally; any moderation action Spotify can't express directly triggers a full **resync** (`PUT /me/player/play` with `uris` = current track + local queue in order, `position_ms` = live re-fetched progress), replacing Spotify's live queue wholesale.

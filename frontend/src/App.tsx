@@ -1,9 +1,13 @@
+import { AppShell } from './components/AppShell'
+
 function App() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-900 text-neutral-100">
-      <h1 className="text-4xl font-bold tracking-tight">Guest Jukebox</h1>
-      <p className="mt-2 text-neutral-400">Coming soon</p>
-    </div>
+    <AppShell>
+      <div className="flex flex-col items-center justify-center gap-2 pt-16 text-center">
+        <h1 className="text-display text-text-primary">Guest Jukebox</h1>
+        <p className="text-body text-text-secondary">Coming soon</p>
+      </div>
+    </AppShell>
   )
 }
 
