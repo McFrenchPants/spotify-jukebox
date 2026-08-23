@@ -4,7 +4,7 @@
 
 ## Status: Phase 0 complete
 
-**Next task: P1.1 — PKCE auth flow** (blocked — needs Spotify Developer credentials, see Open Questions)
+**Next task: P1.1 — PKCE auth flow** (blocked — user's `backend/.env` credentials were accidentally wiped by the P2.1 subagent and need to be re-entered, see Open Questions)
 
 ## Task Table
 
@@ -22,7 +22,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P1.3 | Search proxy | todo | |
 | P1.4 | Device resolution | todo | |
 | P1.5 | Real-time push (SSE) | todo | `/api/events`; replaces client-side polling |
-| P2.1 | SQLite schema & migrations | todo | |
+| P2.1 | SQLite schema & migrations | done | `better-sqlite3` pinned to 11.10.0 (13.x segfaults on Windows x64 in this env); tokens stored in `app_settings` k/v |
 | P2.2 | Guest session issuance | todo | |
 | P2.3 | Rate limiter | todo | |
 | P2.4 | Content guardrails | todo | |
@@ -47,12 +47,19 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 ## Open Questions / Blockers
 
-- **Spotify Developer app**: need a Client ID/Secret from [developer.spotify.com](https://developer.spotify.com/dashboard) with a redirect URI matching the backend's callback route, before P1.1 can be completed end-to-end (it can still be coded against mocks first).
+- **`backend/.env` needs real values re-entered**: user had added Spotify Client ID/Secret and a corrected `SPOTIFY_REDIRECT_URI`/`PORT` (both `http://192.168.50.179:80085/...`), but the P2.1 subagent overwrote `.env` with test values during verification and could not restore the originals (file is gitignored, no git history to recover from). Currently reset to blank placeholders matching `.env.example`. User needs to re-copy the Client ID/Secret from the Spotify dashboard and reset `SPOTIFY_REDIRECT_URI`/`PORT` to `80085`. **Process note**: subagent prompts touching `backend/.env` for verification must be told to back it up first (e.g. copy to `.env.bak`) and restore it exactly afterward, never reconstruct from memory.
 - **Admin PIN value**: not yet chosen — needed before P3.1's first real run (can default to a placeholder in `.env.example`).
 
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P2.1 SQLite schema & migrations
+- Added `backend/src/db/index.ts`: `better-sqlite3` singleton, `runMigrations()` (idempotent `CREATE TABLE IF NOT EXISTS` for all 4 spec tables + 2 indexes on `play_history`), called from `src/index.ts` before `app.listen`. WAL mode + foreign keys pragma enabled.
+- Added generic `getSetting`/`setSetting(key, value)` helpers on `app_settings` — P1.1 will store Spotify tokens there (`spotify_access_token`/`spotify_refresh_token`/`spotify_token_expires_at`) since the spec's table list has no dedicated tokens table.
+- **Pinned `better-sqlite3` to `^11.10.0`** — the latest (13.0.3) segfaults on load on this Windows x64 environment (prebuilt binary and from-source rebuild both crash); 11.10.0 works cleanly. Worth re-checking on a future Node/toolchain upgrade.
+- **Incident**: the subagent overwrote `backend/.env` with test values while verifying server boot, and could not restore the user's real Spotify credentials/redirect-URI/port afterward (gitignored file, no history). See Open Questions — user needs to re-enter them. Added a process note there for future subagent prompts.
+- Next: once `.env` is restored, P1.1 (PKCE auth flow) can proceed using the `getSetting`/`setSetting` helpers for token persistence.
 
 ### 2026-08-23 — P0.5 design system & style guide (Phase 0 complete)
 - Tailwind v4 tokens defined via `@theme` block in `frontend/src/index.css` (no `tailwind.config.js` — v4 doesn't use one): dark neutral scale (`bg`/`surface`/`surface-raised`/`surface-overlay`/`border` tiers), accent `#2fd66f` (distinct from Spotify's `#1DB954`), semantic success/error/warning colors, 4-step type scale (display/title/body/caption), radius scale (sm/md/lg/xl/full), one easing + 3 duration tokens (fast/base/slow, exposed as `.transition-fast/base/slow` utility classes since Tailwind v4 has no themeable duration namespace). Spacing scale: deliberately reused Tailwind's default numeric scale rather than a parallel custom one.
