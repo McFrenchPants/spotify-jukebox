@@ -1,6 +1,7 @@
 import express, { Express } from "express";
 import { authRouter } from "./routes/auth";
 import { deviceRouter } from "./routes/device";
+import { eventsRouter } from "./routes/events";
 import { searchRouter } from "./routes/search";
 
 export function createApp(): Express {
@@ -15,6 +16,7 @@ export function createApp(): Express {
   app.use("/api/auth", authRouter);
   app.use("/api/search", searchRouter);
   app.use("/api/device", deviceRouter);
+  app.use("/api/events", eventsRouter);
 
   return app;
 }

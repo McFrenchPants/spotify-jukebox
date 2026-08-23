@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 0 complete
+## Status: Phase 1 complete
 
-**Next task: P1.5 — Real-time push (SSE)** (last Phase 1 task)
+**Next task: P2.2 — Guest session issuance** (P2.1 already done)
 
 ## Task Table
 
@@ -21,7 +21,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P1.2 | Token refresh worker | done | vitest added; 6 unit tests pass; real refresh still needs P1.1's consent to complete first |
 | P1.3 | Search proxy | done | `GET /api/search?q=`; unfiltered raw proxy (P2.4 does filtering); 20 tests pass |
 | P1.4 | Device resolution | done | `GET /api/device`, `POST /api/device/select`; 18 new tests (38 total in backend) |
-| P1.5 | Real-time push (SSE) | todo | `/api/events`; replaces client-side polling |
+| P1.5 | Real-time push (SSE) | done | `/api/events`; generic `emitEvent`/`subscribe` bus for P2.5/P2.6/P3.4 to use; now-playing poller (4s) |
 | P2.1 | SQLite schema & migrations | done | `better-sqlite3` pinned to 11.10.0 (13.x segfaults on Windows x64 in this env); tokens stored in `app_settings` k/v |
 | P2.2 | Guest session issuance | todo | |
 | P2.3 | Rate limiter | todo | |
@@ -54,6 +54,15 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P1.5 SSE real-time push (Phase 1 complete)
+- Added `backend/src/events/bus.ts`: generic in-process pub/sub (`emitEvent(name, data)` / `subscribe(listener) -> unsubscribe`, Node `EventEmitter`-backed, domain-agnostic) — this is what P2.5 (queue add), P2.6 (leaderboard), and P3.4 (queue moderation) will call into later to broadcast `queue-update`/`leaderboard-update`.
+- Added `backend/src/routes/events.ts`: `GET /api/events` SSE endpoint — sets SSE headers, subscribes to the bus, writes `event:`/`data:` frames per emitted event, 15s heartbeat comments, cleans up subscription + heartbeat timer on client disconnect.
+- Added `backend/src/spotify/nowPlaying.ts`: `pollNowPlaying()` polls `/v1/me/player/currently-playing` every 4s (default), diffs against last-seen state (re-emits only on track-id change or play/pause flip — progress ticking alone doesn't re-emit), calls `emitEvent('now-playing', ...)` on change. Handles 204/nothing-playing and not-yet-connected (no refresh token) gracefully, mirrors the `startTokenRefreshWorker`/`stopTokenRefreshWorker` pattern. Wired into `src/index.ts`.
+- Since P2.5 (queue endpoint) doesn't exist yet, the "queue add delivers a queue-update event" acceptance criterion was validated via a test that calls `emitEvent('queue-update', ...)` directly against a connected SSE client (exercises the same bus→route path P2.5 will use) — full acceptance will be re-confirmed naturally once P2.5 lands and calls `emitEvent` for real.
+- 55 tests total passing across the backend (17 new this task). One SSE disconnect test takes ~4s due to Node socket-teardown latency (not a failure, just slow) — noted here in case it's worth a `testTimeout` bump later if it ever gets flaky in CI.
+- Phase 1 (Backend Core: Spotify Auth & Proxy) is now fully done: PKCE auth, token refresh, search proxy, device resolution, SSE. Still pending from the user: complete the real one-time Spotify consent at `http://192.168.50.179:8085/api/auth/login` (see Open Questions) — nothing has been exercised against the live Spotify API yet, only against mocks/unit tests.
+- Next: Phase 2 (guardrails & guest-facing endpoints), starting at P2.2 (P2.1 schema was already done earlier this session, out of order, since P1.1 depended on its `app_settings` storage).
 
 ### 2026-08-23 — P1.4 device resolution
 - Added `backend/src/spotify/device.ts`: `listDevices()` (fetches `/v1/me/player/devices`, drops any device with a null id), `resolveDevice()` — prefers a previously-selected `spotify_device_id` if still present in the live list (returns live info, not stale stored copy); else auto-resolves and persists if exactly one device is visible; else returns `resolved: null` with the full list for ambiguous (0 or 2+ device) cases.
