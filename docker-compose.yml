@@ -12,7 +12,7 @@ services:
     # has a specific LAN NIC you want to bind to instead of all interfaces,
     # change this to "<lan-ip>:3001:3001".
     ports:
-      - "${PORT:-3001}:3001"
+      - "${PORT:-8085}:8085"
     env_file:
       - backend/.env
     environment:
@@ -20,7 +20,9 @@ services:
       # config) happens to contain, so the container's internal port always
       # matches what's EXPOSEd/published below, and the DB always lands on
       # the persistent volume rather than wherever DB_PATH points locally.
-      - PORT=3001
+      # 8085 (not the more common 3001) specifically to avoid colliding with
+      # other apps on the same host that default to 3001.
+      - PORT=8085
       - DB_PATH=/app/backend/data/jukebox.db
     volumes:
       - jukebox-data:/app/backend/data

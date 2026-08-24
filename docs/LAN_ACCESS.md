@@ -18,11 +18,13 @@ Bonjour, or any host-level feature — just the host's own LAN IP address.
    - Home Assistant OS: Settings → System → Network shows the IP directly.
    - macOS: System Settings → Network, or `ipconfig getifaddr en0`.
    - Windows: `ipconfig` and look under your active adapter.
-2. **Find the published port.** By default this is `3001`, from
-   `docker-compose.yml`'s `ports: ["${PORT:-3001}:3001"]`, unless a `PORT`
-   environment variable overrides it. Check `backend/.env` or however the
-   container was started if unsure.
-3. **Combine them:** `http://<lan-ip>:<port>` — e.g. `http://192.168.1.42:3001`.
+2. **Find the published port.** By default this is `8085` (chosen over the
+   more common `3001` specifically to avoid colliding with other apps on the
+   same host that default to that port), from `docker-compose.yml`'s
+   `ports: ["${PORT:-8085}:8085"]`, unless a `PORT` environment variable
+   overrides it. Check `backend/.env` or however the container was started
+   if unsure.
+3. **Combine them:** `http://<lan-ip>:<port>` — e.g. `http://192.168.1.42:8085`.
 
 This URL works from any device on the same LAN/wifi, with no extra
 configuration. Bookmark it, or just remember it — you'll use it in Section 3
@@ -52,7 +54,7 @@ same LAN:
 http://<host-hostname>.local:<port>
 ```
 
-(e.g. `http://homeassistant.local:3001`). If the app loads, it works — use
+(e.g. `http://homeassistant.local:8085`). If the app loads, it works — use
 this friendlier URL if you like. If it times out or fails to resolve, your
 host doesn't have working local mDNS, and that's fine — fall back to the
 static IP:port URL from Section 1. This is opportunistic and host-dependent;
@@ -73,8 +75,8 @@ There is no separate "guest URL" setting to configure. Instead:
    Section 1, or the `.local` hostname from Section 2 if it works for your
    host.
 2. Load the admin panel in your own browser using **that same URL**
-   (e.g. `http://192.168.1.42:3001/admin`, or
-   `http://homeassistant.local:3001/admin`).
+   (e.g. `http://192.168.1.42:8085/admin`, or
+   `http://homeassistant.local:8085/admin`).
 3. Open the Settings tab. The Guest Link card's QR code and printed URL will
    automatically match whatever URL is in your address bar — no code change,
    no settings screen, no restart needed.
@@ -120,11 +122,11 @@ services:
     network_mode: host
     # NOTE: when network_mode is "host", the `ports:` section below is
     # ignored entirely — the container shares the host's network stack
-    # directly and listens on port 3001 (or $PORT) on every host interface
+    # directly and listens on port 8085 (or $PORT) on every host interface
     # without any Docker-level port mapping. Remove or comment out `ports:`
     # to avoid confusion.
     # ports:
-    #   - "${PORT:-3001}:3001"
+    #   - "${PORT:-8085}:8085"
 ```
 
 This is an advanced, opt-in configuration change, not the default — treat it

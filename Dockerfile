@@ -79,5 +79,5 @@ RUN groupadd --system jukebox && useradd --system --gid jukebox --home /app/back
   && chown -R jukebox:jukebox /app/backend
 USER jukebox
 
-EXPOSE 3001
+EXPOSE 8085
 CMD ["node", "dist/index.js"]

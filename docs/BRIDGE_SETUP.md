@@ -181,7 +181,7 @@ same network as the backend:
 GET http://<backend-host>:<port>/api/device
 ```
 
-(Default port is `3001` unless overridden by the `PORT` environment
+(Default port is `8085` in the Docker deployment, unless overridden by the `PORT` environment
 variable — check how the backend was started if unsure.)
 
 **Successful response — a device is resolved (HTTP 200):**
