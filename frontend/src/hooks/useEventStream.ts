@@ -24,8 +24,15 @@ const STALE_CHECK_INTERVAL_MS = 1000
  * with no credentials involved. Production serves frontend and backend from
  * the same origin (per DESIGN_SPEC's deployment model), so this only
  * matters in dev.
+ *
+ * Uses window.location.hostname rather than a literal "localhost" so this
+ * also works when the dev server is reached from another device on the LAN
+ * (e.g. testing from a phone via the dev machine's IP) — "localhost" in that
+ * case would resolve to the phone itself, not the dev machine.
  */
-const DEFAULT_EVENTS_URL = import.meta.env.DEV ? 'http://localhost:8085/api/events' : '/api/events'
+const DEFAULT_EVENTS_URL = import.meta.env.DEV
+  ? `http://${window.location.hostname}:8085/api/events`
+  : '/api/events'
 
 export interface EventStream {
   connectionState: ConnectionState
