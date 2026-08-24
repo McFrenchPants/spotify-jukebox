@@ -3,12 +3,14 @@ import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import {
   ApiError,
+  getDevice,
   getTrustMode,
   pausePlayback,
   previousPlayback,
   resumePlayback,
   skipPlayback,
   setVolume,
+  type Device,
   type TrustModeState,
 } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
@@ -61,14 +63,30 @@ function SkipPreviousIcon() {
   )
 }
 
+const VOLUME_UNSUPPORTED_COPY =
+  "This device's volume can't be controlled remotely — adjust the phone or speaker directly."
+
 /**
  * Maps a playback-action failure to distinct, guest-facing copy. Mirrors
  * describeQueueError in SearchAndQueue.tsx: 403 is an expected mode-changed
  * race (not scary), 503 is the same "admin needs to finish setup" copy as
  * the P4.2 queue-add path, everything else is generic.
+ *
+ * Fallback/defense-in-depth: even though the volume slider is proactively
+ * disabled when the resolved device doesn't support remote volume control
+ * (see the device fetch in PlaybackControls below), a stale client-side
+ * device read or a race with a device change could still let a volume
+ * request reach Spotify and come back with this exact failure. Recognize it
+ * by message content (the backend wraps this as a 502 spotify_volume_failed,
+ * not a 403 — Spotify's own "403" appears only inside the error text, not as
+ * our backend's actual HTTP status) and show the same friendly copy instead
+ * of the raw Spotify string.
  */
 function describePlaybackError(err: unknown): string {
   if (err instanceof ApiError) {
+    if (/cannot control device volume/i.test(err.message)) {
+      return VOLUME_UNSUPPORTED_COPY
+    }
     if (err.status === 403) {
       return "This action isn't available right now."
     }
@@ -96,6 +114,7 @@ function describePlaybackError(err: unknown): string {
  */
 export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
   const [permissions, setPermissions] = useState<TrustModeState | null>(null)
+  const [device, setDevice] = useState<Device | null | undefined>(undefined)
   const [pending, setPending] = useState<Record<ActionKey, boolean>>({
     previous: false,
     pauseResume: false,
@@ -115,6 +134,26 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
       .catch(() => {
         // Leave permissions null — all controls stay disabled, which is the
         // safe default when we can't confirm what's allowed.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+    // GET /api/device is public/unauthenticated, so this guest-facing
+    // component can call it directly (same endpoint DeviceSelector.tsx uses
+    // for the admin panel) to learn whether the resolved bridge device
+    // supports remote volume control ahead of time, rather than letting a
+    // guest hit a confusing raw Spotify error after already using the slider.
+    getDevice()
+      .then((data) => {
+        if (!cancelled) setDevice(data.resolved)
+      })
+      .catch(() => {
+        // Leave device undefined/unresolved — the volume slider stays
+        // disabled below (undefined is treated the same as "no device").
       })
     return () => {
       cancelled = true
@@ -160,7 +199,11 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
 
   const pauseResumeAllowed = permissions?.pauseResume ?? false
   const skipAllowed = permissions?.skip ?? false
-  const volumeAllowed = permissions?.volume ?? false
+  // Volume needs both the trust-mode permission AND a resolved device that
+  // actually supports remote volume control — no device (undefined/null) or
+  // supports_volume: false disables the slider regardless of trust mode.
+  const deviceSupportsVolume = device != null && device.supports_volume
+  const volumeAllowed = (permissions?.volume ?? false) && deviceSupportsVolume
 
   return (
     <Card className="flex flex-col gap-4">
@@ -212,10 +255,13 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
       {!permissions && (
         <p className="text-caption text-text-muted">Checking playback permissions&hellip;</p>
       )}
-      {permissions && !pauseResumeAllowed && !skipAllowed && !volumeAllowed && (
+      {permissions && !pauseResumeAllowed && !skipAllowed && !permissions.volume && (
         <p className="text-caption text-text-muted">
           Playback controls are restricted right now — ask the host to enable them.
         </p>
+      )}
+      {permissions?.volume && !deviceSupportsVolume && (
+        <p className="text-caption text-text-muted">{VOLUME_UNSUPPORTED_COPY}</p>
       )}
     </Card>
   )

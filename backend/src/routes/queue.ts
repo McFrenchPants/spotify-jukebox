@@ -1,8 +1,6 @@
 import { Response, Router } from "express";
 import { getSetting } from "../db";
-import { insertPlayHistory } from "../db/playHistory";
 import { insertQueueEntry, listQueueEntries } from "../db/queueEntries";
-import { recordTrackPlay } from "../db/trackStats";
 import { emitEvent } from "../events/bus";
 import { runQueueGuardrails } from "../guardrails/queueGuardrails";
 import { recordAllowedRequest, rateLimitGuestSession } from "../guardrails/rateLimiter";
@@ -123,15 +121,6 @@ queueRouter.post("/", resolveGuestSession, rateLimitGuestSession, async (req, re
     return;
   }
 
-  insertPlayHistory({
-    spotifyTrackId: track.id,
-    trackName: track.name,
-    artistName: track.artist,
-    albumArtUrl: track.albumArt,
-    durationMs: track.durationMs,
-    guestSessionId: req.guestSession.sessionId,
-  });
-  recordTrackPlay(track.id);
   insertQueueEntry({
     spotifyTrackId: track.id,
     trackName: track.name,
@@ -141,12 +130,14 @@ queueRouter.post("/", resolveGuestSession, rateLimitGuestSession, async (req, re
     addedBySessionId: req.guestSession.sessionId,
   });
 
+  // play_history/track_stats are no longer written here — queueing a track
+  // only means a guest asked for it, not that it actually played (it could
+  // still be skipped/cleared before ever playing). The now-playing poller
+  // (spotify/nowPlaying.ts) records the actual play — including the
+  // guest-attribution lookup via this queue_entries row — once Spotify
+  // reports the track has actually started, which also correctly captures
+  // organic/autoplay-continuation tracks that never go through this route.
   emitEvent("queue-update", { track, queuedBy: req.guestSession.sessionId });
-  // recordTrackPlay() above changes leaderboard standing (play_count) for
-  // every successful queue-add, not just admin blacklist actions (the only
-  // other current emitter of this event, in routes/admin.ts) — a leaderboard
-  // view relying solely on this event to stay live needs it here too.
-  emitEvent("leaderboard-update", { trackId: track.id });
 
   res.status(201).json(track);
 });

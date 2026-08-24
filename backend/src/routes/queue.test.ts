@@ -166,7 +166,7 @@ describe("POST /api/queue", () => {
     expect(getTrack).not.toHaveBeenCalled();
   });
 
-  it("happy path: 201, exactly one addTrackToQueue call, one play_history row, play_count = 1 for a fresh track", async () => {
+  it("happy path: 201, exactly one addTrackToQueue call, and a local queue_entries mirror row", async () => {
     vi.mocked(getTrack).mockResolvedValue(TRACK_1);
     const { token, sessionId } = await createGuestToken();
 
@@ -183,22 +183,27 @@ describe("POST /api/queue", () => {
     expect(addTrackToQueue).toHaveBeenCalledTimes(1);
     expect(addTrackToQueue).toHaveBeenCalledWith("track-1", DEVICE_ID);
 
-    const rows = playHistoryRowsFor("track-1") as any[];
-    expect(rows).toHaveLength(1);
-    expect(rows[0].spotify_track_id).toBe("track-1");
-    expect(rows[0].guest_session_id).toBe(sessionId);
-    expect(rows[0].track_name).toBe(TRACK_1.name);
+    // play_history/track_stats are no longer written synchronously by this
+    // route — that now happens in spotify/nowPlaying.ts once the track
+    // actually starts playing. This route only mirrors the pending request.
+    expect(playHistoryRowsFor("track-1")).toHaveLength(0);
+    expect(playCountFor("track-1")).toBeUndefined();
 
-    expect(playCountFor("track-1")).toBe(1);
+    const queueRes = await fetch(`${baseUrl}/api/queue`);
+    const queueBody = (await queueRes.json()) as any[];
+    expect(queueBody).toHaveLength(1);
+    expect(queueBody[0]).toMatchObject({ spotifyTrackId: "track-1", addedBySessionId: sessionId });
 
     expect(emitEvent).toHaveBeenCalledWith(
       "queue-update",
       expect.objectContaining({ track: TRACK_1, queuedBy: sessionId })
     );
-    expect(emitEvent).toHaveBeenCalledWith("leaderboard-update", { trackId: "track-1" });
+    // leaderboard-update is no longer emitted from this route — it now fires
+    // from the now-playing poller at actual-play-time instead of add-time.
+    expect(emitEvent).not.toHaveBeenCalledWith("leaderboard-update", expect.anything());
   });
 
-  it("accumulates play_count across two different tracks queued by two different sessions", async () => {
+  it("mirrors two different tracks queued by two different sessions into queue_entries, without writing play_history/track_stats", async () => {
     vi.mocked(getTrack).mockResolvedValueOnce(TRACK_1);
     const session1 = await createGuestToken();
     const res1 = await fetch(`${baseUrl}/api/queue`, {
@@ -217,7 +222,7 @@ describe("POST /api/queue", () => {
     });
     expect(res2.status).toBe(201);
 
-    // A different session queues track-1 again — accumulation across sessions.
+    // A different session queues track-1 again.
     vi.mocked(getTrack).mockResolvedValueOnce(TRACK_1);
     const session3 = await createGuestToken();
     const res3 = await fetch(`${baseUrl}/api/queue`, {
@@ -228,13 +233,17 @@ describe("POST /api/queue", () => {
     expect(res3.status).toBe(201);
 
     expect(addTrackToQueue).toHaveBeenCalledTimes(3);
-    expect(playCountFor("track-1")).toBe(2);
-    expect(playCountFor("track-2")).toBe(1);
-    expect(playHistoryRowsFor("track-1")).toHaveLength(2);
-    expect(playHistoryRowsFor("track-2")).toHaveLength(1);
+    expect(playCountFor("track-1")).toBeUndefined();
+    expect(playCountFor("track-2")).toBeUndefined();
+    expect(playHistoryRowsFor("track-1")).toHaveLength(0);
+    expect(playHistoryRowsFor("track-2")).toHaveLength(0);
+
+    const queueRes = await fetch(`${baseUrl}/api/queue`);
+    const queueBody = (await queueRes.json()) as any[];
+    expect(queueBody).toHaveLength(3);
   });
 
-  it("rate-limits a second request from the same session and writes no second play_history row", async () => {
+  it("rate-limits a second request from the same session", async () => {
     vi.mocked(getTrack).mockResolvedValue(TRACK_1);
     const { token } = await createGuestToken();
 
@@ -256,10 +265,9 @@ describe("POST /api/queue", () => {
     expect(body2.error).toBe("rate_limited");
 
     expect(addTrackToQueue).toHaveBeenCalledTimes(1);
-    expect(playHistoryRowsFor("track-1")).toHaveLength(1);
   });
 
-  it("returns 422 on a guardrail rejection (explicit filter), does not consume the rate-limit bucket, and writes no play_history row", async () => {
+  it("returns 422 on a guardrail rejection (explicit filter), does not consume the rate-limit bucket, and writes no queue_entries row", async () => {
     vi.mocked(getTrack).mockResolvedValueOnce(EXPLICIT_TRACK);
     const { token } = await createGuestToken();
 
@@ -273,7 +281,9 @@ describe("POST /api/queue", () => {
     expect(rejectedRes.status).toBe(422);
     expect(rejectedBody.error).toBe("explicit");
     expect(addTrackToQueue).not.toHaveBeenCalled();
-    expect(playHistoryRowsFor("track-explicit")).toHaveLength(0);
+
+    const queueResAfterReject = await fetch(`${baseUrl}/api/queue`);
+    expect((await queueResAfterReject.json()) as any[]).toHaveLength(0);
 
     // The rate-limit bucket must not have been consumed by the rejected
     // request — a subsequent (allowed) request from the same session must

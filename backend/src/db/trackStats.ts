@@ -85,9 +85,12 @@ interface LeaderboardRow {
  * insertion order, giving a deterministic single match. This is an INNER
  * JOIN: a track_stats row with play_count > 0 always has at least one
  * matching play_history row, because recordTrackPlay() is only ever called
- * alongside insertPlayHistory() (see routes/queue.ts) — there is no code
- * path that creates a track_stats row without a corresponding play_history
- * row, so the "no match" case cannot occur given the current write path.
+ * alongside insertPlayHistory() (see spotify/nowPlaying.ts's pollNowPlaying,
+ * which records both together once a track actually starts playing — not
+ * routes/queue.ts, which only mirrors a guest's queue request locally) —
+ * there is no code path that creates a track_stats row without a
+ * corresponding play_history row, so the "no match" case cannot occur given
+ * the current write path.
  */
 export function getLeaderboard(limit = 10): LeaderboardEntry[] {
   const rows = db

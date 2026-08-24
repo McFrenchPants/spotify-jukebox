@@ -73,21 +73,30 @@ describe("deleteQueueEntry", () => {
 });
 
 describe("dequeueBySpotifyTrackId", () => {
-  it("removes only the oldest matching row", () => {
-    const id1 = insertQueueEntry(entry({ spotifyTrackId: "track-dup" }));
-    const id2 = insertQueueEntry(entry({ spotifyTrackId: "track-dup" }));
+  it("removes only the oldest matching row and returns its added_by_session_id", () => {
+    const id1 = insertQueueEntry(entry({ spotifyTrackId: "track-dup", addedBySessionId: "session-a" }));
+    const id2 = insertQueueEntry(entry({ spotifyTrackId: "track-dup", addedBySessionId: "session-b" }));
 
-    dequeueBySpotifyTrackId("track-dup");
+    const result = dequeueBySpotifyTrackId("track-dup");
 
+    expect(result).toBe("session-a");
     const remaining = listQueueEntries();
     expect(remaining.map((e) => e.id)).toEqual([id2]);
     expect(id1).not.toBe(id2);
   });
 
-  it("is a no-op when no row matches", () => {
+  it("returns null (and deletes nothing) when no row matches", () => {
     insertQueueEntry(entry({ spotifyTrackId: "track-1" }));
-    dequeueBySpotifyTrackId("track-nonexistent");
+    const result = dequeueBySpotifyTrackId("track-nonexistent");
+    expect(result).toBeNull();
     expect(listQueueEntries()).toHaveLength(1);
+  });
+
+  it("returns null when the matched row's added_by_session_id is itself null (organic-looking mirror entry)", () => {
+    insertQueueEntry(entry({ spotifyTrackId: "track-organic", addedBySessionId: null }));
+    const result = dequeueBySpotifyTrackId("track-organic");
+    expect(result).toBeNull();
+    expect(listQueueEntries()).toHaveLength(0);
   });
 });
 

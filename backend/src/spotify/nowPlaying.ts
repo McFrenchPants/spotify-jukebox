@@ -1,4 +1,6 @@
 import { dequeueBySpotifyTrackId } from "../db/queueEntries";
+import { insertPlayHistory } from "../db/playHistory";
+import { recordTrackPlay } from "../db/trackStats";
 import { emitEvent } from "../events/bus";
 import { getValidAccessToken } from "./client";
 import { listDevices } from "./device";
@@ -218,9 +220,35 @@ export async function pollNowPlaying(
   if (hasChanged(lastState, nextState)) {
     lastState = nextState;
     if (nextState.trackId) {
-      // Best-effort: the track that just started playing is no longer
-      // "pending," so drop it from the local queue mirror.
-      dequeueBySpotifyTrackId(nextState.trackId);
+      // The track that just started playing is no longer "pending," so drop
+      // it from the local queue mirror — and use the matched row's
+      // added_by_session_id (if any) to attribute the play recorded below.
+      // No match (null) means this track was never queued locally, i.e. it's
+      // an organic/autoplay continuation Spotify picked on its own.
+      const addedBySessionId = dequeueBySpotifyTrackId(nextState.trackId);
+
+      // This is the actual "a new track started playing" signal — the right
+      // place to record play_history/track_stats (see trackStats.ts's
+      // getLeaderboard docs for why this moved here from routes/queue.ts:
+      // queueing a track only means a guest asked for it, not that it
+      // played). Only record on an actual play start, not a pause.
+      if (nextState.isPlaying) {
+        insertPlayHistory({
+          spotifyTrackId: nextState.trackId,
+          trackName: nextState.name ?? "Unknown track",
+          artistName: nextState.artist ?? "Unknown artist",
+          albumArtUrl: nextState.albumArt ?? null,
+          durationMs: nextState.durationMs ?? 0,
+          guestSessionId: addedBySessionId,
+        });
+        recordTrackPlay(nextState.trackId);
+        // recordTrackPlay() above changes leaderboard standing (play_count)
+        // for every actual play, not just admin blacklist actions (the only
+        // other current emitter of this event, in routes/admin.ts) — a
+        // leaderboard view relying solely on this event to stay live needs
+        // it here too.
+        emitEvent("leaderboard-update", { trackId: nextState.trackId });
+      }
     }
     emitEvent("now-playing", nextState);
   } else {

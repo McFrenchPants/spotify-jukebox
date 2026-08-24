@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 5 nearly complete — only P5.5 (end-to-end smoke test) remains, blocked on real hardware + user sign-off
+## Status: Phase 5 — P5.5 end-to-end smoke test in progress (real hardware, live with the user)
 
-**Next task: P5.5 (end-to-end smoke test) — needs the user with real bridge-phone/speaker hardware, not autonomous work**
+**Next task: continue P5.5 alongside the user as they test — fix issues as found**
 
 ## Task Table
 
@@ -44,7 +44,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P5.2 | Dockerfile & Compose | done | Multi-stage `Dockerfile` + `docker-compose.yml`; **verified 2026-08-23** with a real `docker compose build`/`up` — health check, static frontend, and SQLite volume all confirmed working |
 | P5.3 | LAN discovery | done | `docs/LAN_ACCESS.md`; decided against in-container mDNS/avahi (bridge-network/Docker Desktop friction, extra daemon) in favor of static IP:port + opportunistic host-level `.local`; QR code already auto-matches via `window.location.origin` (P4.6), no code change needed |
 | P5.4 | Resilience pass | done | `SpotifyReauthRequiredError`/`classifySpotifyAuthError` for dead refresh tokens (`503 spotify_reauth_required`); `nowPlaying.ts` poller now also detects bridge-device offline/online (throttled every 3rd tick) and emits `device-status` SSE, surfaced live in `DeviceSelector`; restart/volume persistence verified directly against real Docker |
-| P5.5 | End-to-end smoke test | todo | Requires real hardware + user sign-off |
+| P5.5 | End-to-end smoke test | in-progress | User is actively testing with real bridge phone/speaker/Spotify account; found & fixed volume-control and play-history-timing bugs so far (see session log), still ongoing |
 
 ## Open Questions / Blockers
 
@@ -55,6 +55,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — Real smoke-test bugs found and fixed: volume control, play-history timing
+- **User began the real P5.5 hardware smoke test** (real bridge phone + Bluetooth speaker, already playing music) and found three things: (1) a stray "Song One"/"Artist A" row with no album art in the leaderboard/history — traced to a leftover test-fixture row (`spotify_track_id: 'track-1'`) written to the real dev DB before P2.5's test-isolation fix; user explicitly said not to bother cleaning it up since the Docker deployment starts from a fresh DB anyway, so left as-is; (2) volume slider produced a raw error toast: `Spotify volume change failed: 403 Player command failed: Cannot control device volume`; (3) recently-played/leaderboard history only showed guest-queued tracks, never Spotify's own autoplay/radio continuation tracks.
+- **Volume fix**: root cause is a real Spotify Connect limitation — a phone bridging audio out via Bluetooth commonly doesn't support the Web API's remote volume-control command at all, independent of anything this app does. Spotify's device object exposes this ahead of time via `supports_volume`, which `backend/src/spotify/device.ts`'s `Device` shape wasn't capturing. Now captured and threaded through `GET /api/device`; `frontend/src/components/playback/PlaybackControls.tsx` fetches it and proactively disables the volume slider (distinct caption: *"This device's volume can't be controlled remotely — adjust the phone or speaker directly."*) instead of letting a guest hit the confusing raw error. Kept a defense-in-depth message match on the raw Spotify error text too, in case of a stale-state race.
+- **Play-history timing fix**: `POST /api/queue` was recording `play_history`/`track_stats` at queue-*add* time (a guest asking for a track), not at actual-play time — which both missed all organic/autoplay continuation entirely and could over-count a track that got skipped before ever playing. Moved the recording into the existing `nowPlaying.ts` poller (which already detects real track-start events every ~4s and already has full metadata from Spotify, no extra API call needed), attributing the play to whichever guest queued it (via a lookup against the local `queue_entries` mirror) or `null` for a track Spotify picked on its own. `routes/queue.ts` no longer writes history directly — it only maintains the queue mirror and the `queue-update` SSE event now; `leaderboard-update` moved to fire from the poller alongside the new recording.
+- 232 backend tests passing (up from 227), `tsc --noEmit` clean both sides, frontend build/lint clean — independently re-verified by the supervisor, not just taken on the subagent's report.
+- Real Spotify connection continues to check out well otherwise per the user's live testing (search, queue, now-playing progress all working).
 
 ### 2026-08-23 — P5.4 resilience pass (Phase 5 nearly complete)
 - **Token expiry mid-session**: added `backend/src/spotify/errors.ts` (`SpotifyReauthRequiredError` + shared `classifySpotifyAuthError()` helper). `tokenRefresh.ts`'s `refreshAccessToken()` now throws this distinct error type specifically on Spotify's `invalid_grant` (a dead/revoked refresh token that will never recover on its own — as opposed to a transient network/HTTP failure, which stays a plain retryable `Error`). Routes `search.ts`, `device.ts`, `artist.ts`, `playback.ts`, `queue.ts` all replaced their previously-duplicated `/No spotify_refresh_token/` regex check with the shared helper, so all five now also return a distinct `503 spotify_reauth_required` (pointing at `GET /api/auth/login`) instead of a generic unhelpful `502` when this happens. The `nowPlaying.ts` poller treats it as a silent-skip case, same as not-connected-yet, to avoid log spam every 4s.

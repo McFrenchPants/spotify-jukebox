@@ -28,6 +28,16 @@ function jsonResponse(body: unknown, status = 200): Response {
   } as Response;
 }
 
+/**
+ * Counts only "now-playing" emitEvent calls — pollNowPlaying now also emits
+ * "leaderboard-update" whenever it records an actual play, so raw
+ * emitEvent-call-count assertions from before that behavior existed need to
+ * filter to the specific event they care about.
+ */
+function nowPlayingEmitCount(): number {
+  return vi.mocked(emitEvent).mock.calls.filter((call) => call[0] === "now-playing").length;
+}
+
 function noContentResponse(): Response {
   return {
     ok: true,
@@ -70,6 +80,8 @@ describe("pollNowPlaying", () => {
   beforeEach(() => {
     runMigrations();
     db.prepare("DELETE FROM queue_entries").run();
+    db.prepare("DELETE FROM play_history").run();
+    db.prepare("DELETE FROM track_stats").run();
     deleteSetting("spotify_device_id");
     resetNowPlayingState();
     vi.clearAllMocks();
@@ -97,6 +109,75 @@ describe("pollNowPlaying", () => {
     expect(listQueueEntries().find((e) => e.spotifyTrackId === "track-a")).toBeDefined();
   });
 
+  it("records play_history/track_stats and emits leaderboard-update for a new track with a matching queue_entries row, using its added_by_session_id", async () => {
+    db.prepare(
+      `INSERT INTO queue_entries (spotify_track_id, track_name, artist_name, duration_ms, added_by_session_id)
+       VALUES ('track-a', 'Song A', 'Artist A', 200000, 'session-guest-1')`
+    ).run();
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+
+    const historyRow = db
+      .prepare("SELECT * FROM play_history WHERE spotify_track_id = 'track-a'")
+      .get() as any;
+    expect(historyRow).toBeDefined();
+    expect(historyRow.guest_session_id).toBe("session-guest-1");
+    expect(historyRow.track_name).toBe("Song A");
+
+    const statsRow = db
+      .prepare("SELECT * FROM track_stats WHERE spotify_track_id = 'track-a'")
+      .get() as any;
+    expect(statsRow.play_count).toBe(1);
+
+    expect(listQueueEntries().find((e) => e.spotifyTrackId === "track-a")).toBeUndefined();
+
+    expect(emitEvent).toHaveBeenCalledWith("leaderboard-update", { trackId: "track-a" });
+  });
+
+  it("records play_history/track_stats with guestSessionId: null for an organic/autoplay track with no matching queue_entries row", async () => {
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+
+    const historyRow = db
+      .prepare("SELECT * FROM play_history WHERE spotify_track_id = 'track-a'")
+      .get() as any;
+    expect(historyRow).toBeDefined();
+    expect(historyRow.guest_session_id).toBeNull();
+
+    expect(emitEvent).toHaveBeenCalledWith("leaderboard-update", { trackId: "track-a" });
+  });
+
+  it("does not record a play when the track pauses (not a new track starting)", async () => {
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+    const countAfterPlay = (
+      db.prepare("SELECT COUNT(*) AS c FROM play_history WHERE spotify_track_id = 'track-a'").get() as any
+    ).c;
+    expect(countAfterPlay).toBe(1);
+
+    await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A_PAUSED)), getTokenFn);
+    const countAfterPause = (
+      db.prepare("SELECT COUNT(*) AS c FROM play_history WHERE spotify_track_id = 'track-a'").get() as any
+    ).c;
+    expect(countAfterPause).toBe(1);
+    expect(emitEvent).not.toHaveBeenLastCalledWith("leaderboard-update", expect.anything());
+  });
+
+  it("does not record a play on an unchanged poll (progress ticking, same track/state)", async () => {
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+    await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A_PROGRESSED)), getTokenFn);
+
+    const count = (
+      db.prepare("SELECT COUNT(*) AS c FROM play_history WHERE spotify_track_id = 'track-a'").get() as any
+    ).c;
+    expect(count).toBe(1);
+  });
+
   it("emits now-playing when the track id changes", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(TRACK_A));
     const getTokenFn = vi.fn().mockResolvedValue("access-token");
@@ -118,36 +199,36 @@ describe("pollNowPlaying", () => {
     const getTokenFn = vi.fn().mockResolvedValue("access-token");
 
     await pollNowPlaying(fetchMock, getTokenFn);
-    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(nowPlayingEmitCount()).toBe(1);
 
     await pollNowPlaying(fetchMock, getTokenFn);
-    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(nowPlayingEmitCount()).toBe(1);
   });
 
   it("does not re-emit for progress-only changes on the same track", async () => {
     const getTokenFn = vi.fn().mockResolvedValue("access-token");
 
     await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
-    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(nowPlayingEmitCount()).toBe(1);
 
     await pollNowPlaying(
       vi.fn().mockResolvedValue(jsonResponse(TRACK_A_PROGRESSED)),
       getTokenFn
     );
-    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(nowPlayingEmitCount()).toBe(1);
   });
 
   it("emits when play/pause state flips on the same track", async () => {
     const getTokenFn = vi.fn().mockResolvedValue("access-token");
 
     await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
-    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(nowPlayingEmitCount()).toBe(1);
 
     await pollNowPlaying(
       vi.fn().mockResolvedValue(jsonResponse(TRACK_A_PAUSED)),
       getTokenFn
     );
-    expect(emitEvent).toHaveBeenCalledTimes(2);
+    expect(nowPlayingEmitCount()).toBe(2);
     expect(emitEvent).toHaveBeenLastCalledWith(
       "now-playing",
       expect.objectContaining({ trackId: "track-a", isPlaying: false })
@@ -160,7 +241,7 @@ describe("pollNowPlaying", () => {
     await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
     await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_B)), getTokenFn);
 
-    expect(emitEvent).toHaveBeenCalledTimes(2);
+    expect(nowPlayingEmitCount()).toBe(2);
     expect(emitEvent).toHaveBeenLastCalledWith(
       "now-playing",
       expect.objectContaining({ trackId: "track-b" })
@@ -171,7 +252,7 @@ describe("pollNowPlaying", () => {
     const getTokenFn = vi.fn().mockResolvedValue("access-token");
 
     await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
-    expect(emitEvent).toHaveBeenCalledTimes(1);
+    expect(nowPlayingEmitCount()).toBe(1);
 
     await expect(
       pollNowPlaying(vi.fn().mockResolvedValue(noContentResponse()), getTokenFn)
@@ -222,6 +303,7 @@ describe("pollNowPlaying", () => {
       type: "Smartphone",
       is_active: true,
       volume_percent: 80,
+      supports_volume: true,
     };
 
     it("does not call listDevices when no device is resolved yet", async () => {

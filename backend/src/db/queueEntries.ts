@@ -87,13 +87,26 @@ export function deleteQueueEntry(id: number): boolean {
  * Deletes the single oldest (lowest id) queue_entries row matching the given
  * Spotify track id, if any. Used by the now-playing poller to dequeue a
  * track from the local mirror once it starts actually playing (it's no
- * longer "pending"). No-op if no matching row exists.
+ * longer "pending"), and to attribute the resulting play_history/track_stats
+ * write to the guest who queued it (see nowPlaying.ts). Returns the matched
+ * row's `added_by_session_id` (which may itself be null for an entry that
+ * was inserted with no session), or `null` if no row matched at all — the
+ * latter is the "Spotify played this on its own" (organic/autoplay) case.
  */
-export function dequeueBySpotifyTrackId(spotifyTrackId: string): void {
-  db.prepare(
-    `DELETE FROM queue_entries
-     WHERE id = (SELECT MIN(id) FROM queue_entries WHERE spotify_track_id = ?)`
-  ).run(spotifyTrackId);
+export function dequeueBySpotifyTrackId(spotifyTrackId: string): string | null {
+  const row = db
+    .prepare<[string], { id: number; added_by_session_id: string | null }>(
+      `SELECT id, added_by_session_id FROM queue_entries
+       WHERE id = (SELECT MIN(id) FROM queue_entries WHERE spotify_track_id = ?)`
+    )
+    .get(spotifyTrackId);
+
+  if (!row) {
+    return null;
+  }
+
+  db.prepare("DELETE FROM queue_entries WHERE id = ?").run(row.id);
+  return row.added_by_session_id;
 }
 
 /** Deletes all queue_entries rows. */

@@ -9,6 +9,7 @@ export interface Device {
   type: string;
   is_active: boolean;
   volume_percent: number | null;
+  supports_volume: boolean;
 }
 
 interface SpotifyDevicesResponse {
@@ -18,6 +19,7 @@ interface SpotifyDevicesResponse {
     type: string;
     is_active: boolean;
     volume_percent: number | null;
+    supports_volume: boolean;
   }>;
 }
 
@@ -72,6 +74,7 @@ export async function listDevices(
       type: d.type,
       is_active: d.is_active,
       volume_percent: d.volume_percent,
+      supports_volume: d.supports_volume,
     }));
 }
 

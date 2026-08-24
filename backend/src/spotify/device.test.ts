@@ -26,6 +26,7 @@ const DEVICE_A = {
   type: "Smartphone",
   is_active: true,
   volume_percent: 80,
+  supports_volume: false,
 };
 
 const DEVICE_B = {
@@ -34,6 +35,7 @@ const DEVICE_B = {
   type: "Speaker",
   is_active: false,
   volume_percent: 50,
+  supports_volume: true,
 };
 
 describe("listDevices", () => {

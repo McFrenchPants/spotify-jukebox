@@ -463,6 +463,9 @@ export interface Device {
   type: string
   is_active: boolean
   volume_percent: number | null
+  /** Whether Spotify's remote volume-control command works on this device (e.g. false for
+   *  phones outputting audio via Bluetooth) — a well-known Spotify Connect limitation. */
+  supports_volume: boolean
 }
 
 /** GET /api/device — public, no admin token needed. */
