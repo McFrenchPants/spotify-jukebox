@@ -1,0 +1,28 @@
+name: "Guest Jukebox"
+version: "1.0.0"
+slug: "guest_jukebox"
+description: "Self-hosted, LAN-only party music queueing app for guests, powered by Spotify"
+url: "https://github.com/McFrenchPants/spotify-jukebox"
+arch:
+  - amd64
+startup: application
+boot: auto
+init: false
+ports:
+  8085/tcp: 8085
+ports_description:
+  8085/tcp: "Guest Jukebox web app and API"
+webui: "http://[HOST]:[PORT:8085]/"
+ingress: false
+options:
+  SPOTIFY_CLIENT_ID: ""
+  SPOTIFY_CLIENT_SECRET: ""
+  SPOTIFY_REDIRECT_URI: "http://127.0.0.1:8085/api/auth/callback"
+  ADMIN_PIN: "change-me"
+  SPOTIFY_REFRESH_TOKEN: ""
+schema:
+  SPOTIFY_CLIENT_ID: str
+  SPOTIFY_CLIENT_SECRET: password
+  SPOTIFY_REDIRECT_URI: str
+  ADMIN_PIN: password
+  SPOTIFY_REFRESH_TOKEN: password?
