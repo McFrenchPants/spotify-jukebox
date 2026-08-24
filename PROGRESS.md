@@ -4,7 +4,7 @@
 
 ## Status: Phase 5 in progress
 
-**Next task: P5.3 (LAN discovery)**
+**Next task: P5.4 (resilience pass)**
 
 ## Task Table
 
@@ -42,7 +42,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.8 | Navigation restructure to 4-tab IA | done | Bottom nav via `RootLayout`/`Outlet` context; icon transport controls incl. previous-track; `ArtistInfoPanel`; renamed to "French's Jukebox". Settings tab is a placeholder pending P4.6 |
 | P5.1 | Bridge phone setup runbook | done | `docs/BRIDGE_SETUP.md`; documents `resolveDevice()`'s exact resolution order and current `GET /api/device`/`POST /api/device/select` response shapes |
 | P5.2 | Dockerfile & Compose | done | Multi-stage `Dockerfile` + `docker-compose.yml`; **verified 2026-08-23** with a real `docker compose build`/`up` — health check, static frontend, and SQLite volume all confirmed working |
-| P5.3 | LAN discovery | todo | |
+| P5.3 | LAN discovery | done | `docs/LAN_ACCESS.md`; decided against in-container mDNS/avahi (bridge-network/Docker Desktop friction, extra daemon) in favor of static IP:port + opportunistic host-level `.local`; QR code already auto-matches via `window.location.origin` (P4.6), no code change needed |
 | P5.4 | Resilience pass | todo | |
 | P5.5 | End-to-end smoke test | todo | Requires real hardware + user sign-off |
 
@@ -55,6 +55,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P5.3 LAN discovery
+- Added `docs/LAN_ACCESS.md`: static `http://<lan-ip>:<port>` documented as the always-works primary method; opportunistic host-level `.local` mDNS (common on Home Assistant OS/Linux-with-avahi/Mac hosts) documented as a secondary "try it, fall back if it doesn't work" option, explicitly worded as host-dependent and not something Guest Jukebox implements itself; `network_mode: host` documented as an advanced/opt-in/Linux-only snippet (not applied to the actual `docker-compose.yml`, which stays on default bridge networking).
+- **Decision**: did not build in-container mDNS/avahi. Reasoning: mDNS multicast doesn't traverse Docker's default bridge network (would need `network_mode: host`, Linux-only, breaks Docker Desktop Mac/Windows parity) plus bundling an `avahi-daemon` process in the image — real added complexity for a home-party jukebox app, when the static-IP path always works and host-level mDNS already covers the common friendly-hostname case for free.
+- Confirmed (code reading only) that P4.6's `GuestUrlCard.tsx` already satisfies "QR code encodes the resolved URL" with zero changes needed — it builds the QR from `window.location.origin`, so whatever URL the admin actually loads the panel from (static IP, `.local`, anything) is what guests get.
+- No code changed this task — pure documentation, `docker-compose.yml` untouched.
+- Next: P5.4 (resilience pass).
 
 ### 2026-08-23 — P5.2 Docker build/run verified against real Docker
 - User installed Docker Desktop; supervisor ran the actual `docker compose build` + `docker compose up -d` for the first time (previous session only had static inspection available). Build completed clean including the `better-sqlite3` native module (glibc prebuild path worked as expected on this x86_64 host — the arm64 source-compile fallback still remains unexercised). Confirmed live: `GET /api/health` → `200 {"status":"ok"}`, `GET /` served the real built frontend `index.html`, `GET /api/device` correctly 503'd `spotify_not_connected` (expected — the container's named volume starts with a fresh empty DB, separate from local dev's `backend/data/jukebox.db`, so a real deployment needs its own one-time Spotify consent run or a way to seed the volume), and the SQLite file + WAL files were confirmed present on the named volume via `docker exec`. Torn down cleanly with `docker compose down`.
