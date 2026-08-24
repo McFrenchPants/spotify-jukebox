@@ -1,0 +1,29 @@
+services:
+  jukebox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: guest-jukebox:local
+    container_name: guest-jukebox
+    restart: unless-stopped
+    # LAN-only by design: this publishes the port on every interface the
+    # host has, which is fine on a home server's LAN but must NOT be
+    # port-forwarded through your router / exposed to the WAN. If your host
+    # has a specific LAN NIC you want to bind to instead of all interfaces,
+    # change this to "<lan-ip>:3001:3001".
+    ports:
+      - "${PORT:-3001}:3001"
+    env_file:
+      - backend/.env
+    environment:
+      # These two are pinned regardless of what backend/.env (your local dev
+      # config) happens to contain, so the container's internal port always
+      # matches what's EXPOSEd/published below, and the DB always lands on
+      # the persistent volume rather than wherever DB_PATH points locally.
+      - PORT=3001
+      - DB_PATH=/app/backend/data/jukebox.db
+    volumes:
+      - jukebox-data:/app/backend/data
+
+volumes:
+  jukebox-data:

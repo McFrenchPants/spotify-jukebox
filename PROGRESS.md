@@ -4,7 +4,7 @@
 
 ## Status: Phase 5 in progress
 
-**Next task: P5.2 (Dockerfile & Compose)**
+**Next task: P5.3 (LAN discovery)**
 
 ## Task Table
 
@@ -41,13 +41,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.7 | Micro-interactions & motion pass | done | Shared `ToastContext` (stacking, replaces 5 separate `useSimpleToast` instances); `usePrefersReducedMotion` fixes JS-timed crossfade delays; `Button` md size bumped to 44px, several form controls bumped to match |
 | P4.8 | Navigation restructure to 4-tab IA | done | Bottom nav via `RootLayout`/`Outlet` context; icon transport controls incl. previous-track; `ArtistInfoPanel`; renamed to "French's Jukebox". Settings tab is a placeholder pending P4.6 |
 | P5.1 | Bridge phone setup runbook | done | `docs/BRIDGE_SETUP.md`; documents `resolveDevice()`'s exact resolution order and current `GET /api/device`/`POST /api/device/select` response shapes |
-| P5.2 | Dockerfile & Compose | todo | |
+| P5.2 | Dockerfile & Compose | done | Multi-stage `Dockerfile` + `docker-compose.yml`; actual `docker build`/`up` **not verified** — Docker unavailable in this dev environment, see Open Questions |
 | P5.3 | LAN discovery | todo | |
 | P5.4 | Resilience pass | todo | |
 | P5.5 | End-to-end smoke test | todo | Requires real hardware + user sign-off |
 
 ## Open Questions / Blockers
 
+- **P5.2 Docker build/run is unverified.** Docker is not installed in this dev/agent environment, so the multi-stage `Dockerfile`/`docker-compose.yml` were checked only by static inspection (paths/commands cross-checked against the real repo, backend `tsc`/tests still pass after the small `app.ts` static-file-serving addition) — never an actual `docker build`/`docker compose up`. In particular, the `better-sqlite3` native-module build path on non-x86_64 hosts (e.g. arm64 Raspberry Pi) has a source-compile fallback (`python3`/`make`/`g++` installed in the relevant build stages) that has never been exercised. **Before relying on this in production**, run `docker compose up --build` on the actual target host once and confirm `GET /api/health` responds and the frontend loads at `/`.
 - **Spotify consent: resolved 2026-08-23.** The one-time PKCE consent is now complete against the real Spotify API — `spotify_refresh_token` is persisted for real. Note for future reference: Spotify now rejects any redirect URI over plain HTTP except the literal loopback address `http://127.0.0.1:<port>/...` — LAN IPs like the previous `http://192.168.50.179:8085/...` get an "insecure redirect_uri" error even when registered in the dashboard. `backend/.env`'s `SPOTIFY_REDIRECT_URI` was updated to `http://127.0.0.1:8085/api/auth/callback` accordingly — **this means the one-time login step must be done from a browser on the same machine as the backend**, not from another device on the LAN. Everything else (guest traffic, admin panel) is a separate code path and unaffected, reachable from any LAN device as before.
 - **Process note**: subagent prompts touching `backend/.env` must be told never to overwrite/reset it, and to back it up + restore byte-for-byte if they need to test with different values (a past subagent lost the user's real credentials this way once already; P1.1's subagent handled it correctly by using a shell-level env override instead).
 - **Frontend dev server is LAN-only-blind by default**: `vite` only binds to `localhost`, so only the machine running it can currently open the guest/admin UI. Fine for now; needs `server.host: true` (or `--host`) before testing from other LAN devices, or moot once Phase 5's Docker deployment serves the built frontend from the backend's own (already LAN-reachable) origin.
@@ -55,6 +56,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P5.2 Dockerfile & Compose
+- Added root `Dockerfile` (4-stage: `frontend-build` Vite static build → `backend-build` tsc compile → `backend-deps` prod-only `npm ci --omit=dev` → slim `runtime`), `docker-compose.yml`, and `.dockerignore` (keeps `backend/.env` and other secrets/build artifacts out of the image context).
+- **Debian slim chosen over Alpine** for all Node stages — `better-sqlite3` targets glibc prebuilds; Alpine's musl libc would force a from-source compile every time. Build-stage toolchain (`python3`/`make`/`g++`) is installed as a fallback in case no matching prebuilt binary exists for the host arch (e.g. arm64 Raspberry Pi), but that fallback path has never actually been exercised — see Open Questions.
+- **Backend code change** (`backend/src/app.ts`): added a guarded static-file-serving block after all existing `/api/*` route mounts — serves the frontend's built `public/` dir (copied there in the image) and falls back to `index.html` for client-side routing on any non-`/api` path, only activating when a build is actually present (so local `npm run dev` without a frontend build is unaffected). 213 backend tests still passing, `tsc` clean after this change (independently re-verified).
+- SQLite DB + `app_settings`-stored Spotify tokens persist via a named Docker volume (`jukebox-data`) mounted at `/app/backend/data`; compose pins `PORT=3001`/`DB_PATH=/app/backend/data/jukebox.db` regardless of what the user's local `backend/.env` (passed through via `env_file`) happens to contain, so the container's DB always lands on the persistent volume. Port publish comment explicitly flags LAN-only intent, warns against port-forwarding through the router. Non-root `jukebox` user runs the final container.
+- **Not verified**: Docker isn't installed in this dev/agent environment, so no actual `docker build`/`docker compose up` was run — flagged as an open question needing a real run on the target host before relying on this in production.
+- Next: P5.3 (LAN discovery).
 
 ### 2026-08-23 — P5.1 bridge phone setup runbook (Phase 5 started)
 - Added `docs/BRIDGE_SETUP.md` (docs-only, no app code): Spotify login on the bridge phone (Premium requirement, same-account caveat), Bluetooth pairing (OS-level pairing vs. Spotify's own "Connect to a device" routing treated as two separate required steps — a common real-world failure mode), Android/iOS keep-alive settings (battery optimization exemptions, OEM-specific background killers, Auto-Lock/Background App Refresh), auto-reconnect behavior/manual recovery (documents `resolveDevice()`'s actual resolution order — stale-ID match wins, else auto-persist if exactly one device visible, else `resolved: null` — and states plainly the backend cannot remotely wake the phone), and how to verify via the admin panel's device selector or a direct `GET /api/device` call (with real response shapes/status codes pulled from the actual route code: `200`, `503 spotify_not_connected`, `502 spotify_device_lookup_failed`).
