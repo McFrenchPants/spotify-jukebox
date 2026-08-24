@@ -74,10 +74,16 @@ COPY --from=frontend-build /app/frontend/dist ./public
 # Data directory for the SQLite DB (mounted as a volume in compose)
 RUN mkdir -p /app/backend/data
 
-# Run as non-root
-RUN groupadd --system jukebox && useradd --system --gid jukebox --home /app/backend jukebox \
-  && chown -R jukebox:jukebox /app/backend
-USER jukebox
+# Deliberately runs as root (no USER directive): a prior non-root `jukebox`
+# user worked fine for the standalone docker-compose deployment (that volume
+# is created by Docker and chown'd above) but broke under Home Assistant OS's
+# Supervisor, which mounts the add-on's /data directory with its own
+# ownership we don't control -- the non-root user got EACCES reading
+# /data/options.json there. Running as root avoids this whole class of
+# volume-ownership mismatches across every deployment mode (add-on,
+# docker-compose, and anything else), at the cost of the least-privilege
+# hardening a non-root user would normally provide. Acceptable tradeoff for a
+# LAN-only, single-household app with no untrusted multi-tenant exposure.
 
 EXPOSE 8085
 CMD ["node", "dist/index.js"]

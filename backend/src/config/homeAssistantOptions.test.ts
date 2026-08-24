@@ -91,4 +91,32 @@ describe("loadHomeAssistantOptions", () => {
 
     expect(process.env.ADMIN_PIN).toBe("already-set-pin");
   });
+
+  it("pins PORT/DB_PATH even when /data exists but options.json doesn't (still under the Supervisor)", () => {
+    vi.spyOn(fs, "existsSync").mockImplementation((p) => p === "/data");
+    const readSpy = vi.spyOn(fs, "readFileSync");
+
+    loadHomeAssistantOptions();
+
+    expect(readSpy).not.toHaveBeenCalled();
+    expect(process.env.PORT).toBe("8085");
+    expect(process.env.DB_PATH).toBe("/data/jukebox.db");
+  });
+
+  it("pins PORT/DB_PATH even when options.json exists but can't be read (e.g. EACCES) — the real bug this guards against", () => {
+    vi.spyOn(fs, "existsSync").mockReturnValue(true);
+    vi.spyOn(fs, "readFileSync").mockImplementation(() => {
+      const err = new Error("EACCES: permission denied") as NodeJS.ErrnoException;
+      err.code = "EACCES";
+      throw err;
+    });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    expect(() => loadHomeAssistantOptions()).not.toThrow();
+
+    expect(warnSpy).toHaveBeenCalled();
+    expect(process.env.PORT).toBe("8085");
+    expect(process.env.DB_PATH).toBe("/data/jukebox.db");
+    expect(process.env.SPOTIFY_CLIENT_ID).toBeUndefined();
+  });
 });

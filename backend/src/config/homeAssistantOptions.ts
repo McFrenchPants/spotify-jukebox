@@ -12,6 +12,7 @@ import fs from "fs";
 // docker-compose.yml setup) /data/options.json simply doesn't exist, so this
 // is a no-op there.
 
+const DATA_DIR = "/data";
 const OPTIONS_PATH = "/data/options.json";
 
 // Keys the add-on's config.yaml schema exposes to the user, 1:1 with
@@ -26,6 +27,23 @@ const KNOWN_OPTION_KEYS = [
 ] as const;
 
 export function loadHomeAssistantOptions(): void {
+  // Presence of /data itself (not just options.json) is the signal that
+  // we're running under the Supervisor — it's always mounted for an add-on,
+  // even in the rare case options.json itself can't be read (see below).
+  // PORT/DB_PATH must be pinned whenever that's true, unconditionally: if
+  // pinning only happened after a *successful* options.json read, any read
+  // failure would silently leave the app listening on the wrong port while
+  // config.yaml's `ports` mapping still forwards external traffic to 8085 —
+  // a "connection refused" with no obvious cause. Pinning first, and
+  // treating the actual option values as best-effort on top, avoids that
+  // whole failure mode.
+  if (!fs.existsSync(DATA_DIR)) {
+    return;
+  }
+
+  process.env.PORT = "8085";
+  process.env.DB_PATH = "/data/jukebox.db";
+
   if (!fs.existsSync(OPTIONS_PATH)) {
     return;
   }
@@ -67,13 +85,4 @@ export function loadHomeAssistantOptions(): void {
       process.env[key] = value;
     }
   }
-
-  // Pinned regardless of what options.json contains, same reasoning as
-  // docker-compose.yml's `environment:` block for the standalone deployment:
-  // the container's internal port must always match config.yaml's `ports`
-  // mapping, and the DB must always land on the Supervisor-provided
-  // persistent /data directory rather than wherever DB_PATH might otherwise
-  // point.
-  process.env.PORT = "8085";
-  process.env.DB_PATH = "/data/jukebox.db";
 }
