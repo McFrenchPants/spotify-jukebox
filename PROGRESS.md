@@ -41,14 +41,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.7 | Micro-interactions & motion pass | done | Shared `ToastContext` (stacking, replaces 5 separate `useSimpleToast` instances); `usePrefersReducedMotion` fixes JS-timed crossfade delays; `Button` md size bumped to 44px, several form controls bumped to match |
 | P4.8 | Navigation restructure to 4-tab IA | done | Bottom nav via `RootLayout`/`Outlet` context; icon transport controls incl. previous-track; `ArtistInfoPanel`; renamed to "French's Jukebox". Settings tab is a placeholder pending P4.6 |
 | P5.1 | Bridge phone setup runbook | done | `docs/BRIDGE_SETUP.md`; documents `resolveDevice()`'s exact resolution order and current `GET /api/device`/`POST /api/device/select` response shapes |
-| P5.2 | Dockerfile & Compose | done | Multi-stage `Dockerfile` + `docker-compose.yml`; actual `docker build`/`up` **not verified** — Docker unavailable in this dev environment, see Open Questions |
+| P5.2 | Dockerfile & Compose | done | Multi-stage `Dockerfile` + `docker-compose.yml`; **verified 2026-08-23** with a real `docker compose build`/`up` — health check, static frontend, and SQLite volume all confirmed working |
 | P5.3 | LAN discovery | todo | |
 | P5.4 | Resilience pass | todo | |
 | P5.5 | End-to-end smoke test | todo | Requires real hardware + user sign-off |
 
 ## Open Questions / Blockers
 
-- **P5.2 Docker build/run is unverified.** Docker is not installed in this dev/agent environment, so the multi-stage `Dockerfile`/`docker-compose.yml` were checked only by static inspection (paths/commands cross-checked against the real repo, backend `tsc`/tests still pass after the small `app.ts` static-file-serving addition) — never an actual `docker build`/`docker compose up`. In particular, the `better-sqlite3` native-module build path on non-x86_64 hosts (e.g. arm64 Raspberry Pi) has a source-compile fallback (`python3`/`make`/`g++` installed in the relevant build stages) that has never been exercised. **Before relying on this in production**, run `docker compose up --build` on the actual target host once and confirm `GET /api/health` responds and the frontend loads at `/`.
 - **Spotify consent: resolved 2026-08-23.** The one-time PKCE consent is now complete against the real Spotify API — `spotify_refresh_token` is persisted for real. Note for future reference: Spotify now rejects any redirect URI over plain HTTP except the literal loopback address `http://127.0.0.1:<port>/...` — LAN IPs like the previous `http://192.168.50.179:8085/...` get an "insecure redirect_uri" error even when registered in the dashboard. `backend/.env`'s `SPOTIFY_REDIRECT_URI` was updated to `http://127.0.0.1:8085/api/auth/callback` accordingly — **this means the one-time login step must be done from a browser on the same machine as the backend**, not from another device on the LAN. Everything else (guest traffic, admin panel) is a separate code path and unaffected, reachable from any LAN device as before.
 - **Process note**: subagent prompts touching `backend/.env` must be told never to overwrite/reset it, and to back it up + restore byte-for-byte if they need to test with different values (a past subagent lost the user's real credentials this way once already; P1.1's subagent handled it correctly by using a shell-level env override instead).
 - **Frontend dev server is LAN-only-blind by default**: `vite` only binds to `localhost`, so only the machine running it can currently open the guest/admin UI. Fine for now; needs `server.host: true` (or `--host`) before testing from other LAN devices, or moot once Phase 5's Docker deployment serves the built frontend from the backend's own (already LAN-reachable) origin.
@@ -56,6 +55,10 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P5.2 Docker build/run verified against real Docker
+- User installed Docker Desktop; supervisor ran the actual `docker compose build` + `docker compose up -d` for the first time (previous session only had static inspection available). Build completed clean including the `better-sqlite3` native module (glibc prebuild path worked as expected on this x86_64 host — the arm64 source-compile fallback still remains unexercised). Confirmed live: `GET /api/health` → `200 {"status":"ok"}`, `GET /` served the real built frontend `index.html`, `GET /api/device` correctly 503'd `spotify_not_connected` (expected — the container's named volume starts with a fresh empty DB, separate from local dev's `backend/data/jukebox.db`, so a real deployment needs its own one-time Spotify consent run or a way to seed the volume), and the SQLite file + WAL files were confirmed present on the named volume via `docker exec`. Torn down cleanly with `docker compose down`.
+- Removed the now-resolved "Docker build unverified" open question.
 
 ### 2026-08-23 — P5.2 Dockerfile & Compose
 - Added root `Dockerfile` (4-stage: `frontend-build` Vite static build → `backend-build` tsc compile → `backend-deps` prod-only `npm ci --omit=dev` → slim `runtime`), `docker-compose.yml`, and `.dockerignore` (keeps `backend/.env` and other secrets/build artifacts out of the image context).
