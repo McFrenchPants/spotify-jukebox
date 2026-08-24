@@ -97,6 +97,20 @@ describe("GET /api/device", () => {
     expect(res.status).toBe(502);
     expect(body.error).toBe("spotify_device_lookup_failed");
   });
+
+  it("returns 503 spotify_reauth_required when the stored refresh token is dead (invalid_grant)", async () => {
+    const { SpotifyReauthRequiredError } = await import("../spotify/errors");
+    vi.mocked(resolveDevice).mockRejectedValue(
+      new SpotifyReauthRequiredError("Spotify token refresh failed: invalid_grant Refresh token revoked")
+    );
+
+    const res = await fetch(`${baseUrl}/api/device`);
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(503);
+    expect(body.error).toBe("spotify_reauth_required");
+    expect(body.message).toMatch(/GET \/api\/auth\/login/);
+  });
 });
 
 describe("POST /api/device/select", () => {

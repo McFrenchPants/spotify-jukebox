@@ -1,3 +1,4 @@
+import { useOutletContext } from 'react-router-dom'
 import { Button } from '../components/ui/Button'
 import { PinEntry } from '../components/admin/PinEntry'
 import { SettingsForm } from '../components/admin/SettingsForm'
@@ -5,6 +6,7 @@ import { QueueModeration } from '../components/admin/QueueModeration'
 import { DeviceSelector } from '../components/admin/DeviceSelector'
 import { GuestUrlCard } from '../components/admin/GuestUrlCard'
 import { AdminAuthProvider, useAdminAuth } from '../context/AdminAuthContext'
+import type { RootLayoutContext } from '../components/RootLayout'
 
 /**
  * Authenticated admin view: settings form, queue moderation, device
@@ -13,6 +15,7 @@ import { AdminAuthProvider, useAdminAuth } from '../context/AdminAuthContext'
  */
 function AdminPanel() {
   const { token, logout } = useAdminAuth()
+  const { subscribe } = useOutletContext<RootLayoutContext>()
 
   // token is guaranteed non-null here (only rendered from the authenticated
   // branch below), but TypeScript doesn't know that from the context shape.
@@ -29,7 +32,7 @@ function AdminPanel() {
 
       <SettingsForm token={token} />
       <QueueModeration token={token} />
-      <DeviceSelector token={token} />
+      <DeviceSelector token={token} subscribe={subscribe} />
       <GuestUrlCard />
     </div>
   )

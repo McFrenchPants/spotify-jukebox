@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 5 in progress
+## Status: Phase 5 nearly complete — only P5.5 (end-to-end smoke test) remains, blocked on real hardware + user sign-off
 
-**Next task: P5.4 (resilience pass)**
+**Next task: P5.5 (end-to-end smoke test) — needs the user with real bridge-phone/speaker hardware, not autonomous work**
 
 ## Task Table
 
@@ -43,7 +43,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P5.1 | Bridge phone setup runbook | done | `docs/BRIDGE_SETUP.md`; documents `resolveDevice()`'s exact resolution order and current `GET /api/device`/`POST /api/device/select` response shapes |
 | P5.2 | Dockerfile & Compose | done | Multi-stage `Dockerfile` + `docker-compose.yml`; **verified 2026-08-23** with a real `docker compose build`/`up` — health check, static frontend, and SQLite volume all confirmed working |
 | P5.3 | LAN discovery | done | `docs/LAN_ACCESS.md`; decided against in-container mDNS/avahi (bridge-network/Docker Desktop friction, extra daemon) in favor of static IP:port + opportunistic host-level `.local`; QR code already auto-matches via `window.location.origin` (P4.6), no code change needed |
-| P5.4 | Resilience pass | todo | |
+| P5.4 | Resilience pass | done | `SpotifyReauthRequiredError`/`classifySpotifyAuthError` for dead refresh tokens (`503 spotify_reauth_required`); `nowPlaying.ts` poller now also detects bridge-device offline/online (throttled every 3rd tick) and emits `device-status` SSE, surfaced live in `DeviceSelector`; restart/volume persistence verified directly against real Docker |
 | P5.5 | End-to-end smoke test | todo | Requires real hardware + user sign-off |
 
 ## Open Questions / Blockers
@@ -55,6 +55,13 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P5.4 resilience pass (Phase 5 nearly complete)
+- **Token expiry mid-session**: added `backend/src/spotify/errors.ts` (`SpotifyReauthRequiredError` + shared `classifySpotifyAuthError()` helper). `tokenRefresh.ts`'s `refreshAccessToken()` now throws this distinct error type specifically on Spotify's `invalid_grant` (a dead/revoked refresh token that will never recover on its own — as opposed to a transient network/HTTP failure, which stays a plain retryable `Error`). Routes `search.ts`, `device.ts`, `artist.ts`, `playback.ts`, `queue.ts` all replaced their previously-duplicated `/No spotify_refresh_token/` regex check with the shared helper, so all five now also return a distinct `503 spotify_reauth_required` (pointing at `GET /api/auth/login`) instead of a generic unhelpful `502` when this happens. The `nowPlaying.ts` poller treats it as a silent-skip case, same as not-connected-yet, to avoid log spam every 4s.
+- **Bridge device going offline**: `nowPlaying.ts`'s existing 4s poll loop now also checks (throttled to every 3rd tick, ~12s, to avoid tripling Spotify API traffic) whether the resolved `spotify_device_id` is still present in Spotify's live device list, emitting a new `device-status` SSE event only when online/offline actually changes. Frontend: `DeviceSelector.tsx` gained an optional `subscribe` prop (wired through `SettingsPage.tsx` from the shared `RootLayout` event stream) — on `device-status` it shows a warning banner and re-fetches `GET /api/device` live, reusing the card's existing resolved/empty states rather than inventing new UI.
+- **Backend restart recovering DB/token state from the mounted volume**: verified directly by the supervisor (not delegated) now that Docker Desktop is installed — brought the P5.2 container down and back up against the same named volume, confirmed the SQLite file (`jukebox.db`/`-wal`/`-shm`) survived with an unchanged mtime, i.e. the same file, not a fresh one. No code changes needed for this part — `better-sqlite3` + the named volume already provide this for free.
+- 227 backend tests passing (up from 213), `tsc --noEmit` clean on both sides, frontend `npm run build`/`npm run lint` clean (only the 3 known pre-existing advisories). All independently re-verified by the supervisor, not just taken on the subagent's report.
+- **Phase 5 is now effectively done except P5.5** (end-to-end smoke test), which per its own note in the task table requires real hardware (the actual bridge phone + Bluetooth speaker) and the user's sign-off — not something to attempt autonomously. Stopping here for a check-in.
 
 ### 2026-08-23 — P5.3 LAN discovery
 - Added `docs/LAN_ACCESS.md`: static `http://<lan-ip>:<port>` documented as the always-works primary method; opportunistic host-level `.local` mDNS (common on Home Assistant OS/Linux-with-avahi/Mac hosts) documented as a secondary "try it, fall back if it doesn't work" option, explicitly worded as host-dependent and not something Guest Jukebox implements itself; `network_mode: host` documented as an advanced/opt-in/Linux-only snippet (not applied to the actual `docker-compose.yml`, which stays on default bridge networking).

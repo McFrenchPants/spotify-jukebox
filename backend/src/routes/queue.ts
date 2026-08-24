@@ -9,6 +9,7 @@ import { recordAllowedRequest, rateLimitGuestSession } from "../guardrails/rateL
 import { resolveGuestSession } from "../middleware/guestSession";
 import { getTrack } from "../spotify/client";
 import { addTrackToQueue, getQueueState } from "../spotify/queue";
+import { classifySpotifyAuthError } from "../spotify/errors";
 
 export const queueRouter = Router();
 
@@ -18,7 +19,7 @@ queueRouter.get("/", (_req, res) => {
 
 /**
  * Shapes a Spotify-call failure into an HTTP response, following the same
- * message-sniffing approach as device.ts's handleSpotifyError. `fallbackCode`
+ * shared-classifier approach as device.ts's handleSpotifyError. `fallbackCode`
  * is the error code used for the generic 502 case; a track lookup that
  * Spotify reports as a 404 is special-cased to also respond 404 (with
  * `notFoundCode`) rather than the generic 502.
@@ -29,15 +30,13 @@ function handleSpotifyError(
   fallbackCode: string,
   notFoundCode?: string
 ): void {
-  const message = err instanceof Error ? err.message : String(err);
-
-  if (/No spotify_refresh_token/.test(message)) {
-    res.status(503).json({
-      error: "spotify_not_connected",
-      message: "Spotify not connected yet — complete /api/auth/login first.",
-    });
+  const classified = classifySpotifyAuthError(err);
+  if (classified) {
+    res.status(classified.status).json(classified.body);
     return;
   }
+
+  const message = err instanceof Error ? err.message : String(err);
 
   if (notFoundCode && /^Spotify track lookup failed: 404/.test(message)) {
     res.status(404).json({ error: notFoundCode, message });

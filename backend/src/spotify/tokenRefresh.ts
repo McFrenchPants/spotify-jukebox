@@ -1,4 +1,5 @@
 import { getSetting, setSetting } from "../db";
+import { SpotifyReauthRequiredError } from "./errors";
 
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 
@@ -58,11 +59,20 @@ export async function refreshAccessToken(): Promise<void> {
   const tokenData = (await response.json()) as SpotifyTokenResponse;
 
   if (!response.ok || !tokenData.access_token) {
-    throw new Error(
-      `Spotify token refresh failed: ${tokenData.error ?? response.status} ${
-        tokenData.error_description ?? ""
-      }`.trim()
-    );
+    const message = `Spotify token refresh failed: ${tokenData.error ?? response.status} ${
+      tokenData.error_description ?? ""
+    }`.trim();
+
+    // invalid_grant specifically means the stored refresh token itself is
+    // dead (revoked, expired past Spotify's lifetime for it, etc.) — no
+    // amount of retrying will fix this, an admin must redo the one-time
+    // consent flow. Every other error/status here is treated as a generic,
+    // potentially-transient failure worth retrying on the next interval.
+    if (tokenData.error === "invalid_grant") {
+      throw new SpotifyReauthRequiredError(message);
+    }
+
+    throw new Error(message);
   }
 
   const expiresAt = Date.now() + (tokenData.expires_in ?? 3600) * 1000;

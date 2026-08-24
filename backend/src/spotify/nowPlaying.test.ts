@@ -4,9 +4,14 @@ vi.mock("../events/bus", () => ({
   emitEvent: vi.fn(),
 }));
 
+vi.mock("./device", () => ({
+  listDevices: vi.fn(),
+}));
+
 import { emitEvent } from "../events/bus";
-import { db, runMigrations } from "../db";
+import { db, runMigrations, setSetting, deleteSetting } from "../db";
 import { listQueueEntries } from "../db/queueEntries";
+import { listDevices } from "./device";
 import {
   DEFAULT_POLL_INTERVAL_MS,
   pollNowPlaying,
@@ -65,8 +70,10 @@ describe("pollNowPlaying", () => {
   beforeEach(() => {
     runMigrations();
     db.prepare("DELETE FROM queue_entries").run();
+    deleteSetting("spotify_device_id");
     resetNowPlayingState();
     vi.clearAllMocks();
+    vi.mocked(listDevices).mockResolvedValue([]);
   });
 
   it("dequeues the local queue mirror entry for a track that just started playing, but not on an unchanged poll", async () => {
@@ -187,6 +194,18 @@ describe("pollNowPlaying", () => {
     expect(emitEvent).not.toHaveBeenCalled();
   });
 
+  it("skips silently when the stored refresh token is dead (SpotifyReauthRequiredError)", async () => {
+    const { SpotifyReauthRequiredError } = await import("./errors");
+    const fetchMock = vi.fn();
+    const getTokenFn = vi
+      .fn()
+      .mockRejectedValue(new SpotifyReauthRequiredError("invalid_grant"));
+
+    await expect(pollNowPlaying(fetchMock, getTokenFn)).resolves.toBeUndefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(emitEvent).not.toHaveBeenCalled();
+  });
+
   it("throws on other fetch errors so the caller can log them", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}, 500));
     const getTokenFn = vi.fn().mockResolvedValue("access-token");
@@ -194,6 +213,109 @@ describe("pollNowPlaying", () => {
     await expect(pollNowPlaying(fetchMock, getTokenFn)).rejects.toThrow(
       /currently-playing request failed/
     );
+  });
+
+  describe("device-status detection", () => {
+    const DEVICE_A = {
+      id: "device-a",
+      name: "Kitchen Phone",
+      type: "Smartphone",
+      is_active: true,
+      volume_percent: 80,
+    };
+
+    it("does not call listDevices when no device is resolved yet", async () => {
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(noContentResponse()), getTokenFn);
+
+      expect(listDevices).not.toHaveBeenCalled();
+      expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+    });
+
+    it("checks device presence on the first tick but does not emit yet (baseline only)", async () => {
+      setSetting("spotify_device_id", "device-a");
+      vi.mocked(listDevices).mockResolvedValue([DEVICE_A]);
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(noContentResponse()), getTokenFn);
+
+      expect(listDevices).toHaveBeenCalledTimes(1);
+      expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+    });
+
+    it("throttles the device check to every 3rd tick, then emits offline on the change", async () => {
+      setSetting("spotify_device_id", "device-a");
+      vi.mocked(listDevices).mockResolvedValueOnce([DEVICE_A]).mockResolvedValue([]);
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+      const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
+
+      // Ticks 0-2: only tick 0 triggers a device check (establishes the
+      // online baseline, no emit yet).
+      await pollNowPlaying(fetchMock, getTokenFn);
+      await pollNowPlaying(fetchMock, getTokenFn);
+      await pollNowPlaying(fetchMock, getTokenFn);
+      expect(listDevices).toHaveBeenCalledTimes(1);
+      expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+
+      // Tick 3: the next throttled check — device is now missing, so this
+      // is a real change from the established baseline.
+      await pollNowPlaying(fetchMock, getTokenFn);
+
+      expect(listDevices).toHaveBeenCalledTimes(2);
+      expect(emitEvent).toHaveBeenCalledWith("device-status", {
+        online: false,
+        deviceId: "device-a",
+        deviceName: undefined,
+      });
+    });
+
+    it("does not re-emit while the device stays online across multiple checks", async () => {
+      setSetting("spotify_device_id", "device-a");
+      vi.mocked(listDevices).mockResolvedValue([DEVICE_A]);
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+      const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
+
+      for (let i = 0; i < 7; i += 1) {
+        await pollNowPlaying(fetchMock, getTokenFn);
+      }
+
+      expect(vi.mocked(listDevices).mock.calls.length).toBeGreaterThan(1);
+      expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+    });
+
+    it("emits online:true when the device comes back after being offline", async () => {
+      setSetting("spotify_device_id", "device-a");
+      vi.mocked(listDevices)
+        .mockResolvedValueOnce([DEVICE_A]) // tick 0: baseline online
+        .mockResolvedValueOnce([]) // tick 3: goes offline -> emits
+        .mockResolvedValueOnce([DEVICE_A]); // tick 6: back online -> emits
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+      const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
+
+      for (let i = 0; i < 7; i += 1) {
+        await pollNowPlaying(fetchMock, getTokenFn);
+      }
+
+      expect(emitEvent).toHaveBeenCalledWith(
+        "device-status",
+        expect.objectContaining({ online: false })
+      );
+      expect(emitEvent).toHaveBeenCalledWith(
+        "device-status",
+        expect.objectContaining({ online: true, deviceName: "Kitchen Phone" })
+      );
+    });
+
+    it("does not abort the poll when the device-list fetch itself fails", async () => {
+      setSetting("spotify_device_id", "device-a");
+      vi.mocked(listDevices).mockRejectedValue(new Error("Spotify device list failed: 500"));
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await expect(
+        pollNowPlaying(vi.fn().mockResolvedValue(noContentResponse()), getTokenFn)
+      ).resolves.toBeUndefined();
+    });
   });
 });
 

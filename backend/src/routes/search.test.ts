@@ -100,4 +100,18 @@ describe("GET /api/search", () => {
     expect(body.error).toBe("spotify_not_connected");
     expect(body.message).toMatch(/complete \/api\/auth\/login first/);
   });
+
+  it("returns 503 spotify_reauth_required when the stored refresh token is dead (invalid_grant)", async () => {
+    const { SpotifyReauthRequiredError } = await import("../spotify/errors");
+    vi.mocked(searchTracks).mockRejectedValue(
+      new SpotifyReauthRequiredError("Spotify token refresh failed: invalid_grant Refresh token revoked")
+    );
+
+    const res = await fetch(`${baseUrl}/api/search?q=test`);
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(503);
+    expect(body.error).toBe("spotify_reauth_required");
+    expect(body.message).toMatch(/GET \/api\/auth\/login/);
+  });
 });

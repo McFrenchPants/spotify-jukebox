@@ -4,27 +4,24 @@ import { getSetting } from "../db";
 import { PlaybackCapability, resolveEffectivePermission } from "../guardrails/playbackPermissions";
 import { ADMIN_TOKEN_HEADER } from "../middleware/adminAuth";
 import { pausePlayback, resumePlayback, setVolume, skipToNext, skipToPrevious } from "../spotify/playback";
+import { classifySpotifyAuthError } from "../spotify/errors";
 
 export const playbackRouter = Router();
 
 /**
  * Shapes a Spotify-call failure into an HTTP response, following the same
- * message-sniffing approach as queue.ts's handleSpotifyError.
+ * shared-classifier approach as queue.ts's handleSpotifyError.
  */
 function handleSpotifyError(err: unknown, res: Response, fallbackCode: string): void {
-  const message = err instanceof Error ? err.message : String(err);
-
-  if (/No spotify_refresh_token/.test(message)) {
-    res.status(503).json({
-      error: "spotify_not_connected",
-      message: "Spotify not connected yet — complete /api/auth/login first.",
-    });
+  const classified = classifySpotifyAuthError(err);
+  if (classified) {
+    res.status(classified.status).json(classified.body);
     return;
   }
 
   res.status(502).json({
     error: fallbackCode,
-    message,
+    message: err instanceof Error ? err.message : String(err),
   });
 }
 

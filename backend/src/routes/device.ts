@@ -2,23 +2,20 @@ import { Response, Router } from "express";
 import { setSetting } from "../db";
 import { requireAdminAuth } from "../middleware/adminAuth";
 import { listDevices, resolveDevice } from "../spotify/device";
+import { classifySpotifyAuthError } from "../spotify/errors";
 
 export const deviceRouter = Router();
 
 function handleSpotifyError(err: unknown, res: Response) {
-  const message = err instanceof Error ? err.message : String(err);
-
-  if (/No spotify_refresh_token/.test(message)) {
-    res.status(503).json({
-      error: "spotify_not_connected",
-      message: "Spotify not connected yet — complete /api/auth/login first.",
-    });
+  const classified = classifySpotifyAuthError(err);
+  if (classified) {
+    res.status(classified.status).json(classified.body);
     return;
   }
 
   res.status(502).json({
     error: "spotify_device_lookup_failed",
-    message,
+    message: err instanceof Error ? err.message : String(err),
   });
 }
 

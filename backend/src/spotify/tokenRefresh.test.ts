@@ -16,6 +16,7 @@ import {
   startTokenRefreshWorker,
   stopTokenRefreshWorker,
 } from "./tokenRefresh";
+import { SpotifyReauthRequiredError } from "./errors";
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return {
@@ -113,6 +114,40 @@ describe("refreshAccessToken", () => {
 
     await expect(refreshAccessToken()).rejects.toThrow(/Spotify token refresh failed/);
     expect(getSetting("spotify_access_token")).toBeUndefined();
+  });
+
+  it("throws a distinct SpotifyReauthRequiredError specifically on invalid_grant", async () => {
+    settings.set("spotify_refresh_token", "revoked-refresh-token");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse(
+          { error: "invalid_grant", error_description: "Refresh token revoked" },
+          false,
+          400
+        )
+      )
+    );
+
+    await expect(refreshAccessToken()).rejects.toBeInstanceOf(SpotifyReauthRequiredError);
+    await expect(refreshAccessToken()).rejects.toThrow(/invalid_grant/);
+    expect(getSetting("spotify_access_token")).toBeUndefined();
+  });
+
+  it("throws a plain Error (not SpotifyReauthRequiredError) for other Spotify error codes", async () => {
+    settings.set("spotify_refresh_token", "stored-refresh-token");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ error: "server_error", error_description: "Try again" }, false, 500)
+      )
+    );
+
+    const rejection = refreshAccessToken();
+    await expect(rejection).rejects.not.toBeInstanceOf(SpotifyReauthRequiredError);
+    await expect(rejection).rejects.toThrow(/Spotify token refresh failed: server_error/);
   });
 });
 

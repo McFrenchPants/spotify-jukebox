@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { searchTracks } from "../spotify/client";
+import { classifySpotifyAuthError } from "../spotify/errors";
 
 export const searchRouter = Router();
 
@@ -18,19 +19,15 @@ searchRouter.get("/", async (req, res) => {
     const results = await searchTracks(q);
     res.status(200).json(results);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-
-    if (/No spotify_refresh_token/.test(message)) {
-      res.status(503).json({
-        error: "spotify_not_connected",
-        message: "Spotify not connected yet — complete /api/auth/login first.",
-      });
+    const classified = classifySpotifyAuthError(err);
+    if (classified) {
+      res.status(classified.status).json(classified.body);
       return;
     }
 
     res.status(502).json({
       error: "spotify_search_failed",
-      message,
+      message: err instanceof Error ? err.message : String(err),
     });
   }
 });
