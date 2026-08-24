@@ -84,6 +84,15 @@ export async function getValidAccessToken(
 }
 
 /**
+ * Spotify's documented max for /v1/search's `limit` is 50, but as of testing
+ * against the live API in 2026 it now rejects anything above 10 with a
+ * generic "400 Invalid limit" (no docs update found for this — discovered
+ * empirically while testing real search after completing the one-time OAuth
+ * consent). Clamped here rather than trusting the historical docs.
+ */
+const MAX_SEARCH_LIMIT = 10;
+
+/**
  * Searches Spotify for tracks matching `query` and shapes the results into
  * a simplified array of { id, name, artist, albumArt, durationMs, explicit }.
  *
@@ -94,7 +103,7 @@ export async function getValidAccessToken(
  */
 export async function searchTracks(
   query: string,
-  limit = 20,
+  limit = MAX_SEARCH_LIMIT,
   fetchFn: typeof fetch = fetch,
   getTokenFn: () => Promise<string> = getValidAccessToken
 ): Promise<ShapedTrack[]> {
@@ -103,7 +112,7 @@ export async function searchTracks(
   const params = new URLSearchParams({
     q: query,
     type: "track",
-    limit: String(limit),
+    limit: String(Math.min(limit, MAX_SEARCH_LIMIT)),
   });
 
   const response = await fetchFn(`${SPOTIFY_API_BASE}/search?${params.toString()}`, {
