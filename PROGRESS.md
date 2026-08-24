@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 4 complete
+## Status: Phase 5 in progress
 
-**Next task: Phase 5 — Deployment & Resilience, starting at P5.1 (bridge phone setup runbook)**
+**Next task: P5.2 (Dockerfile & Compose)**
 
 ## Task Table
 
@@ -40,7 +40,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P4.6 | Admin panel UI | done | PIN login (`AdminAuthContext`), settings form, queue moderation, device selector, QR/guest-link card; fills in P4.8's Settings tab placeholder |
 | P4.7 | Micro-interactions & motion pass | done | Shared `ToastContext` (stacking, replaces 5 separate `useSimpleToast` instances); `usePrefersReducedMotion` fixes JS-timed crossfade delays; `Button` md size bumped to 44px, several form controls bumped to match |
 | P4.8 | Navigation restructure to 4-tab IA | done | Bottom nav via `RootLayout`/`Outlet` context; icon transport controls incl. previous-track; `ArtistInfoPanel`; renamed to "French's Jukebox". Settings tab is a placeholder pending P4.6 |
-| P5.1 | Bridge phone setup runbook | todo | |
+| P5.1 | Bridge phone setup runbook | done | `docs/BRIDGE_SETUP.md`; documents `resolveDevice()`'s exact resolution order and current `GET /api/device`/`POST /api/device/select` response shapes |
 | P5.2 | Dockerfile & Compose | todo | |
 | P5.3 | LAN discovery | todo | |
 | P5.4 | Resilience pass | todo | |
@@ -55,6 +55,10 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-23 — P5.1 bridge phone setup runbook (Phase 5 started)
+- Added `docs/BRIDGE_SETUP.md` (docs-only, no app code): Spotify login on the bridge phone (Premium requirement, same-account caveat), Bluetooth pairing (OS-level pairing vs. Spotify's own "Connect to a device" routing treated as two separate required steps — a common real-world failure mode), Android/iOS keep-alive settings (battery optimization exemptions, OEM-specific background killers, Auto-Lock/Background App Refresh), auto-reconnect behavior/manual recovery (documents `resolveDevice()`'s actual resolution order — stale-ID match wins, else auto-persist if exactly one device visible, else `resolved: null` — and states plainly the backend cannot remotely wake the phone), and how to verify via the admin panel's device selector or a direct `GET /api/device` call (with real response shapes/status codes pulled from the actual route code: `200`, `503 spotify_not_connected`, `502 spotify_device_lookup_failed`).
+- Next: P5.2 (Dockerfile & Compose).
 
 ### 2026-08-23 — Real Spotify connection completed; first live-API bug found and fixed
 - User completed the one-time Spotify PKCE consent for real (see Open Questions for the `127.0.0.1`-only redirect URI requirement discovered in the process — `backend/.env` updated accordingly, restarted backend to pick it up). This is the first time anything in this project has been exercised against the real Spotify API rather than mocks.
