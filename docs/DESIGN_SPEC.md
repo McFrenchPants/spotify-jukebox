@@ -100,10 +100,12 @@ Spotify's Web API has no endpoint to remove a single track from a device's live 
 
 ## 9. Deployment
 
-- **Model**: standalone Docker container (Docker Compose) on the Home Assistant host box. Not an HA Add-on — avoids HA Supervisor auth/networking friction for a guest-facing, unauthenticated app.
-- **Networking**: container port published on the LAN interface only (no port-forwarding to WAN); reachable at the host's LAN IP or a local hostname (e.g. via mDNS/`jukebox.local` if avahi is available, otherwise document the LAN IP:port for the QR code).
-- **Persistence**: SQLite file and Spotify refresh token on a mounted volume so state survives container restarts/updates.
-- **Config**: `.env` for Spotify client ID/secret, admin PIN (hashed at first run), default port.
+- **Model**: two supported deployment methods, both shipped for v1 (see revision history):
+  1. **Standalone Docker container** (Docker Compose) on the Home Assistant host box — the originally planned method, config via `.env`.
+  2. **Home Assistant OS Add-on** — installed through the Supervisor's Add-on Store UI from a GitHub repository (`config.yaml` manifest at the repo root), added post-MVP once real usage showed SSH/terminal comfort was a real adoption barrier. Reuses the same Docker image; config is entered through the Supervisor's auto-generated options form instead of a `.env` file (see `backend/src/config/homeAssistantOptions.ts`). **Deliberately does not use HA's Ingress proxy** — guests still hit a directly-published port (`ports` in `config.yaml`, not `ingress: true`), preserving the original "no login for guests" requirement, which Ingress would have violated by forcing every guest through Home Assistant's own auth first. This is the resolution of the original Docker-vs-Add-on trade-off noted in §10: it turned out to not be either/or.
+- **Networking**: container port published on the LAN interface only (no port-forwarding to WAN); reachable at the host's LAN IP or a local hostname (e.g. via mDNS/`jukebox.local` if avahi is available, otherwise document the LAN IP:port for the QR code) — see `docs/LAN_ACCESS.md`.
+- **Persistence**: SQLite file and Spotify refresh token on a mounted volume (Docker named volume, or the Supervisor's per-add-on `/data` directory) so state survives container restarts/updates.
+- **Config**: `.env` (standalone Docker) or the Supervisor's options form (Add-on) for Spotify client ID/secret, admin PIN (hashed at first run), default port. An optional `SPOTIFY_REFRESH_TOKEN` value lets a new deployment reuse an already-authorized Spotify connection from an existing one, skipping the one-time browser consent flow entirely — useful for the Add-on specifically, since that flow otherwise requires an SSH tunnel (Spotify only accepts the literal `127.0.0.1` loopback for plain-HTTP redirects).
 
 ## 9a. UI/UX Design System
 
@@ -150,7 +152,8 @@ Transport controls gain a **previous track** action (mirrors the existing skip/n
 | Session handshake / ephemeral token described alongside no stated login policy | Explicitly: no login, network access is the only gate; token is bookkeeping only | Confirmed by user — "no login" was the deliberate choice |
 | Not specified: per-guest permission granularity | Single global trust mode (Restricted/Trusted preset + overridable toggles), not per-guest roles | User wants simplicity; different guests aren't distinguished, only the party-wide mode is |
 | Host PIN admin panel (stated, kept) | Kept as-is | Confirmed |
-| Deployment: Docker vs HA Add-on presented as an open trade-off | Decided: Docker container alongside HA, not an Add-on | User is hosting on an HA box but wants the app lifecycle-independent of HA and avoid Supervisor auth friction |
+| Deployment: Docker vs HA Add-on presented as an open trade-off | Decided (v1.1.0): Docker container alongside HA, not an Add-on | User is hosting on an HA box but wants the app lifecycle-independent of HA and avoid Supervisor auth friction |
+| ^ Revisited post-MVP (v1.4.0) | Both supported: standalone Docker Compose, and an HA OS Add-on installed via the Supervisor UI (direct port, not Ingress) | Real usage showed SSH/terminal comfort was a genuine adoption barrier; the Add-on avoids it for installation while still avoiding Ingress's forced-HA-login problem for guests — the original concern is satisfied either way |
 | Audio bridge: dedicated phone (stated) | Kept as-is | Confirmed — matches user's actual setup |
 
 ## 11. Explicit Non-Goals (v1)
@@ -167,5 +170,6 @@ Transport controls gain a **previous track** action (mirrors the existing skip/n
 |---|---|
 | 1.0.0 | Original preliminary draft (source doc) |
 | 1.1.0 | Finalized after requirements review: access model, trust model, hosting, audio bridge, admin auth (§10) |
+| 1.4.0 | **MVP shipped and verified end-to-end on real hardware (2026-08-25)**: real Spotify Premium account, real bridge phone + Bluetooth speaker, real guest queueing/history/leaderboard, real admin panel, deployed and confirmed working both as a standalone Docker container and as a Home Assistant OS Add-on (§9 revised accordingly, §10 updated). Project moves to a lighter-weight post-launch process from here — see `PROGRESS.md`'s Post-Launch section instead of new phased tasks in `IMPLEMENTATION_PLAN.md`. |
 | 1.2.0 | Added §6a (real-time sync via SSE, replacing client-side polling) and §9a (UI/UX design system: dark album-art-driven theme, design tokens, micro-interactions); added kiosk non-goal to §11. Prompted by feedback that the plan was engineering-only and under-specified visual/UX design and live-sync latency. |
 | 1.3.0 | Added §9b (4-tab bottom-nav IA replacing the single stacked page; icon-based transport controls; previous-track control; artist info panel). Prompted by user feedback after reviewing the working P4.1–P4.5 build. Lyrics considered and explicitly deferred (no official Spotify API support). |

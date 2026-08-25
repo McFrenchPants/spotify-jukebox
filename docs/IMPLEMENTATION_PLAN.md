@@ -1,5 +1,7 @@
 # Guest Jukebox — Master Implementation Plan
 
+**MVP shipped 2026-08-25 — all phases below (P0–P5) are complete and verified on real hardware.** This document is kept as a historical record of scope/acceptance-criteria per task; it's not being extended with new phases. Post-launch work (new features, bug fixes found in real use) is tracked as a lightweight backlog in [PROGRESS.md](../PROGRESS.md)'s Post-Launch section instead of new `P<n>.<n>` tasks here.
+
 Reference: [DESIGN_SPEC.md](DESIGN_SPEC.md). Progress is tracked in [PROGRESS.md](../PROGRESS.md) at the repo root — that file is the source of truth for "what's done and what's next," not this one. This file defines scope per task; don't duplicate status here.
 
 Stack decision for implementation: **Node.js/Express backend, React (Vite) PWA frontend, better-sqlite3 for storage, Server-Sent Events for live updates (no WebSockets, no external message broker).** (Chosen over FastAPI/Next.js for a single-language repo and simpler Docker image; revisit only if a strong reason emerges.)

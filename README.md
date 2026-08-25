@@ -2,7 +2,7 @@
 
 A self-hosted, Spotify-backed party jukebox: guests scan a QR code, search tracks, and queue songs from their phones; a dedicated host device plays via Spotify Connect.
 
-See [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md) for the full requirements and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) / [PROGRESS.md](PROGRESS.md) for build status. **PROGRESS.md is the source of truth for what's currently working.**
+**Status: MVP shipped and verified on real hardware (2026-08-25).** See [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md) for the full requirements and [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) / [PROGRESS.md](PROGRESS.md) for build status. **PROGRESS.md is the source of truth for what's currently working and what's next.**
 
 ## How it works
 
@@ -16,13 +16,27 @@ See [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md) for the full requirements and [do
 
 - `backend/` — Express/TypeScript API server (Spotify auth proxy, queue, guardrails, admin, SSE)
 - `frontend/` — Vite + React PWA (guest and admin UI)
-- `docs/` — design spec, implementation plan, progress tracker
+- `docs/` — design spec, implementation plan, progress tracker, and deployment/setup runbooks
+- `Dockerfile` / `docker-compose.yml` — standalone Docker deployment
+- `config.yaml` / `repository.yaml` / `DOCS.md` (repo root) — Home Assistant OS Add-on manifest (installed via the Supervisor's Add-on Store, not Docker Compose directly — see below)
 
 ## Requirements
 
-- Node.js 18+ and npm
+- Node.js 18+ and npm (only needed for local dev — the Docker/Add-on deployments bundle their own)
 - A Spotify **Premium** account (queueing/playback control requires Premium) and a [Spotify Developer app](https://developer.spotify.com/dashboard) (client ID + secret)
-- A device to act as the audio bridge (see [docs/BRIDGE_SETUP.md](docs/BRIDGE_SETUP.md) once written — Phase 5) — for local dev, any device signed into the same Spotify account showing up under Spotify Connect works
+- A device to act as the audio bridge — see [docs/BRIDGE_SETUP.md](docs/BRIDGE_SETUP.md) for prepping a dedicated phone. For local dev, any device signed into the same Spotify account showing up under Spotify Connect works.
+
+## Deploying
+
+Three ways to run this, depending on your setup:
+
+1. **Local dev** (this machine only) — see "Running locally" below.
+2. **Standalone Docker container** (any Linux host with Docker) — see [docs/DEPLOY.md](docs/DEPLOY.md). Manual, SSH-based.
+3. **Home Assistant OS Add-on** (if you're running HA OS and want to avoid SSH entirely) — push this repo to your own GitHub repository, then add it as a custom repository in Settings → Add-ons → Add-on Store → Repositories, and install/configure/start it entirely through the HA UI. The add-on's in-UI docs (`DOCS.md` at the repo root) cover the Spotify setup steps; `docs/DESIGN_SPEC.md` §9 has the architecture rationale (notably: it does **not** use HA's Ingress proxy, so guests still connect directly with no Home Assistant login involved).
+
+Either deployment method serves guests at `http://<host-lan-ip>:8085` — see [docs/LAN_ACCESS.md](docs/LAN_ACCESS.md) for finding that URL and getting the admin panel's QR code to point at it.
+
+**Tip for either Docker-based method**: if you've already completed the one-time Spotify consent somewhere else (e.g. local dev), you can skip repeating that browser flow — copy the `spotify_refresh_token` value out of that setup's SQLite `app_settings` table and paste it into the new deployment's `SPOTIFY_REFRESH_TOKEN` config (env var for Docker Compose, or the Add-on's options form). See `backend/src/config/seedRefreshToken.ts`.
 
 ## Running locally
 
@@ -64,3 +78,4 @@ Backend tests run against an in-memory SQLite database (`vitest.config.ts` sets 
 - **`better-sqlite3` version**: pinned to `^11.10.0` in `backend/package.json` — newer major versions have been observed to segfault on some Windows x64 setups.
 - **Admin auth**: a PIN (set via `ADMIN_PIN`) exchanges for a short-lived signed token (`x-admin-token` header) used by all `/api/admin/*` and playback-control routes; it's independent of guest sessions (`x-guest-token`), which are anonymous and created automatically on first load.
 - **Trust mode**: playback controls (pause/resume/skip/volume) are gated by a global "restricted" vs "trusted" mode plus per-capability overrides, configurable from the admin panel — this determines what guests (not admins, who can always act) are allowed to do.
+- **Docker image runs as root**: an earlier non-root `USER` directive broke the Home Assistant Add-on deployment (EACCES reading the Supervisor-managed `/data` mount, whose ownership isn't under this project's control) — accepted tradeoff for a LAN-only, single-household app rather than adding entrypoint-script complexity to fix it properly. Revisit if this project ever needs to run somewhere with untrusted multi-tenant exposure.

@@ -2,9 +2,9 @@
 
 **Read this file first in any new session.** It's the source of truth for what's done, what's next, and any context needed to resume. Task scopes/acceptance criteria live in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md); the frozen requirements are in [docs/DESIGN_SPEC.md](docs/DESIGN_SPEC.md).
 
-## Status: Phase 5 — P5.5 end-to-end smoke test in progress (real hardware, live with the user)
+## Status: MVP shipped (2026-08-25) — project is now in post-launch mode
 
-**Next task: continue P5.5 alongside the user as they test — fix issues as found**
+All 29 planned tasks (P0.1–P5.5) are done. Real end-to-end usage is confirmed: real Spotify Premium account, real bridge phone + Bluetooth speaker, real guest queueing/history/leaderboard, real admin panel, deployed and verified working both as a standalone Docker container and as a Home Assistant OS Add-on (with a dashboard card for quick access). No more phased `P<n>.<n>` tasks are planned — see **Post-Launch** below for how new work is tracked from here.
 
 ## Task Table
 
@@ -44,17 +44,36 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | P5.2 | Dockerfile & Compose | done | Multi-stage `Dockerfile` + `docker-compose.yml`; **verified 2026-08-23** with a real `docker compose build`/`up` — health check, static frontend, and SQLite volume all confirmed working |
 | P5.3 | LAN discovery | done | `docs/LAN_ACCESS.md`; decided against in-container mDNS/avahi (bridge-network/Docker Desktop friction, extra daemon) in favor of static IP:port + opportunistic host-level `.local`; QR code already auto-matches via `window.location.origin` (P4.6), no code change needed |
 | P5.4 | Resilience pass | done | `SpotifyReauthRequiredError`/`classifySpotifyAuthError` for dead refresh tokens (`503 spotify_reauth_required`); `nowPlaying.ts` poller now also detects bridge-device offline/online (throttled every 3rd tick) and emits `device-status` SSE, surfaced live in `DeviceSelector`; restart/volume persistence verified directly against real Docker |
-| P5.5 | End-to-end smoke test | in-progress | User is actively testing with real bridge phone/speaker/Spotify account; found & fixed volume-control and play-history-timing bugs so far (see session log), still ongoing |
+| P5.5 | End-to-end smoke test | done | Real hardware, real Spotify account, both deployment methods, guest LAN access, admin dashboard card — all confirmed working by the user 2026-08-25. See session log for the full list of bugs found and fixed along the way. |
 
 ## Open Questions / Blockers
 
-- **Spotify consent: resolved 2026-08-23.** The one-time PKCE consent is now complete against the real Spotify API — `spotify_refresh_token` is persisted for real. Note for future reference: Spotify now rejects any redirect URI over plain HTTP except the literal loopback address `http://127.0.0.1:<port>/...` — LAN IPs like the previous `http://192.168.50.179:8085/...` get an "insecure redirect_uri" error even when registered in the dashboard. `backend/.env`'s `SPOTIFY_REDIRECT_URI` was updated to `http://127.0.0.1:8085/api/auth/callback` accordingly — **this means the one-time login step must be done from a browser on the same machine as the backend**, not from another device on the LAN. Everything else (guest traffic, admin panel) is a separate code path and unaffected, reachable from any LAN device as before.
-- **Process note**: subagent prompts touching `backend/.env` must be told never to overwrite/reset it, and to back it up + restore byte-for-byte if they need to test with different values (a past subagent lost the user's real credentials this way once already; P1.1's subagent handled it correctly by using a shell-level env override instead).
-- **Frontend dev server is LAN-only-blind by default**: `vite` only binds to `localhost`, so only the machine running it can currently open the guest/admin UI. Fine for now; needs `server.host: true` (or `--host`) before testing from other LAN devices, or moot once Phase 5's Docker deployment serves the built frontend from the backend's own (already LAN-reachable) origin.
+*(none currently open — all prior items below are resolved; kept for historical context)*
+
+- **Spotify consent: resolved 2026-08-23.** The one-time PKCE consent is now complete against the real Spotify API — `spotify_refresh_token` is persisted for real. Note for future reference: Spotify now rejects any redirect URI over plain HTTP except the literal loopback address `http://127.0.0.1:<port>/...` — LAN IPs like the previous `http://192.168.50.179:8085/...` get an "insecure redirect_uri" error even when registered in the dashboard. This means the one-time login step must be done from a browser on the same machine as the backend (or via an SSH tunnel), not from another device on the LAN directly — **unless** `SPOTIFY_REFRESH_TOKEN` is used to seed an already-obtained token instead (see `backend/src/config/seedRefreshToken.ts`), which sidesteps this entirely. Everything else (guest traffic, admin panel) is a separate code path and unaffected, reachable from any LAN device as before.
+- **Frontend dev server LAN access: resolved 2026-08-23.** `vite.config.ts` now sets `server.host: true`; `useEventStream.ts`'s dev-mode SSE workaround uses `window.location.hostname` instead of a hardcoded `localhost`. Local dev is now testable from a phone on the same LAN, not just the machine running it.
+- **Process note (still relevant for any future subagent work)**: subagent prompts touching `backend/.env` must be told never to overwrite/reset it, and to back it up + restore byte-for-byte if they need to test with different values (a past subagent lost the user's real credentials this way once already; P1.1's subagent handled it correctly by using a shell-level env override instead).
+
+## Post-Launch
+
+MVP is done — this section replaces the phased task table for tracking new work from here (bug fixes found in real use, feature requests, polish). Unlike the P0–P5 table, entries here don't need a formal ID/acceptance-criteria writeup in IMPLEMENTATION_PLAN.md first — just log what's being worked on and its status, same `todo`/`in-progress`/`blocked`/`done` legend as before. Completed post-launch work still gets a session-log entry below, same as before.
+
+| Item | Status | Notes |
+|---|---|---|
+| *(none yet — add rows here as new work comes up)* | | |
 
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-25 — MVP wrap-up: P5.5 marked done, docs cleanup, post-launch process established
+- User confirmed the HA Add-on version bump fixed the EACCES bug from the previous session, tested a Lovelace "Webpage" (iframe) dashboard card pointing at the add-on's LAN URL for quick admin access, and confirmed it all works well — this is the real-world confirmation P5.5 was waiting on. Marked P5.5 `done`, updated the Status header to reflect MVP-shipped, moved the project into post-launch mode.
+- **Documentation cleanup** (no application code changed this session):
+  - `docs/DESIGN_SPEC.md`: §9 (Deployment) was factually stale — it explicitly said "not an HA Add-on," which is no longer true. Rewrote it to describe both supported deployment methods (standalone Docker, HA OS Add-on) and why the Add-on doesn't use Ingress (preserves the original no-guest-login requirement). Added a corresponding row to §10's deviations table and a new `1.4.0` entry to §12's revision history documenting the MVP shipping.
+  - `docs/IMPLEMENTATION_PLAN.md`: added a banner at the top marking it historical/complete — no new phased tasks will be added there; post-launch work goes in `PROGRESS.md` instead.
+  - `README.md`: was still describing only local dev, with a stale "see docs/BRIDGE_SETUP.md once written" reference from before that file existed. Added a "Deploying" section covering all three methods (local dev, standalone Docker, HA Add-on) with links to `docs/DEPLOY.md`/`docs/LAN_ACCESS.md`/`docs/BRIDGE_SETUP.md`, documented the `SPOTIFY_REFRESH_TOKEN` shortcut, and added a note in "Notes for anyone picking this up" about the Docker image now running as root (a real security-relevant tradeoff from the previous session's EACCES fix, worth surfacing prominently rather than leaving buried in a session-log entry).
+  - `PROGRESS.md` itself: resolved/annotated the two Open Questions that were actually fixed earlier this project (Spotify consent, LAN dev access) rather than leaving them looking open; added a **Post-Launch** section (lightweight table, no formal IMPLEMENTATION_PLAN.md writeup required per item) to replace the phased task table for tracking whatever comes next.
+- Next: nothing queued — add rows to the Post-Launch table as new work comes in.
 
 ### 2026-08-24 — Real HA add-on bug found and fixed: EACCES on /data/options.json
 - User's first real install attempt on their actual Home Assistant OS box surfaced a bug this session's Docker simulation didn't catch (the simulation ran as the same non-root user consistently, so it never exercised a real ownership mismatch): `[homeAssistantOptions] Found /data/options.json but could not read it, ignoring: Error: EACCES: permission denied` — the Dockerfile's non-root `jukebox` user couldn't read `/data`, which the Supervisor mounts with its own ownership outside this project's control. Compounding symptom: since the options read failed, `PORT` never got pinned to 8085, so the app silently fell back to its default (3001) while `config.yaml`'s `ports` mapping still forwarded external traffic to 8085 — "connection refused" from the guest side, with the real cause only visible in the add-on's log.
