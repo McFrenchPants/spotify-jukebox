@@ -5,7 +5,7 @@ import { emitEvent } from "../events/bus";
 import { getValidAccessToken } from "./client";
 import { listDevices } from "./device";
 import { getSetting } from "../db";
-import { SpotifyReauthRequiredError } from "./errors";
+import { SpotifyRateLimitedError, SpotifyReauthRequiredError } from "./errors";
 import { isRateLimited, recordRateLimitFromResponse } from "./rateLimitBackoff";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
@@ -34,6 +34,11 @@ interface SpotifyCurrentlyPlayingResponse {
     album: { images: Array<{ url: string }> };
     duration_ms: number;
   } | null;
+  // Present whenever Spotify has an active playback session (i.e. not a 204)
+  // — even while paused. Reused below to infer bridge-device online/offline
+  // status for free, instead of a separate /v1/me/player/devices call on
+  // every tick (see updateDeviceStatusFromDeviceField / checkDeviceStatusFallback).
+  device?: { id: string; name: string } | null;
 }
 
 const NOTHING_PLAYING_STATE: NowPlayingState = {
@@ -51,30 +56,25 @@ export interface DeviceStatus {
 }
 
 /**
- * Piggybacks on this poller's existing 4s loop to also watch for the
- * resolved bridge device disappearing from (or reappearing in) Spotify's
- * live device list, rather than adding a second independent setInterval.
- *
- * Checking device presence needs its own Spotify API call (GET
- * /v1/me/player/devices — currently-playing doesn't reveal which devices
- * exist, only what's currently active), so to avoid tripling the poller's
- * Spotify API traffic just for connectivity monitoring, this only runs
- * every DEVICE_CHECK_EVERY_N_TICKS ticks (every ~12s at the default 4s
- * interval) rather than on every single tick.
+ * Only used as a fallback when the currently-playing response can't tell us
+ * anything about device presence (see updateDeviceStatusFromDeviceField's
+ * docs) — a real GET /v1/me/player/devices call, throttled to at most once
+ * per this interval, since it's the one piece of device monitoring that
+ * genuinely needs a separate Spotify API call.
  */
-const DEVICE_CHECK_EVERY_N_TICKS = 3;
-
-/** Tick counter for throttling the device-presence check; module-level like lastState. */
-let pollTickCount = 0;
+const DEVICE_LIST_FALLBACK_INTERVAL_MS = 5 * 60 * 1000;
 
 /** Last-seen bridge-device online/offline state. null = not checked yet (no baseline). */
 let lastDeviceOnline: boolean | null = null;
 
+/** Timestamp of the last device-presence check by *any* means (device field or fallback list call). */
+let lastDeviceCheckAt = 0;
+
 /** Resets the last-seen state — primarily useful for tests. */
 export function resetNowPlayingState(): void {
   lastState = NOTHING_PLAYING_STATE;
-  pollTickCount = 0;
   lastDeviceOnline = null;
+  lastDeviceCheckAt = 0;
 }
 
 /** Returns the last-seen now-playing state (same data the SSE now-playing event carries). */
@@ -110,12 +110,43 @@ function hasChanged(prev: NowPlayingState, next: NowPlayingState): boolean {
 }
 
 /**
- * Checks whether the resolved bridge device (app_settings.spotify_device_id)
- * is still present in Spotify's live device list, and emits a `device-status`
- * event via the event bus only when that online/offline status actually
- * changes since the last check — mirrors pollNowPlaying's own
- * only-emit-on-change behavior so this doesn't spam the SSE stream every
- * check.
+ * Updates bridge-device online/offline status *for free*, using the
+ * `device` field Spotify already includes in every currently-playing
+ * response that has an active playback session (even while paused) — no
+ * separate API call needed. Emits `device-status` only when the status
+ * actually changes since the last check, same as the fallback below.
+ */
+function updateDeviceStatusFromDeviceField(device: { id: string; name: string }): void {
+  const deviceId = getSetting("spotify_device_id");
+  if (!deviceId) {
+    return;
+  }
+
+  lastDeviceCheckAt = Date.now();
+  const online = device.id === deviceId;
+  const changed = lastDeviceOnline !== null && lastDeviceOnline !== online;
+  lastDeviceOnline = online;
+
+  if (changed) {
+    emitEvent("device-status", {
+      online,
+      deviceId,
+      deviceName: online ? device.name : undefined,
+    } satisfies DeviceStatus);
+  }
+}
+
+/**
+ * Fallback for when the currently-playing response can't tell us anything
+ * about device presence — specifically a 204 (no active playback session at
+ * all, so Spotify includes no `device` field to read for free). Makes a real
+ * GET /v1/me/player/devices call, but throttled to at most once per
+ * DEVICE_LIST_FALLBACK_INTERVAL_MS (5 min) via lastDeviceCheckAt, which is
+ * shared with updateDeviceStatusFromDeviceField above — so as long as
+ * something is actively playing/paused, this fallback essentially never
+ * fires; it only matters while the bridge device is fully idle, where a few
+ * minutes of staleness on offline-detection is an acceptable tradeoff for
+ * not polling a dedicated endpoint on every tick.
  *
  * `accessToken` is passed in (already obtained by the caller) rather than
  * re-resolved here, so this never triggers its own token refresh.
@@ -125,11 +156,17 @@ function hasChanged(prev: NowPlayingState, next: NowPlayingState): boolean {
  * problem is already surfaced by pollNowPlaying's own error handling, this
  * is purely supplementary monitoring.
  */
-async function checkDeviceStatus(fetchFn: typeof fetch, accessToken: string): Promise<void> {
+async function checkDeviceStatusFallback(fetchFn: typeof fetch, accessToken: string): Promise<void> {
   const deviceId = getSetting("spotify_device_id");
   if (!deviceId) {
     return;
   }
+
+  const now = Date.now();
+  if (now - lastDeviceCheckAt < DEVICE_LIST_FALLBACK_INTERVAL_MS) {
+    return;
+  }
+  lastDeviceCheckAt = now;
 
   let devices;
   try {
@@ -156,9 +193,10 @@ async function checkDeviceStatus(fetchFn: typeof fetch, accessToken: string): Pr
 /**
  * Polls Spotify's currently-playing endpoint once, diffs against the
  * last-seen state, and emits a `now-playing` event via the event bus if it
- * changed. Also, every few ticks (see checkDeviceStatus), checks whether the
- * resolved bridge device is still visible to Spotify and emits
- * `device-status` on change.
+ * changed. Also updates bridge-device online/offline status and emits
+ * `device-status` on change — for free from this same response's `device`
+ * field when available (see updateDeviceStatusFromDeviceField), or via a
+ * throttled fallback call when it isn't (see checkDeviceStatusFallback).
  *
  * Handles:
  * - 204 No Content (nothing playing) without erroring.
@@ -191,22 +229,19 @@ export async function pollNowPlaying(
       // not-connected-yet case below.
       return;
     }
+    if (err instanceof SpotifyRateLimitedError) {
+      // Spotify's Accounts (token) endpoint itself was rate-limited —
+      // recordRateLimitFromResponse already armed the shared backoff inside
+      // refreshAccessToken(), so isRateLimited() will skip future ticks;
+      // just don't throw/log-spam for this one.
+      return;
+    }
     const message = err instanceof Error ? err.message : String(err);
     if (/No spotify_refresh_token/.test(message)) {
       // Spotify hasn't been connected yet — skip silently, don't spam logs.
       return;
     }
     throw err;
-  }
-
-  // Throttled device-presence check (see checkDeviceStatus docs) — checked
-  // before incrementing so the very first tick always establishes a
-  // baseline. Runs independently of the currently-playing fetch below (and
-  // best-effort — never lets a device-list failure abort this poll).
-  const shouldCheckDevice = pollTickCount % DEVICE_CHECK_EVERY_N_TICKS === 0;
-  pollTickCount += 1;
-  if (shouldCheckDevice) {
-    await checkDeviceStatus(fetchFn, accessToken);
   }
 
   const response = await fetchFn(`${SPOTIFY_API_BASE}/me/player/currently-playing`, {
@@ -219,6 +254,10 @@ export async function pollNowPlaying(
 
   if (response.status === 204) {
     nextState = NOTHING_PLAYING_STATE;
+    // No active session at all, so no `device` field to read for free —
+    // fall back to a throttled real device-list check (best-effort, never
+    // lets a device-list failure abort this poll).
+    await checkDeviceStatusFallback(fetchFn, accessToken);
   } else if (!response.ok) {
     if (recordRateLimitFromResponse(response)) {
       // Arms the backoff window so the next tick skips outright instead of
@@ -231,6 +270,12 @@ export async function pollNowPlaying(
   } else {
     const data = (await response.json()) as SpotifyCurrentlyPlayingResponse;
     nextState = shapeResponse(data);
+
+    if (data.device) {
+      updateDeviceStatusFromDeviceField(data.device);
+    } else {
+      await checkDeviceStatusFallback(fetchFn, accessToken);
+    }
   }
 
   if (hasChanged(lastState, nextState)) {

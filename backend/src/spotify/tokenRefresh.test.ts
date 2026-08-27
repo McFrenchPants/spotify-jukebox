@@ -16,14 +16,21 @@ import {
   startTokenRefreshWorker,
   stopTokenRefreshWorker,
 } from "./tokenRefresh";
-import { SpotifyReauthRequiredError } from "./errors";
+import { SpotifyRateLimitedError, SpotifyReauthRequiredError } from "./errors";
+import { isRateLimited, resetRateLimitForTests } from "./rateLimitBackoff";
 
-function jsonResponse(body: unknown, ok = true, status = 200): Response {
+function jsonResponse(body: unknown, ok = true, status = 200, retryAfterSeconds?: number): Response {
   return {
     ok,
     status,
     json: async () => body,
-  } as Response;
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === "retry-after" && retryAfterSeconds !== undefined
+          ? String(retryAfterSeconds)
+          : null,
+    },
+  } as unknown as Response;
 }
 
 describe("refreshAccessToken", () => {
@@ -32,6 +39,7 @@ describe("refreshAccessToken", () => {
     process.env.SPOTIFY_CLIENT_ID = "test-client-id";
     process.env.SPOTIFY_CLIENT_SECRET = "test-client-secret";
     vi.restoreAllMocks();
+    resetRateLimitForTests();
   });
 
   it("calls Spotify's token endpoint with the stored refresh token and persists the result", async () => {
@@ -148,6 +156,20 @@ describe("refreshAccessToken", () => {
     const rejection = refreshAccessToken();
     await expect(rejection).rejects.not.toBeInstanceOf(SpotifyReauthRequiredError);
     await expect(rejection).rejects.toThrow(/Spotify token refresh failed: server_error/);
+  });
+
+  it("throws a distinct SpotifyRateLimitedError on a 429 from the token endpoint, and arms the shared backoff", async () => {
+    settings.set("spotify_refresh_token", "stored-refresh-token");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ error: "rate_limited" }, false, 429, 20)
+      )
+    );
+
+    await expect(refreshAccessToken()).rejects.toBeInstanceOf(SpotifyRateLimitedError);
+    expect(isRateLimited()).toBe(true);
   });
 });
 

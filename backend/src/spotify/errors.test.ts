@@ -1,7 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { SpotifyReauthRequiredError, classifySpotifyAuthError } from "./errors";
+import { SpotifyRateLimitedError, SpotifyReauthRequiredError, classifySpotifyAuthError } from "./errors";
 
 describe("classifySpotifyAuthError", () => {
+  it("classifies a SpotifyRateLimitedError as 503 spotify_rate_limited", () => {
+    const result = classifySpotifyAuthError(new SpotifyRateLimitedError("boom"));
+
+    expect(result).toEqual({
+      status: 503,
+      body: {
+        error: "spotify_rate_limited",
+        message: expect.stringMatching(/rate-limiting/),
+      },
+    });
+  });
+
   it("classifies a SpotifyReauthRequiredError as 503 spotify_reauth_required", () => {
     const result = classifySpotifyAuthError(new SpotifyReauthRequiredError("boom"));
 

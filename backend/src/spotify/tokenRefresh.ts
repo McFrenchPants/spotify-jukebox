@@ -1,5 +1,6 @@
 import { getSetting, setSetting } from "../db";
-import { SpotifyReauthRequiredError } from "./errors";
+import { SpotifyRateLimitedError, SpotifyReauthRequiredError } from "./errors";
+import { recordRateLimitFromResponse } from "./rateLimitBackoff";
 
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 
@@ -66,12 +67,21 @@ export async function refreshAccessToken(): Promise<void> {
     // invalid_grant specifically means the stored refresh token itself is
     // dead (revoked, expired past Spotify's lifetime for it, etc.) — no
     // amount of retrying will fix this, an admin must redo the one-time
-    // consent flow. Every other error/status here is treated as a generic,
-    // potentially-transient failure worth retrying on the next interval.
+    // consent flow.
     if (tokenData.error === "invalid_grant") {
       throw new SpotifyReauthRequiredError(message);
     }
 
+    // Spotify's *Accounts* service (this endpoint) can itself be rate-limited
+    // independently of the Web API — arms the same shared backoff the
+    // automatic pollers already respect (see rateLimitBackoff.ts), so a
+    // token-refresh 429 doesn't just get retried every poll tick either.
+    if (recordRateLimitFromResponse(response)) {
+      throw new SpotifyRateLimitedError(message);
+    }
+
+    // Every other error/status here is treated as a generic, potentially-
+    // transient failure worth retrying on the next interval.
     throw new Error(message);
   }
 

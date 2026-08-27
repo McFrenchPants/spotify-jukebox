@@ -322,6 +322,11 @@ describe("pollNowPlaying", () => {
       volume_percent: 80,
       supports_volume: true,
     };
+    const FIVE_MIN_MS = 5 * 60 * 1000;
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
 
     it("does not call listDevices when no device is resolved yet", async () => {
       const getTokenFn = vi.fn().mockResolvedValue("access-token");
@@ -332,33 +337,53 @@ describe("pollNowPlaying", () => {
       expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
     });
 
-    it("checks device presence on the first tick but does not emit yet (baseline only)", async () => {
+    it("updates status for free from the currently-playing response's device field, never calling listDevices", async () => {
       setSetting("spotify_device_id", "device-a");
-      vi.mocked(listDevices).mockResolvedValue([DEVICE_A]);
       const getTokenFn = vi.fn().mockResolvedValue("access-token");
 
-      await pollNowPlaying(vi.fn().mockResolvedValue(noContentResponse()), getTokenFn);
-
-      expect(listDevices).toHaveBeenCalledTimes(1);
+      // Baseline (online) — no emit yet, and no listDevices call needed.
+      await pollNowPlaying(
+        vi.fn().mockResolvedValue(jsonResponse({ ...TRACK_A, device: { id: "device-a", name: "Kitchen Phone" } })),
+        getTokenFn
+      );
+      expect(listDevices).not.toHaveBeenCalled();
       expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+
+      // Device field now shows a different device -> real change, still no listDevices call.
+      await pollNowPlaying(
+        vi.fn().mockResolvedValue(
+          jsonResponse({ ...TRACK_B, device: { id: "some-other-device", name: "Other" } })
+        ),
+        getTokenFn
+      );
+      expect(listDevices).not.toHaveBeenCalled();
+      expect(emitEvent).toHaveBeenCalledWith("device-status", {
+        online: false,
+        deviceId: "device-a",
+        deviceName: undefined,
+      });
     });
 
-    it("throttles the device check to every 3rd tick, then emits offline on the change", async () => {
+    it("falls back to a throttled real device-list check only when the response has no device field (204)", async () => {
+      vi.useFakeTimers();
       setSetting("spotify_device_id", "device-a");
       vi.mocked(listDevices).mockResolvedValueOnce([DEVICE_A]).mockResolvedValue([]);
       const getTokenFn = vi.fn().mockResolvedValue("access-token");
       const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
 
-      // Ticks 0-2: only tick 0 triggers a device check (establishes the
-      // online baseline, no emit yet).
+      // First 204 establishes baseline (online) via the fallback.
       await pollNowPlaying(fetchMock, getTokenFn);
+      expect(listDevices).toHaveBeenCalledTimes(1);
+
+      // Repeated 204s within the 5-minute throttle window don't re-check.
       await pollNowPlaying(fetchMock, getTokenFn);
       await pollNowPlaying(fetchMock, getTokenFn);
       expect(listDevices).toHaveBeenCalledTimes(1);
       expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
 
-      // Tick 3: the next throttled check — device is now missing, so this
-      // is a real change from the established baseline.
+      // Once the window passes, the next 204 tick checks again — device is
+      // now missing, a real change from the established baseline.
+      vi.advanceTimersByTime(FIVE_MIN_MS + 1000);
       await pollNowPlaying(fetchMock, getTokenFn);
 
       expect(listDevices).toHaveBeenCalledTimes(2);
@@ -369,32 +394,36 @@ describe("pollNowPlaying", () => {
       });
     });
 
-    it("does not re-emit while the device stays online across multiple checks", async () => {
+    it("does not re-check via the fallback while something is actively playing (device field keeps refreshing the throttle window)", async () => {
       setSetting("spotify_device_id", "device-a");
-      vi.mocked(listDevices).mockResolvedValue([DEVICE_A]);
       const getTokenFn = vi.fn().mockResolvedValue("access-token");
-      const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ ...TRACK_A, device: { id: "device-a", name: "Kitchen Phone" } }));
 
-      for (let i = 0; i < 7; i += 1) {
+      for (let i = 0; i < 5; i += 1) {
         await pollNowPlaying(fetchMock, getTokenFn);
       }
 
-      expect(vi.mocked(listDevices).mock.calls.length).toBeGreaterThan(1);
+      expect(listDevices).not.toHaveBeenCalled();
       expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
     });
 
-    it("emits online:true when the device comes back after being offline", async () => {
+    it("emits online:true when the device comes back after being offline (fallback path)", async () => {
+      vi.useFakeTimers();
       setSetting("spotify_device_id", "device-a");
       vi.mocked(listDevices)
-        .mockResolvedValueOnce([DEVICE_A]) // tick 0: baseline online
-        .mockResolvedValueOnce([]) // tick 3: goes offline -> emits
-        .mockResolvedValueOnce([DEVICE_A]); // tick 6: back online -> emits
+        .mockResolvedValueOnce([DEVICE_A]) // baseline online
+        .mockResolvedValueOnce([]) // goes offline -> emits
+        .mockResolvedValueOnce([DEVICE_A]); // back online -> emits
       const getTokenFn = vi.fn().mockResolvedValue("access-token");
       const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
 
-      for (let i = 0; i < 7; i += 1) {
-        await pollNowPlaying(fetchMock, getTokenFn);
-      }
+      await pollNowPlaying(fetchMock, getTokenFn); // baseline
+      vi.advanceTimersByTime(FIVE_MIN_MS + 1000);
+      await pollNowPlaying(fetchMock, getTokenFn); // offline
+      vi.advanceTimersByTime(FIVE_MIN_MS + 1000);
+      await pollNowPlaying(fetchMock, getTokenFn); // online again
 
       expect(emitEvent).toHaveBeenCalledWith(
         "device-status",

@@ -20,6 +20,22 @@ export class SpotifyReauthRequiredError extends Error {
   }
 }
 
+/**
+ * Thrown by refreshAccessToken() when Spotify's *token* endpoint itself
+ * (accounts.spotify.com, not the Web API) returns 429. Distinct from a
+ * generic transient failure so callers can treat it the same way as the
+ * automatic pollers' own rate-limit backoff (see rateLimitBackoff.ts) rather
+ * than logging it as a surprising error every retry — this endpoint being
+ * rate-limited is just as recoverable as the Web API being rate-limited, it
+ * only needs the caller to actually back off instead of retrying immediately.
+ */
+export class SpotifyRateLimitedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SpotifyRateLimitedError";
+  }
+}
+
 const NOT_CONNECTED_PATTERN = /No spotify_refresh_token/;
 
 export interface SpotifyErrorResponse {
@@ -49,6 +65,16 @@ export function classifySpotifyAuthError(err: unknown): SpotifyErrorResponse | n
         error: "spotify_reauth_required",
         message:
           "Spotify's stored refresh token is no longer valid — an admin must redo the one-time consent flow at GET /api/auth/login.",
+      },
+    };
+  }
+
+  if (err instanceof SpotifyRateLimitedError) {
+    return {
+      status: 503,
+      body: {
+        error: "spotify_rate_limited",
+        message: "Spotify is rate-limiting requests from this app right now — try again in a bit.",
       },
     };
   }

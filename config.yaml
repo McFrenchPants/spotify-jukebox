@@ -1,5 +1,5 @@
 name: "Guest Jukebox"
-version: "1.0.3"
+version: "1.0.4"
 slug: "guest_jukebox"
 description: "Self-hosted, LAN-only party music queueing app for guests, powered by Spotify"
 url: "https://github.com/McFrenchPants/spotify-jukebox"
