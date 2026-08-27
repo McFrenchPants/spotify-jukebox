@@ -19,13 +19,29 @@ import {
   startNowPlayingPoller,
   stopNowPlayingPoller,
 } from "./nowPlaying";
+import { isRateLimited, resetRateLimitForTests } from "./rateLimitBackoff";
 
 function jsonResponse(body: unknown, status = 200): Response {
   return {
     ok: status >= 200 && status < 300,
     status,
     json: async () => body,
-  } as Response;
+    headers: { get: () => null },
+  } as unknown as Response;
+}
+
+function rateLimitedResponse(retryAfterSeconds?: number): Response {
+  return {
+    ok: false,
+    status: 429,
+    json: async () => ({ error: { message: "Too many requests" } }),
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === "retry-after" && retryAfterSeconds !== undefined
+          ? String(retryAfterSeconds)
+          : null,
+    },
+  } as unknown as Response;
 }
 
 /**
@@ -84,6 +100,7 @@ describe("pollNowPlaying", () => {
     db.prepare("DELETE FROM track_stats").run();
     deleteSetting("spotify_device_id");
     resetNowPlayingState();
+    resetRateLimitForTests();
     vi.clearAllMocks();
     vi.mocked(listDevices).mockResolvedValue([]);
   });
@@ -397,6 +414,57 @@ describe("pollNowPlaying", () => {
       await expect(
         pollNowPlaying(vi.fn().mockResolvedValue(noContentResponse()), getTokenFn)
       ).resolves.toBeUndefined();
+    });
+  });
+
+  describe("rate-limit backoff (real-world 429 incident)", () => {
+    it("arms the backoff window on a 429 from currently-playing, without throwing", async () => {
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await expect(
+        pollNowPlaying(vi.fn().mockResolvedValue(rateLimitedResponse(45)), getTokenFn)
+      ).resolves.toBeUndefined();
+
+      expect(isRateLimited()).toBe(true);
+    });
+
+    it("skips the entire next tick (no token fetch, no Spotify calls) while backed off", async () => {
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+      const fetchFn = vi.fn().mockResolvedValue(rateLimitedResponse(45));
+
+      await pollNowPlaying(fetchFn, getTokenFn); // arms backoff
+      getTokenFn.mockClear();
+      fetchFn.mockClear();
+
+      await pollNowPlaying(fetchFn, getTokenFn);
+
+      expect(getTokenFn).not.toHaveBeenCalled();
+      expect(fetchFn).not.toHaveBeenCalled();
+    });
+
+    it("falls back to a default backoff when Spotify doesn't send a Retry-After header", async () => {
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(rateLimitedResponse()), getTokenFn);
+
+      expect(isRateLimited()).toBe(true);
+    });
+
+    it("resumes polling normally once the backoff window has passed", async () => {
+      vi.useFakeTimers();
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(rateLimitedResponse(1)), getTokenFn);
+      expect(isRateLimited()).toBe(true);
+
+      vi.advanceTimersByTime(1100);
+      expect(isRateLimited()).toBe(false);
+
+      const fetchFn = vi.fn().mockResolvedValue(jsonResponse(TRACK_A));
+      await pollNowPlaying(fetchFn, getTokenFn);
+      expect(fetchFn).toHaveBeenCalled();
+
+      vi.useRealTimers();
     });
   });
 });

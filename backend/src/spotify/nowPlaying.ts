@@ -6,6 +6,7 @@ import { getValidAccessToken } from "./client";
 import { listDevices } from "./device";
 import { getSetting } from "../db";
 import { SpotifyReauthRequiredError } from "./errors";
+import { isRateLimited, recordRateLimitFromResponse } from "./rateLimitBackoff";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
@@ -171,6 +172,14 @@ export async function pollNowPlaying(
   fetchFn: typeof fetch = fetch,
   getTokenFn: () => Promise<string> = getValidAccessToken
 ): Promise<void> {
+  // Skip this entire tick (device check included) while an active backoff
+  // window is in effect — see rateLimitBackoff.ts. Deliberately checked
+  // before doing anything else (including refreshing the access token), so
+  // a 429 doesn't just get immediately re-triggered on the very next tick.
+  if (isRateLimited()) {
+    return;
+  }
+
   let accessToken: string;
   try {
     accessToken = await getTokenFn();
@@ -211,6 +220,13 @@ export async function pollNowPlaying(
   if (response.status === 204) {
     nextState = NOTHING_PLAYING_STATE;
   } else if (!response.ok) {
+    if (recordRateLimitFromResponse(response)) {
+      // Arms the backoff window so the next tick skips outright instead of
+      // immediately re-triggering the same 429 — see rateLimitBackoff.ts.
+      // Not an error worth logging every tick; the poller will just resume
+      // once the window passes.
+      return;
+    }
     throw new Error(`Spotify currently-playing request failed: ${response.status}`);
   } else {
     const data = (await response.json()) as SpotifyCurrentlyPlayingResponse;

@@ -11,13 +11,20 @@ vi.mock("../db", () => ({
 
 import { getSetting, setSetting } from "../db";
 import { listDevices, resolveDevice } from "./device";
+import { isRateLimited, resetRateLimitForTests } from "./rateLimitBackoff";
 
-function jsonResponse(body: unknown, ok = true, status = 200): Response {
+function jsonResponse(body: unknown, ok = true, status = 200, retryAfterSeconds?: number): Response {
   return {
     ok,
     status,
     json: async () => body,
-  } as Response;
+    headers: {
+      get: (name: string) =>
+        name.toLowerCase() === "retry-after" && retryAfterSeconds !== undefined
+          ? String(retryAfterSeconds)
+          : null,
+    },
+  } as unknown as Response;
 }
 
 const DEVICE_A = {
@@ -42,6 +49,7 @@ describe("listDevices", () => {
   beforeEach(() => {
     settings.clear();
     vi.clearAllMocks();
+    resetRateLimitForTests();
   });
 
   it("shapes the Spotify devices response into Device[]", async () => {
@@ -93,6 +101,16 @@ describe("listDevices", () => {
 
     await expect(listDevices(fetchMock, getTokenFn)).rejects.toThrow(/No spotify_refresh_token/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("arms the automatic-pollers' backoff window on a 429, while still throwing for this caller", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ error: { status: 429, message: "Too many requests" } }, false, 429, 30)
+    );
+    const getTokenFn = vi.fn().mockResolvedValue("test-token");
+
+    await expect(listDevices(fetchMock, getTokenFn)).rejects.toThrow(/429/);
+    expect(isRateLimited()).toBe(true);
   });
 });
 
