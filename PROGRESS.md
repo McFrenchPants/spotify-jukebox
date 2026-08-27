@@ -60,11 +60,18 @@ MVP is done — this section replaces the phased task table for tracking new wor
 
 | Item | Status | Notes |
 |---|---|---|
-| *(none yet — add rows here as new work comes up)* | | |
+| Spotify 429 rate-limit resilience | done | Root cause: local dev + the HA Add-on were both polling the same Spotify account simultaneously. Fixed with `rateLimitBackoff.ts` — automatic pollers now back off on a 429 instead of continuing to hammer Spotify every tick. **User action still needed**: stop the local dev backend when not actively developing, to avoid this recurring. |
 
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-25 — Post-launch fix: Spotify 429 rate-limit from duplicate pollers
+- User reported now-playing stopped updating (survived a page reload) and found `Spotify device list failed: 429 Too many requests` in the Settings page. Root-caused: this Windows machine's local dev backend was still running (port 8085) at the same time as the deployed HA Add-on — both independently polling the same Spotify account (now-playing every 4s, device-list every ~12s each), roughly doubling background request volume and tripping Spotify's rate limit. Reload didn't help because both pollers kept re-triggering the same 429 every tick regardless.
+- **Fix**: added `backend/src/spotify/rateLimitBackoff.ts` — a shared backoff window armed by any 429 (respects Spotify's `Retry-After` header when present, falls back to a default). The automatic pollers (now-playing poll, the piggybacked device-status check from P5.4) now skip their entire tick outright while backed off, rather than immediately re-triggering the same limit. Deliberately did NOT gate on-demand/user-triggered calls (search, an admin's manual device-list retry) behind this — those still get a real attempt and an honest error, since silently blocking a human action would be more confusing than a 429. `listDevices()` also now arms the backoff on a 429 while still throwing for its immediate caller.
+- 251 backend tests passing (10 new, directly covering the 429/backoff scenario incl. Retry-After parsing, tick-skipping, and recovery once the window passes), `tsc` clean. One unrelated pre-existing flaky test (`adminAuth.test.ts`) hit once, confirmed non-reproducing across 4 more clean runs — same known class of rare test-isolation flake documented earlier in this project, not a regression.
+- Bumped `config.yaml` to `1.0.3` so the HA Add-on actually rebuilds with this fix (learned from the EACCES incident: Supervisor won't rebuild without a version bump).
+- **Still needed from the user**: stop the local dev backend (`npm run dev` in `backend/`) when not actively developing — running it alongside the deployed Add-on against the same Spotify account is what caused this, and the backoff fix reduces the damage but doesn't eliminate the root cause of *why* the limit gets hit in the first place.
 
 ### 2026-08-25 — MVP wrap-up: P5.5 marked done, docs cleanup, post-launch process established
 - User confirmed the HA Add-on version bump fixed the EACCES bug from the previous session, tested a Lovelace "Webpage" (iframe) dashboard card pointing at the add-on's LAN URL for quick admin access, and confirmed it all works well — this is the real-world confirmation P5.5 was waiting on. Marked P5.5 `done`, updated the Status header to reflect MVP-shipped, moved the project into post-launch mode.
