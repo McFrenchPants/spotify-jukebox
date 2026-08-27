@@ -1,5 +1,9 @@
 name: "Guest Jukebox"
-version: "1.0.4"
+# Bumping this is required for the Home Assistant Supervisor to detect and
+# offer an update at all (it won't rebuild on unchanged version + repo push
+# alone) -- ALWAYS add a matching entry to CHANGELOG.md in the same change,
+# or the add-on's "Changelog" tab shows "No changelog found."
+version: "1.0.5"
 slug: "guest_jukebox"
 description: "Self-hosted, LAN-only party music queueing app for guests, powered by Spotify"
 url: "https://github.com/McFrenchPants/spotify-jukebox"
