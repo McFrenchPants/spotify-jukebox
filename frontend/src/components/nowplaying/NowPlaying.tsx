@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Card } from '../ui/Card'
-import { getNowPlaying, type NowPlayingState } from '../../lib/api'
+import { Modal } from '../ui/Modal'
+import { getArtist, getLeaderboard, getNowPlaying, type ArtistInfo, type NowPlayingState } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
@@ -54,6 +56,9 @@ export function NowPlaying({
   const [displaySnapshot, setDisplaySnapshot] = useState<NowPlayingState | null>(null)
   const [visible, setVisible] = useState(true)
   const [progressMs, setProgressMs] = useState(0)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [detailArtist, setDetailArtist] = useState<ArtistInfo | null>(null)
+  const [detailPlayCount, setDetailPlayCount] = useState<number | null>(null)
   const pendingRef = useRef<NowPlayingState | null>(null)
   const syncRef = useRef<{ progressMs: number; at: number } | null>(null)
   const prefersReducedMotion = usePrefersReducedMotion()
@@ -143,6 +148,41 @@ export function NowPlaying({
     return () => clearInterval(interval)
   }, [displaySnapshot])
 
+  // Fetches the expanded detail sheet's extra data (play count + artist info)
+  // only once it's actually opened, keyed to the track it opened for — a
+  // stale response for a track the guest has since navigated away from is
+  // simply ignored via the `cancelled` flag, same pattern as the effects above.
+  useEffect(() => {
+    if (!detailOpen || !displaySnapshot?.trackId) return
+    let cancelled = false
+    setDetailArtist(null)
+    setDetailPlayCount(null)
+
+    if (displaySnapshot.artistId) {
+      getArtist(displaySnapshot.artistId)
+        .then((data) => {
+          if (!cancelled) setDetailArtist(data)
+        })
+        .catch(() => {
+          // Decorative — silently leave the artist section out.
+        })
+    }
+
+    getLeaderboard()
+      .then((entries) => {
+        if (cancelled) return
+        const match = entries.find((e) => e.spotifyTrackId === displaySnapshot.trackId)
+        setDetailPlayCount(match?.playCount ?? 0)
+      })
+      .catch(() => {
+        // Leave null — the play-count line just stays hidden.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [detailOpen, displaySnapshot?.trackId, displaySnapshot?.artistId])
+
   if (!displaySnapshot || !displaySnapshot.isPlaying || !displaySnapshot.trackId) {
     return (
       <Card className="flex flex-col items-center gap-1 py-8 text-center">
@@ -157,29 +197,105 @@ export function NowPlaying({
   const remaining = Math.max(0, duration - progressMs)
 
   return (
-    <Card className={`flex items-center gap-4 transition-slow ${visible ? 'opacity-100' : 'opacity-0'}`}>
-      {displaySnapshot.albumArt ? (
-        <img
-          src={displaySnapshot.albumArt}
-          alt=""
-          className="h-16 w-16 shrink-0 rounded-md bg-surface-overlay object-cover"
-        />
-      ) : (
-        <PlaceholderArt className="h-16 w-16" />
-      )}
+    <>
+      <Card
+        className={`flex cursor-pointer items-center gap-4 transition-slow active:scale-[0.99] ${visible ? 'opacity-100' : 'opacity-0'}`}
+        onClick={() => setDetailOpen(true)}
+        role="button"
+        tabIndex={0}
+        aria-label="Show more about this track"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            setDetailOpen(true)
+          }
+        }}
+      >
+        {displaySnapshot.albumArt ? (
+          <img
+            src={displaySnapshot.albumArt}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-md bg-surface-overlay object-cover"
+          />
+        ) : (
+          <PlaceholderArt className="h-16 w-16" />
+        )}
 
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-body font-semibold text-text-primary">{displaySnapshot.name}</p>
-        <p className="truncate text-caption text-text-secondary">{displaySnapshot.artist}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-body font-semibold text-text-primary">{displaySnapshot.name}</p>
+          <p className="truncate text-caption text-text-secondary">{displaySnapshot.artist}</p>
 
-        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-overlay">
-          <div className="h-full rounded-full bg-accent transition-fast" style={{ width: `${pct}%` }} />
+          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-overlay">
+            <div className="h-full rounded-full bg-accent transition-fast" style={{ width: `${pct}%` }} />
+          </div>
+          <div className="mt-1 flex justify-between text-caption text-text-muted">
+            <span>{formatDuration(progressMs)}</span>
+            <span>-{formatDuration(remaining)}</span>
+          </div>
         </div>
-        <div className="mt-1 flex justify-between text-caption text-text-muted">
-          <span>{formatDuration(progressMs)}</span>
-          <span>-{formatDuration(remaining)}</span>
+      </Card>
+
+      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title="Now Playing" layout="sheet">
+        <div className="flex flex-col items-center gap-4 text-center">
+          {displaySnapshot.albumArt ? (
+            <img
+              src={displaySnapshot.albumArt}
+              alt=""
+              className="h-48 w-48 rounded-lg bg-surface-overlay object-cover shadow-lg"
+            />
+          ) : (
+            <PlaceholderArt className="h-48 w-48" />
+          )}
+
+          <div>
+            <p className="text-title font-semibold text-text-primary">{displaySnapshot.name}</p>
+            <p className="text-body text-text-secondary">{displaySnapshot.artist}</p>
+          </div>
+
+          {detailPlayCount !== null && (
+            <p className="rounded-full bg-surface-overlay px-3 py-1 text-caption text-text-secondary">
+              Played {detailPlayCount} {detailPlayCount === 1 ? 'time' : 'times'}
+            </p>
+          )}
+
+          {detailArtist && (
+            <div className="flex w-full flex-col gap-3 border-t border-border pt-4 text-left">
+              <div className="flex items-center gap-3">
+                {detailArtist.imageUrl ? (
+                  <img
+                    src={detailArtist.imageUrl}
+                    alt=""
+                    className="h-12 w-12 shrink-0 rounded-full bg-surface-overlay object-cover"
+                  />
+                ) : null}
+                <div className="min-w-0 flex-1">
+                  <Link
+                    to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
+                    onClick={() => setDetailOpen(false)}
+                    className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline"
+                  >
+                    {detailArtist.name}
+                  </Link>
+                  <p className="text-caption text-text-muted">{detailArtist.followers.toLocaleString()} followers</p>
+                </div>
+              </div>
+
+              {detailArtist.genres.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {detailArtist.genres.map((genre) => (
+                    <span
+                      key={genre}
+                      className="rounded-full bg-surface-overlay px-2.5 py-1 text-caption text-text-secondary"
+                    >
+                      {genre}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </div>
-    </Card>
+      </Modal>
+    </>
   )
 }

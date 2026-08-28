@@ -2,6 +2,15 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.6
+
+- Playback control buttons now have noticeably larger icons instead of small icons floating in a lot of empty button padding.
+- The app title in the header is now centered above the content (it used to sit flush against the left edge of wide screens while the cards below it were centered), and its row now matches the same left/right margins as the cards. A search shortcut icon was added next to it.
+- Cards now use a translucent "glass" surface with a blur, so the softly blurred album-art background shows through behind them while music is playing, instead of a fully opaque panel.
+- Tapping the Now Playing card now expands into a detail view with larger album art, how many times the current song has been played, and artist info (followers, genres) — tapping the artist's name jumps to the search tab with that artist already searched.
+- Settings: the rate-limit window and min/max song duration controls are now sliders instead of plain number fields (removing the theme-mismatched up/down spinner arrows browsers add to number inputs), and each has a "?" help button explaining what it actually controls, tappable on mobile or hoverable on desktop.
+- Settings: the four permission-override dropdowns (pause/resume, skip, volume, reorder) are now laid out two-per-row instead of stacked one-per-row, since they don't need the full width.
+
 ## 1.0.5
 
 - Added this changelog file (the Supervisor was showing "No changelog found" — it reads `CHANGELOG.md` from the same directory as `config.yaml`, which didn't exist before now).

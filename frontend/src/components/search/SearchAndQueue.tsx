@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Card } from '../ui/Card'
 import { Skeleton } from '../ui/Skeleton'
 import { TrackRow, type QueueRowStatus } from './TrackRow'
@@ -73,7 +74,11 @@ function describeQueueError(err: unknown): string {
  */
 export function SearchAndQueue() {
   const { token } = useSession()
-  const [query, setQuery] = useState('')
+  // Prefilled from ?q= when arriving via the "See more from this artist" link
+  // on the expanded Now Playing card (NowPlaying.tsx) — read once on mount,
+  // not kept in sync with the URL afterwards.
+  const [searchParams] = useSearchParams()
+  const [query, setQuery] = useState(() => searchParams.get('q') ?? '')
   const debouncedQuery = useDebouncedValue(query.trim(), DEBOUNCE_MS)
   // The most recently *completed* (successful or failed) search outcome.
   // Loading state is derived below by comparing this to debouncedQuery,

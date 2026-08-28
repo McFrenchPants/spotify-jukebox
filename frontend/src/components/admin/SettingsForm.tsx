@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
+import { HelpTooltip } from '../ui/HelpTooltip'
 import { Skeleton } from '../ui/Skeleton'
 import {
   AdminSettingsValidationError,
@@ -22,6 +23,27 @@ type FormState = Omit<AdminSettings, 'spotifyDeviceId'>
 
 const MS_PER_MINUTE = 60_000
 const MS_PER_SECOND = 1000
+
+// Slider ranges are deliberately generous-but-bounded — wide enough to cover
+// any sane venue setup, narrow enough that the thumb stays easy to place
+// precisely with a fingertip (a bare <input type="number"> was the
+// alternative, but its native up/down spinner arrows don't match the rest of
+// the app's theme).
+const RATE_LIMIT_MIN_MINUTES = 1
+const RATE_LIMIT_MAX_MINUTES = 60
+const MIN_DURATION_MAX_SECONDS = 180
+const MAX_DURATION_MIN_SECONDS = 30
+const MAX_DURATION_MAX_SECONDS = 600
+
+function formatMinutes(minutes: number): string {
+  return `${minutes} min`
+}
+
+function formatSeconds(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return m > 0 ? `${m}m ${s}s` : `${s}s`
+}
 
 type OverrideField = 'allowPauseResume' | 'allowSkip' | 'allowVolume' | 'allowReorder'
 
@@ -147,45 +169,71 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-caption text-text-secondary">Rate-limit window (minutes)</span>
-        <input
-          type="number"
-          min={0}
-          step="any"
-          value={form.rateLimitWindowMs / MS_PER_MINUTE}
-          onChange={(e) =>
-            setForm({ ...form, rateLimitWindowMs: Math.round(Number(e.target.value) * MS_PER_MINUTE) })
-          }
-          className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
-        />
+        <span className="flex items-center gap-1.5 text-caption text-text-secondary">
+          Rate-limit window
+          <HelpTooltip
+            label="About rate-limit window"
+            text="How often each guest is allowed to add a song. A guest who queues a track has to wait out this whole window before queueing another."
+          />
+        </span>
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min={RATE_LIMIT_MIN_MINUTES}
+            max={RATE_LIMIT_MAX_MINUTES}
+            step={1}
+            value={Math.round(form.rateLimitWindowMs / MS_PER_MINUTE)}
+            onChange={(e) => setForm({ ...form, rateLimitWindowMs: Number(e.target.value) * MS_PER_MINUTE })}
+            className="h-11 w-full accent-accent"
+          />
+          <span className="w-16 shrink-0 text-right text-caption text-text-primary">
+            {formatMinutes(Math.round(form.rateLimitWindowMs / MS_PER_MINUTE))}
+          </span>
+        </div>
       </label>
 
       <div className="grid grid-cols-2 gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-caption text-text-secondary">Min duration (seconds)</span>
+          <span className="flex items-center gap-1.5 text-caption text-text-secondary">
+            Min duration
+            <HelpTooltip
+              label="About minimum song duration"
+              text="Songs shorter than this can't be added to the queue — keeps guests from spamming very short clips."
+            />
+          </span>
           <input
-            type="number"
+            type="range"
             min={0}
-            step="any"
-            value={form.minDurationMs / MS_PER_SECOND}
-            onChange={(e) =>
-              setForm({ ...form, minDurationMs: Math.round(Number(e.target.value) * MS_PER_SECOND) })
-            }
-            className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+            max={MIN_DURATION_MAX_SECONDS}
+            step={5}
+            value={Math.round(form.minDurationMs / MS_PER_SECOND)}
+            onChange={(e) => setForm({ ...form, minDurationMs: Number(e.target.value) * MS_PER_SECOND })}
+            className="h-11 w-full accent-accent"
           />
+          <span className="text-caption text-text-primary">
+            {formatSeconds(Math.round(form.minDurationMs / MS_PER_SECOND))}
+          </span>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-caption text-text-secondary">Max duration (seconds)</span>
+          <span className="flex items-center gap-1.5 text-caption text-text-secondary">
+            Max duration
+            <HelpTooltip
+              label="About maximum song duration"
+              text="Songs longer than this can't be added to the queue — keeps one guest's pick from hogging playback time."
+            />
+          </span>
           <input
-            type="number"
-            min={0}
-            step="any"
-            value={form.maxDurationMs / MS_PER_SECOND}
-            onChange={(e) =>
-              setForm({ ...form, maxDurationMs: Math.round(Number(e.target.value) * MS_PER_SECOND) })
-            }
-            className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+            type="range"
+            min={MAX_DURATION_MIN_SECONDS}
+            max={MAX_DURATION_MAX_SECONDS}
+            step={5}
+            value={Math.round(form.maxDurationMs / MS_PER_SECOND)}
+            onChange={(e) => setForm({ ...form, maxDurationMs: Number(e.target.value) * MS_PER_SECOND })}
+            className="h-11 w-full accent-accent"
           />
+          <span className="text-caption text-text-primary">
+            {formatSeconds(Math.round(form.maxDurationMs / MS_PER_SECOND))}
+          </span>
         </label>
       </div>
 
@@ -193,23 +241,25 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
         <p className="text-caption font-semibold uppercase tracking-wide text-text-muted">
           Permission overrides
         </p>
-        {OVERRIDE_FIELDS.map(({ key, label }) => (
-          <label key={key} className="flex flex-col gap-1">
-            <span className="text-caption text-text-secondary">{label}</span>
-            <select
-              value={form[key] === null ? 'inherit' : form[key] ? 'allow' : 'deny'}
-              onChange={(e) => {
-                const v = e.target.value
-                setOverride(key, v === 'inherit' ? null : v === 'allow')
-              }}
-              className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
-            >
-              <option value="inherit">Inherit from mode</option>
-              <option value="allow">Always allow</option>
-              <option value="deny">Always deny</option>
-            </select>
-          </label>
-        ))}
+        <div className="grid grid-cols-2 gap-3">
+          {OVERRIDE_FIELDS.map(({ key, label }) => (
+            <label key={key} className="flex flex-col gap-1">
+              <span className="text-caption text-text-secondary">{label}</span>
+              <select
+                value={form[key] === null ? 'inherit' : form[key] ? 'allow' : 'deny'}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setOverride(key, v === 'inherit' ? null : v === 'allow')
+                }}
+                className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+              >
+                <option value="inherit">Inherit from mode</option>
+                <option value="allow">Always allow</option>
+                <option value="deny">Always deny</option>
+              </select>
+            </label>
+          ))}
+        </div>
       </div>
 
       {validationErrors && (

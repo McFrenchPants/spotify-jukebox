@@ -1,5 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
+
+function SearchIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <circle cx="10.5" cy="10.5" r="6.5" />
+      <path d="m20 20-4.8-4.8" strokeLinecap="round" />
+    </svg>
+  )
+}
 
 export interface AppShellProps {
   children: ReactNode
@@ -106,7 +116,17 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
           className="px-4 pb-2"
           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
         >
-          <p className="text-title text-text-primary">French&rsquo;s Jukebox</p>
+          <div className="mx-auto flex w-full max-w-lg items-center justify-between">
+            <div className="h-10 w-10 shrink-0" aria-hidden="true" />
+            <p className="text-title text-text-primary">French&rsquo;s Jukebox</p>
+            <Link
+              to="/search"
+              aria-label="Search"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-text-secondary transition-fast hover:bg-surface-overlay hover:text-text-primary active:scale-90"
+            >
+              <SearchIcon />
+            </Link>
+          </div>
         </header>
 
         <main

@@ -20,7 +20,7 @@ export function Card({
 }: CardProps) {
   return (
     <div
-      className={`rounded-lg border border-border bg-surface ${noPadding ? '' : 'p-4'} ${className}`}
+      className={`rounded-lg border border-border/60 bg-surface/70 backdrop-blur-md ${noPadding ? '' : 'p-4'} ${className}`}
       {...rest}
     >
       {children}
