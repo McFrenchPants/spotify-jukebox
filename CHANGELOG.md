@@ -2,6 +2,12 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.10
+
+- Full glassmorphism visual pass: cards, buttons, the bottom nav bar, inputs, sliders, modals, and toasts now share one consistent frosted-glass look (translucency, blur, and a soft top-edge highlight) instead of the previous mix of flat and partially-glass surfaces. The active tab in the bottom nav now sits inside a glass pill instead of just changing color.
+- Settings: Trust mode is now a custom glass toggle switch instead of a dropdown (it's always exactly two options), and it now sits on the same row as the Explicit filter, which is now a custom glass checkbox instead of the browser's default checkbox. The four permission-override dropdowns are now glass-styled and color-coded (green for "Always allow", red for "Always deny").
+- All sliders (rate-limit window, min/max song duration, volume) now use a custom glass track with a glowing accent-colored thumb instead of the plain OS slider control.
+
 ## 1.0.9
 
 - Found the actual reason the playback icons kept looking small no matter how much bigger they were made: the buttons mixed a `size` preset (which sets its own left/right padding) with a manual override meant to zero that padding out, and Tailwind always applies the size preset's padding *after* the override in the generated stylesheet — so the override never took effect and was quietly eating almost all of the button's interior space. Icons now render at their actual intended size (fills roughly 60% of the button) instead of being squeezed into a sliver by leftover padding.
