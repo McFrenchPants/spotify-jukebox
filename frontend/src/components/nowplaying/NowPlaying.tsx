@@ -198,7 +198,15 @@ export function NowPlaying({
   return (
     <Card
       className={`cursor-pointer transition-slow active:scale-[0.99] ${visible ? 'opacity-100' : 'opacity-0'}`}
-      onClick={() => setExpanded((e) => !e)}
+      onClick={(e) => {
+        // The artist link inside the expanded section (below) needs its own
+        // click to navigate rather than toggle this card — checking the
+        // actual click target here (rather than relying solely on the
+        // link's own stopPropagation) means any future interactive element
+        // added inside the card is safe by default too.
+        if ((e.target as HTMLElement).closest('a')) return
+        setExpanded((prev) => !prev)
+      }}
       role="button"
       tabIndex={0}
       aria-expanded={expanded}
@@ -243,54 +251,42 @@ export function NowPlaying({
         </div>
       </div>
 
-      {/*
-       * Grid-rows trick for an animatable height on content whose size isn't
-       * known up front (album/genre text lengths vary) — a plain max-height
-       * transition would need a guessed cap, this doesn't.
-       */}
-      <div
-        className="grid transition-slow"
-        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
-      >
-        <div className="overflow-hidden">
-          {detailArtist && (
-            <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 text-left">
-              <div className="flex items-center gap-3">
-                {detailArtist.imageUrl ? (
-                  <img
-                    src={detailArtist.imageUrl}
-                    alt=""
-                    className="h-12 w-12 shrink-0 rounded-full bg-surface-overlay object-cover"
-                  />
-                ) : null}
-                <div className="min-w-0 flex-1">
-                  <Link
-                    to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
-                    onClick={(e) => e.stopPropagation()}
-                    className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline"
-                  >
-                    {detailArtist.name}
-                  </Link>
-                  <p className="text-caption text-text-muted">{detailArtist.followers.toLocaleString()} followers</p>
-                </div>
-              </div>
+      {expanded && detailArtist && (
+        <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 text-left">
+          <div className="flex items-center gap-3">
+            {detailArtist.imageUrl ? (
+              <img
+                src={detailArtist.imageUrl}
+                alt=""
+                className="h-12 w-12 shrink-0 rounded-full bg-surface-overlay object-cover"
+              />
+            ) : null}
+            <div className="min-w-0 flex-1">
+              <Link
+                to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
+                onClick={(e) => e.stopPropagation()}
+                className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline"
+              >
+                {detailArtist.name}
+              </Link>
+              <p className="text-caption text-text-muted">{detailArtist.followers.toLocaleString()} followers</p>
+            </div>
+          </div>
 
-              {detailArtist.genres.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {detailArtist.genres.map((genre) => (
-                    <span
-                      key={genre}
-                      className="rounded-full bg-surface-overlay px-2.5 py-1 text-caption text-text-secondary"
-                    >
-                      {genre}
-                    </span>
-                  ))}
-                </div>
-              )}
+          {detailArtist.genres.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {detailArtist.genres.map((genre) => (
+                <span
+                  key={genre}
+                  className="rounded-full bg-surface-overlay px-2.5 py-1 text-caption text-text-secondary"
+                >
+                  {genre}
+                </span>
+              ))}
             </div>
           )}
         </div>
-      </div>
+      )}
     </Card>
   )
 }

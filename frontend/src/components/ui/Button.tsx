@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'danger'
-export type ButtonSize = 'md' | 'lg'
+export type ButtonSize = 'md' | 'lg' | 'icon' | 'icon-lg'
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
@@ -21,6 +21,16 @@ const sizes: Record<ButtonSize, string> = {
   // "Add to queue" rows to admin actions) must clear it, not just `lg`.
   md: 'h-11 px-4 text-body',
   lg: 'h-12 px-6 text-title',
+  // Square icon-only buttons (playback controls). Deliberately their own
+  // size entries rather than `md`/`lg` + a `className="w-12 p-0"` override —
+  // Tailwind emits per-axis padding utilities (`px-4`) AFTER the all-sides
+  // one (`p-0`) in its generated stylesheet regardless of which order the
+  // classes appear in the JSX, so a `p-0` override never actually wins
+  // against `md`/`lg`'s built-in `px-*` and silently squashes the icon
+  // against the button's edges. Keeping icon sizing in its own map entry
+  // means only one set of padding/height classes is ever present at once.
+  icon: 'h-12 w-12 p-0',
+  'icon-lg': 'h-14 w-14 p-0',
 }
 
 // Pressed/active state is deliberately strong (color shift + scale) since

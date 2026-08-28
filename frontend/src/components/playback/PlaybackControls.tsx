@@ -210,7 +210,7 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
       <div className="flex items-center justify-center gap-3">
         <Button
           variant="secondary"
-          className="h-12 w-12 p-0"
+          size="icon"
           onClick={handlePrevious}
           disabled={!skipAllowed || pending.previous}
           aria-label="Previous track"
@@ -219,8 +219,7 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
         </Button>
         <Button
           variant="primary"
-          size="lg"
-          className="h-14 w-14 p-0"
+          size="icon-lg"
           onClick={handlePauseResume}
           disabled={!pauseResumeAllowed || pending.pauseResume}
           aria-label={isPlaying ? 'Pause' : 'Resume'}
@@ -229,7 +228,7 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
         </Button>
         <Button
           variant="secondary"
-          className="h-12 w-12 p-0"
+          size="icon"
           onClick={handleSkip}
           disabled={!skipAllowed || pending.skip}
           aria-label="Skip to next track"

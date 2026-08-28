@@ -2,6 +2,11 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.9
+
+- Found the actual reason the playback icons kept looking small no matter how much bigger they were made: the buttons mixed a `size` preset (which sets its own left/right padding) with a manual override meant to zero that padding out, and Tailwind always applies the size preset's padding *after* the override in the generated stylesheet — so the override never took effect and was quietly eating almost all of the button's interior space. Icons now render at their actual intended size (fills roughly 60% of the button) instead of being squeezed into a sliver by leftover padding.
+- Fixed the "About the artist" link in the expanded Now Playing card actually being unclickable: the card's own animated expand/collapse section was computing to zero height in-browser (a CSS technique that didn't behave the way intended), so the artist name and its link were invisibly stacked on top of the controls below and never received the tap. The expand no longer relies on that technique — the artist section now reliably appears and its link reliably works.
+
 ## 1.0.8
 
 - The Print button on the admin Settings page's guest-link QR code now prints only the QR code and its URL, instead of the entire admin panel underneath it.
