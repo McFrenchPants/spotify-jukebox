@@ -98,7 +98,7 @@ export function QueueList({ subscribe, refreshKey }: QueueListProps) {
       )}
 
       {errorMessage && (
-        <div className="rounded-md border border-error-muted bg-error-muted px-4 py-3 text-center text-caption text-error">
+        <div className="rounded-md border border-error-muted/60 bg-error-muted/70 backdrop-blur-md px-4 py-3 text-center text-caption text-error">
           {errorMessage}
         </div>
       )}

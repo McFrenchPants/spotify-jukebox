@@ -57,7 +57,7 @@ export function PinEntry() {
           }}
           placeholder="PIN"
           aria-label="Admin PIN"
-          className="h-12 rounded-md border border-border bg-surface-raised px-4 text-center text-title tracking-widest text-text-primary outline-none transition-fast focus-visible:border-accent"
+          className="glass-inset h-12 rounded-md px-4 text-center text-title tracking-widest text-text-primary outline-none transition-fast focus-visible:border-accent"
         />
 
         {error && (

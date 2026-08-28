@@ -141,7 +141,7 @@ export function SearchAndQueue() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for a song or artist…"
-          className="h-12 w-full rounded-md border border-border bg-surface-raised px-4 text-body text-text-primary placeholder:text-text-muted transition-fast focus:border-accent focus:outline-none"
+          className="glass-inset h-12 w-full rounded-md px-4 text-body text-text-primary placeholder:text-text-muted transition-fast focus:border-accent focus:outline-none"
         />
       </label>
 
@@ -161,7 +161,7 @@ export function SearchAndQueue() {
       )}
 
       {!isLoading && debouncedQuery !== '' && outcome?.query === debouncedQuery && outcome.errorMessage && (
-        <div className="flex flex-col items-center gap-1 rounded-md border border-error-muted bg-error-muted px-4 py-6 text-center">
+        <div className="flex flex-col items-center gap-1 rounded-md border border-error-muted/60 bg-error-muted/70 backdrop-blur-md px-4 py-6 text-center">
           <p className="text-body text-error">Search failed</p>
           <p className="text-caption text-text-secondary">{outcome.errorMessage}</p>
         </div>

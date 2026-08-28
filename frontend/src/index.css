@@ -115,6 +115,118 @@ body {
 }
 
 /*
+ * ---- Glass system ----
+ * A handful of reusable surfaces built from translucency + blur + a thin
+ * inner highlight (simulating light catching a beveled edge of glass) +
+ * a soft drop shadow for depth. Kept as plain utility classes (rather than
+ * per-component one-off styles) so every "glass" surface in the app —
+ * cards, buttons, the nav bar, inputs, popovers — reads as one material.
+ * Deliberately subtle: a faint gradient and a 1px highlight, not a heavy
+ * frosted-glass effect that would fight the album-art background.
+ */
+.glass {
+  position: relative;
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02) 60%);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.12),
+    0 8px 24px -8px rgba(0, 0, 0, 0.45);
+}
+
+/* Stronger blur + dimmer tint for large fixed chrome (nav bar, header) that
+   sits over constantly-scrolling content and needs to stay legible. */
+.glass-chrome {
+  background: linear-gradient(180deg, rgba(21, 21, 23, 0.55), rgba(10, 10, 11, 0.7));
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+/* Recessed surfaces: inputs, track backgrounds, anything meant to look
+   etched *into* the glass rather than sitting on top of it. */
+.glass-inset {
+  background: linear-gradient(155deg, rgba(0, 0, 0, 0.22), rgba(0, 0, 0, 0.1));
+  backdrop-filter: blur(16px) saturate(120%);
+  -webkit-backdrop-filter: blur(16px) saturate(120%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+/* Small glass chip/pill (badges, the nav active indicator, toggle thumbs). */
+.glass-pill {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.14), rgba(255, 255, 255, 0.04));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/*
+ * ---- Custom range slider ----
+ * Applies app-wide (rate limit, min/max duration, volume) so every slider
+ * shares the same glass track + glowing accent thumb instead of the bare OS
+ * control. `accent-color` alone (previously used) only tints the native
+ * widget; this reskins the track/thumb directly for the glass material
+ * while keeping the accent hue the user asked to preserve.
+ */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  height: 20px;
+}
+input[type='range']::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+input[type='range']::-moz-range-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+input[type='range']::-moz-range-progress {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg, var(--color-accent-active), var(--color-accent));
+}
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  margin-top: -8px;
+  height: 22px;
+  width: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), var(--color-accent) 65%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 5px rgba(47, 214, 111, 0.16), 0 2px 6px rgba(0, 0, 0, 0.45);
+  transition: box-shadow var(--duration-fast) var(--ease-standard), transform var(--duration-fast) var(--ease-standard);
+}
+input[type='range']::-moz-range-thumb {
+  height: 22px;
+  width: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.95), var(--color-accent) 65%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 0 0 5px rgba(47, 214, 111, 0.16), 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+input[type='range']:active::-webkit-slider-thumb {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 7px rgba(47, 214, 111, 0.22), 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+input[type='range']:disabled::-webkit-slider-thumb,
+input[type='range']:disabled::-moz-range-thumb {
+  background: radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.25) 65%);
+  box-shadow: none;
+}
+
+/*
  * Printing GuestUrlCard.tsx's "Print" button should print only the QR
  * code, not the whole admin settings page underneath it. Classic
  * print-one-element trick: hide everything, then re-reveal just the

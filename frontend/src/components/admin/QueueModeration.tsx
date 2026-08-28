@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
+import { Select } from '../ui/Select'
 import { Skeleton } from '../ui/Skeleton'
 import {
   ApiError,
@@ -145,7 +146,7 @@ export function QueueModeration({ token }: QueueModerationProps) {
       </div>
 
       {loadError && (
-        <div className="rounded-md border border-error-muted bg-error-muted px-4 py-3 text-center text-caption text-error">
+        <div className="rounded-md border border-error-muted/60 bg-error-muted/70 backdrop-blur-md px-4 py-3 text-center text-caption text-error">
           {loadError}
         </div>
       )}
@@ -172,20 +173,22 @@ export function QueueModeration({ token }: QueueModerationProps) {
       <form onSubmit={handleBlacklistSubmit} className="flex flex-col gap-2 border-t border-border pt-4">
         <p className="text-caption font-semibold uppercase tracking-wide text-text-muted">Blacklist</p>
         <div className="flex gap-2">
-          <select
-            value={blacklistType}
-            onChange={(e) => setBlacklistType(e.target.value as BlacklistType)}
-            className="h-11 shrink-0 rounded-md border border-border bg-surface-raised px-2 text-body text-text-primary outline-none focus-visible:border-accent"
-          >
-            <option value="artist">Artist</option>
-            <option value="track">Track</option>
-          </select>
+          <div className="w-32 shrink-0">
+            <Select
+              value={blacklistType}
+              onChange={(e) => setBlacklistType(e.target.value as BlacklistType)}
+              options={[
+                { value: 'artist', label: 'Artist' },
+                { value: 'track', label: 'Track' },
+              ]}
+            />
+          </div>
           <input
             type="text"
             value={blacklistValue}
             onChange={(e) => setBlacklistValue(e.target.value)}
             placeholder={blacklistType === 'artist' ? 'Artist name' : 'Spotify track id'}
-            className="h-11 min-w-0 flex-1 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+            className="glass-inset h-11 min-w-0 flex-1 rounded-md px-3 text-body text-text-primary outline-none focus-visible:border-accent"
           />
         </div>
         <Button type="submit" variant="secondary" disabled={blacklistValue.trim() === '' || submittingBlacklist}>

@@ -44,14 +44,14 @@ export function HelpTooltip({ text, label }: HelpTooltipProps) {
         onMouseLeave={() => setHoverOpen(false)}
         onFocus={() => setHoverOpen(true)}
         onBlur={() => setHoverOpen(false)}
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border-strong text-caption leading-none text-text-muted transition-fast hover:border-accent hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+        className="glass-pill flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-caption leading-none text-text-muted transition-fast hover:text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
       >
         ?
       </button>
       {open && (
         <div
           role="tooltip"
-          className="absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded-md border border-border bg-surface-raised p-2.5 text-caption text-text-secondary shadow-lg"
+          className="glass-chrome absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 rounded-md p-2.5 text-caption text-text-secondary shadow-lg"
         >
           {text}
         </div>

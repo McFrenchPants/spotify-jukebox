@@ -28,7 +28,7 @@ export function Toast({ variant = 'info', title, description, onDismiss }: Toast
   return (
     <div
       role="status"
-      className={`flex w-full max-w-sm items-start gap-3 rounded-md border border-border border-l-4 ${styles.border} bg-surface-raised p-4 shadow-lg transition-base`}
+      className={`glass-chrome flex w-full max-w-sm items-start gap-3 rounded-md border-l-4 ${styles.border} p-4 shadow-lg transition-base`}
     >
       <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${styles.dot}`} aria-hidden="true" />
       <div className="min-w-0 flex-1">

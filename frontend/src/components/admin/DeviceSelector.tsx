@@ -83,13 +83,13 @@ export function DeviceSelector({ token, subscribe }: DeviceSelectorProps) {
       <p className="text-title text-text-primary">Playback device</p>
 
       {loadError && (
-        <div className="rounded-md border border-error-muted bg-error-muted px-4 py-3 text-center text-caption text-error">
+        <div className="rounded-md border border-error-muted/60 bg-error-muted/70 backdrop-blur-md px-4 py-3 text-center text-caption text-error">
           {loadError}
         </div>
       )}
 
       {offlineNotice && !loadError && (
-        <div className="rounded-md border border-warning-muted bg-warning-muted px-4 py-3 text-center text-caption text-warning">
+        <div className="rounded-md border border-warning-muted/60 bg-warning-muted/70 backdrop-blur-md px-4 py-3 text-center text-caption text-warning">
           The bridge device just went offline — pick another device below, or reconnect it.
         </div>
       )}
@@ -122,10 +122,10 @@ export function DeviceSelector({ token, subscribe }: DeviceSelectorProps) {
                     type="button"
                     onClick={() => void handleSelect(device.id)}
                     disabled={selectingId !== null}
-                    className={`flex items-center justify-between gap-3 rounded-md border px-4 py-3 text-left transition-fast active:scale-[0.98] disabled:opacity-60 ${
+                    className={`flex items-center justify-between gap-3 rounded-md px-4 py-3 text-left transition-fast active:scale-[0.98] disabled:opacity-60 ${
                       isCurrent
-                        ? 'border-accent bg-accent-muted'
-                        : 'border-border bg-surface-raised hover:bg-surface-overlay'
+                        ? 'glass-inset border-accent/50 shadow-[0_0_0_1px_rgba(47,214,111,0.25)]'
+                        : 'glass-inset hover:bg-white/[0.05]'
                     }`}
                   >
                     <div className="min-w-0">

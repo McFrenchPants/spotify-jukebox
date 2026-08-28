@@ -63,24 +63,34 @@ const NAV_ITEMS: NavItem[] = [
 export function BottomNav() {
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-border bg-surface/95 backdrop-blur"
+      className="glass-chrome fixed inset-x-0 bottom-0 z-20 border-x-0 border-b-0"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Primary"
     >
-      <div className="mx-auto flex w-full max-w-lg items-stretch justify-around">
+      <div className="mx-auto flex w-full max-w-lg items-stretch justify-around px-2 py-1.5">
         {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
             className={({ isActive }) =>
-              `flex flex-1 flex-col items-center justify-center gap-1 py-2 text-caption transition-fast ${
+              `group flex flex-1 flex-col items-center justify-center gap-1 py-1.5 text-caption transition-fast ${
                 isActive ? 'text-accent' : 'text-text-muted'
               }`
             }
           >
-            <Icon className="shrink-0" />
-            <span>{label}</span>
+            {({ isActive }) => (
+              <>
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-full transition-fast ${
+                    isActive ? 'glass-pill' : 'group-active:bg-white/5'
+                  }`}
+                >
+                  <Icon className="shrink-0" />
+                </span>
+                <span>{label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </div>

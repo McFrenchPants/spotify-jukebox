@@ -43,8 +43,8 @@ export function Modal({ open, onClose, title, children, layout = 'sheet' }: Moda
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative w-full max-w-md border border-border bg-surface-raised p-5 shadow-lg transition-base ${
-          isSheet ? 'rounded-t-xl' : 'mx-4 mb-4 rounded-lg sm:mb-0'
+        className={`glass-chrome relative w-full max-w-md border-b-0 p-5 shadow-lg transition-base ${
+          isSheet ? 'rounded-t-xl' : 'mx-4 mb-4 rounded-lg border-b sm:mb-0'
         }`}
       >
         {title && (

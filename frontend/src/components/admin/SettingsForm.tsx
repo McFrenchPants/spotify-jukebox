@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Button } from '../ui/Button'
 import { Card } from '../ui/Card'
+import { Checkbox } from '../ui/Checkbox'
 import { HelpTooltip } from '../ui/HelpTooltip'
+import { Select } from '../ui/Select'
 import { Skeleton } from '../ui/Skeleton'
+import { Switch } from '../ui/Switch'
 import {
   AdminSettingsValidationError,
   ApiError,
@@ -144,29 +147,27 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
         Current device: {deviceId ?? 'No device selected'}
       </p>
 
-      <label className="flex flex-col gap-1">
-        <span className="text-caption text-text-secondary">Trust mode</span>
-        <select
-          value={form.activeMode}
-          onChange={(e) =>
-            setForm({ ...form, activeMode: e.target.value as AdminSettings['activeMode'] })
-          }
-          className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
-        >
-          <option value="restricted">Restricted</option>
-          <option value="trusted">Trusted</option>
-        </select>
-      </label>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-caption text-text-secondary">Trust mode</span>
+          <Switch
+            checked={form.activeMode === 'trusted'}
+            onChange={(next) => setForm({ ...form, activeMode: next ? 'trusted' : 'restricted' })}
+            offLabel="Restricted"
+            onLabel="Trusted"
+            aria-label="Trust mode"
+          />
+        </div>
 
-      <label className="flex items-center justify-between gap-3">
-        <span className="text-caption text-text-secondary">Explicit filter enabled</span>
-        <input
-          type="checkbox"
-          checked={form.explicitFilterEnabled}
-          onChange={(e) => setForm({ ...form, explicitFilterEnabled: e.target.checked })}
-          className="h-5 w-5 accent-accent"
-        />
-      </label>
+        <div className="flex items-center gap-3">
+          <span className="text-caption text-text-secondary">Explicit filter</span>
+          <Checkbox
+            checked={form.explicitFilterEnabled}
+            onChange={(checked) => setForm({ ...form, explicitFilterEnabled: checked })}
+            aria-label="Explicit filter enabled"
+          />
+        </div>
+      </div>
 
       <label className="flex flex-col gap-1">
         <span className="flex items-center gap-1.5 text-caption text-text-secondary">
@@ -242,28 +243,32 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
           Permission overrides
         </p>
         <div className="grid grid-cols-2 gap-3">
-          {OVERRIDE_FIELDS.map(({ key, label }) => (
-            <label key={key} className="flex flex-col gap-1">
-              <span className="text-caption text-text-secondary">{label}</span>
-              <select
-                value={form[key] === null ? 'inherit' : form[key] ? 'allow' : 'deny'}
-                onChange={(e) => {
-                  const v = e.target.value
-                  setOverride(key, v === 'inherit' ? null : v === 'allow')
-                }}
-                className="h-11 rounded-md border border-border bg-surface-raised px-3 text-body text-text-primary outline-none focus-visible:border-accent"
-              >
-                <option value="inherit">Inherit from mode</option>
-                <option value="allow">Always allow</option>
-                <option value="deny">Always deny</option>
-              </select>
-            </label>
-          ))}
+          {OVERRIDE_FIELDS.map(({ key, label }) => {
+            const current = form[key] === null ? 'inherit' : form[key] ? 'allow' : 'deny'
+            return (
+              <label key={key} className="flex flex-col gap-1">
+                <span className="text-caption text-text-secondary">{label}</span>
+                <Select
+                  value={current}
+                  tone={current === 'allow' ? 'accent' : current === 'deny' ? 'error' : 'default'}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setOverride(key, v === 'inherit' ? null : v === 'allow')
+                  }}
+                  options={[
+                    { value: 'inherit', label: 'Inherit from mode' },
+                    { value: 'allow', label: 'Always allow' },
+                    { value: 'deny', label: 'Always deny' },
+                  ]}
+                />
+              </label>
+            )
+          })}
         </div>
       </div>
 
       {validationErrors && (
-        <div className="rounded-md border border-error-muted bg-error-muted px-4 py-3 text-caption text-error">
+        <div className="rounded-md border border-error-muted/60 bg-error-muted/70 backdrop-blur-md px-4 py-3 text-caption text-error">
           <ul className="list-disc pl-4">
             {validationErrors.map((msg, i) => (
               <li key={i}>{msg}</li>
