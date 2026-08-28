@@ -35,21 +35,33 @@ export function GuestUrlCard() {
 
   return (
     <Card className="flex flex-col items-center gap-3 text-center print:shadow-none">
-      <p className="text-title text-text-primary">Guest link</p>
+      {/*
+       * Printing this card should print ONLY the QR code, not the whole
+       * admin settings page it sits on. `.print-area` + the `@media print`
+       * rule in index.css hides every other element on the page (via
+       * `visibility: hidden` on everything, `visible` on this subtree) and
+       * pulls this block to the top of the printed page — the classic
+       * print-one-element trick, since `display: none` on siblings would
+       * also work but this way the layout doesn't need to change at all
+       * for the on-screen view.
+       */}
+      <div className="print-area flex flex-col items-center gap-3 print:text-black">
+        <p className="text-title text-text-primary print:text-black">Guest link for French&rsquo;s Jukebox</p>
 
-      {dataUrl && (
-        <img
-          src={dataUrl}
-          alt={`QR code linking to ${guestUrl}`}
-          className="h-48 w-48 rounded-md bg-white p-2"
-        />
-      )}
-      {!dataUrl && !error && (
-        <div className="h-48 w-48 animate-pulse rounded-md bg-surface-overlay" />
-      )}
-      {error && <p className="text-caption text-error">{error}</p>}
+        {dataUrl && (
+          <img
+            src={dataUrl}
+            alt={`QR code linking to ${guestUrl}`}
+            className="h-48 w-48 rounded-md bg-white p-2 print:h-64 print:w-64"
+          />
+        )}
+        {!dataUrl && !error && (
+          <div className="h-48 w-48 animate-pulse rounded-md bg-surface-overlay" />
+        )}
+        {error && <p className="text-caption text-error">{error}</p>}
 
-      <p className="select-all break-all text-caption text-text-secondary">{guestUrl}</p>
+        <p className="select-all break-all text-caption text-text-secondary print:text-black">{guestUrl}</p>
+      </div>
 
       <Button variant="secondary" onClick={() => window.print()} className="print:hidden">
         Print

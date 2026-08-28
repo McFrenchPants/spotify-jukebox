@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../ui/Card'
-import { Modal } from '../ui/Modal'
 import { getArtist, getLeaderboard, getNowPlaying, type ArtistInfo, type NowPlayingState } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
@@ -56,7 +55,7 @@ export function NowPlaying({
   const [displaySnapshot, setDisplaySnapshot] = useState<NowPlayingState | null>(null)
   const [visible, setVisible] = useState(true)
   const [progressMs, setProgressMs] = useState(0)
-  const [detailOpen, setDetailOpen] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const [detailArtist, setDetailArtist] = useState<ArtistInfo | null>(null)
   const [detailPlayCount, setDetailPlayCount] = useState<number | null>(null)
   const pendingRef = useRef<NowPlayingState | null>(null)
@@ -148,12 +147,12 @@ export function NowPlaying({
     return () => clearInterval(interval)
   }, [displaySnapshot])
 
-  // Fetches the expanded detail sheet's extra data (play count + artist info)
-  // only once it's actually opened, keyed to the track it opened for — a
+  // Fetches the expanded section's extra data (play count + artist info)
+  // only once it's actually expanded, keyed to the track it opened for — a
   // stale response for a track the guest has since navigated away from is
   // simply ignored via the `cancelled` flag, same pattern as the effects above.
   useEffect(() => {
-    if (!detailOpen || !displaySnapshot?.trackId) return
+    if (!expanded || !displaySnapshot?.trackId) return
     let cancelled = false
     setDetailArtist(null)
     setDetailPlayCount(null)
@@ -181,7 +180,7 @@ export function NowPlaying({
     return () => {
       cancelled = true
     }
-  }, [detailOpen, displaySnapshot?.trackId, displaySnapshot?.artistId])
+  }, [expanded, displaySnapshot?.trackId, displaySnapshot?.artistId])
 
   if (!displaySnapshot || !displaySnapshot.isPlaying || !displaySnapshot.trackId) {
     return (
@@ -197,28 +196,31 @@ export function NowPlaying({
   const remaining = Math.max(0, duration - progressMs)
 
   return (
-    <>
-      <Card
-        className={`flex cursor-pointer items-center gap-4 transition-slow active:scale-[0.99] ${visible ? 'opacity-100' : 'opacity-0'}`}
-        onClick={() => setDetailOpen(true)}
-        role="button"
-        tabIndex={0}
-        aria-label="Show more about this track"
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            setDetailOpen(true)
-          }
-        }}
-      >
+    <Card
+      className={`cursor-pointer transition-slow active:scale-[0.99] ${visible ? 'opacity-100' : 'opacity-0'}`}
+      onClick={() => setExpanded((e) => !e)}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      aria-label={expanded ? 'Show less about this track' : 'Show more about this track'}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          setExpanded((prev) => !prev)
+        }
+      }}
+    >
+      <div className="flex items-center gap-4">
         {displaySnapshot.albumArt ? (
           <img
             src={displaySnapshot.albumArt}
             alt=""
-            className="h-16 w-16 shrink-0 rounded-md bg-surface-overlay object-cover"
+            className={`shrink-0 rounded-md bg-surface-overlay object-cover transition-slow ${
+              expanded ? 'h-40 w-40' : 'h-16 w-16'
+            }`}
           />
         ) : (
-          <PlaceholderArt className="h-16 w-16" />
+          <PlaceholderArt className={`transition-slow ${expanded ? 'h-40 w-40' : 'h-16 w-16'}`} />
         )}
 
         <div className="min-w-0 flex-1">
@@ -232,34 +234,27 @@ export function NowPlaying({
             <span>{formatDuration(progressMs)}</span>
             <span>-{formatDuration(remaining)}</span>
           </div>
-        </div>
-      </Card>
 
-      <Modal open={detailOpen} onClose={() => setDetailOpen(false)} title="Now Playing" layout="sheet">
-        <div className="flex flex-col items-center gap-4 text-center">
-          {displaySnapshot.albumArt ? (
-            <img
-              src={displaySnapshot.albumArt}
-              alt=""
-              className="h-48 w-48 rounded-lg bg-surface-overlay object-cover shadow-lg"
-            />
-          ) : (
-            <PlaceholderArt className="h-48 w-48" />
-          )}
-
-          <div>
-            <p className="text-title font-semibold text-text-primary">{displaySnapshot.name}</p>
-            <p className="text-body text-text-secondary">{displaySnapshot.artist}</p>
-          </div>
-
-          {detailPlayCount !== null && (
-            <p className="rounded-full bg-surface-overlay px-3 py-1 text-caption text-text-secondary">
+          {expanded && detailPlayCount !== null && (
+            <p className="mt-3 inline-block rounded-full bg-surface-overlay px-3 py-1 text-caption text-text-secondary">
               Played {detailPlayCount} {detailPlayCount === 1 ? 'time' : 'times'}
             </p>
           )}
+        </div>
+      </div>
 
+      {/*
+       * Grid-rows trick for an animatable height on content whose size isn't
+       * known up front (album/genre text lengths vary) — a plain max-height
+       * transition would need a guessed cap, this doesn't.
+       */}
+      <div
+        className="grid transition-slow"
+        style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden">
           {detailArtist && (
-            <div className="flex w-full flex-col gap-3 border-t border-border pt-4 text-left">
+            <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 text-left">
               <div className="flex items-center gap-3">
                 {detailArtist.imageUrl ? (
                   <img
@@ -271,7 +266,7 @@ export function NowPlaying({
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
-                    onClick={() => setDetailOpen(false)}
+                    onClick={(e) => e.stopPropagation()}
                     className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline"
                   >
                     {detailArtist.name}
@@ -295,7 +290,7 @@ export function NowPlaying({
             </div>
           )}
         </div>
-      </Modal>
-    </>
+      </div>
+    </Card>
   )
 }

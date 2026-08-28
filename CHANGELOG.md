@@ -2,6 +2,11 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.8
+
+- The Print button on the admin Settings page's guest-link QR code now prints only the QR code and its URL, instead of the entire admin panel underneath it.
+- Tapping the Now Playing card no longer pops up a separate dialog — it now expands the card itself in place (bigger album art, play count, artist info), and the expanded view keeps the progress bar/time that the popup version had dropped. The artist's name is a link straight to the search tab with that artist already searched.
+
 ## 1.0.7
 
 - Playback control icons are bigger still (the 1.0.6 bump wasn't enough) — they now fill about 60% of their button instead of ~50%.

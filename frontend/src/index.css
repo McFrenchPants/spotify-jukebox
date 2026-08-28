@@ -113,3 +113,25 @@ body {
   color: var(--color-text-primary);
   font-family: var(--font-sans);
 }
+
+/*
+ * Printing GuestUrlCard.tsx's "Print" button should print only the QR
+ * code, not the whole admin settings page underneath it. Classic
+ * print-one-element trick: hide everything, then re-reveal just the
+ * `.print-area` subtree and pull it to the top of the page.
+ */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .print-area,
+  .print-area * {
+    visibility: visible;
+  }
+  .print-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+}
