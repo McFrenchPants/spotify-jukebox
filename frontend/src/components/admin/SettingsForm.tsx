@@ -29,14 +29,14 @@ const MS_PER_SECOND = 1000
 // precisely with a fingertip (a bare <input type="number"> was the
 // alternative, but its native up/down spinner arrows don't match the rest of
 // the app's theme).
-const RATE_LIMIT_MIN_MINUTES = 1
-const RATE_LIMIT_MAX_MINUTES = 60
+const RATE_LIMIT_MIN_MINUTES = 0
+const RATE_LIMIT_MAX_MINUTES = 5
 const MIN_DURATION_MAX_SECONDS = 180
 const MAX_DURATION_MIN_SECONDS = 30
 const MAX_DURATION_MAX_SECONDS = 600
 
 function formatMinutes(minutes: number): string {
-  return `${minutes} min`
+  return minutes === 0 ? 'Off' : `${minutes} min`
 }
 
 function formatSeconds(seconds: number): string {
@@ -173,7 +173,7 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
           Rate-limit window
           <HelpTooltip
             label="About rate-limit window"
-            text="How often each guest is allowed to add a song. A guest who queues a track has to wait out this whole window before queueing another."
+            text="How often each guest is allowed to add a song. A guest who queues a track has to wait out this whole window before queueing another. Set to Off to remove the limit entirely."
           />
         </span>
         <div className="flex items-center gap-3">

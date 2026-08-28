@@ -27,7 +27,7 @@ type ActionKey = 'previous' | 'pauseResume' | 'skip' | 'volume'
 /** Filled triangle pointing right — play. */
 function PlayIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true">
       <path d="M8 5.5v13l11-6.5z" />
     </svg>
   )
@@ -36,7 +36,7 @@ function PlayIcon() {
 /** Two vertical bars — pause. */
 function PauseIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="34" height="34" fill="currentColor" aria-hidden="true">
       <rect x="6.5" y="5" width="4" height="14" rx="1" />
       <rect x="13.5" y="5" width="4" height="14" rx="1" />
     </svg>
@@ -46,7 +46,7 @@ function PauseIcon() {
 /** Triangle-against-a-bar — skip forward. */
 function SkipNextIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true">
       <path d="M6 5.5v13l9-6.5z" />
       <rect x="16" y="5" width="3" height="14" rx="1" />
     </svg>
@@ -56,7 +56,7 @@ function SkipNextIcon() {
 /** Triangle-against-a-bar, mirrored — skip back / previous. */
 function SkipPreviousIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true">
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true">
       <path d="M18 5.5v13l-9-6.5z" />
       <rect x="5" y="5" width="3" height="14" rx="1" />
     </svg>

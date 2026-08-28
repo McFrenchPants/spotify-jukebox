@@ -2,6 +2,11 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.7
+
+- Playback control icons are bigger still (the 1.0.6 bump wasn't enough) — they now fill about 60% of their button instead of ~50%.
+- The rate-limit window setting can now be set to 0 ("Off") to disable it entirely, and its slider's top end was brought down from 60 minutes to a more realistic 5 — the old 1-to-60-minute range made the useful part of the slider hard to land on precisely.
+
 ## 1.0.6
 
 - Playback control buttons now have noticeably larger icons instead of small icons floating in a lot of empty button padding.

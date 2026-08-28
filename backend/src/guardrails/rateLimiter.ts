@@ -17,11 +17,16 @@ export interface RateLimitResult {
   retryAfterMs?: number;
 }
 
-/** Reads the configured rate-limit window from app_settings, falling back to the default. */
+/**
+ * Reads the configured rate-limit window from app_settings, falling back to
+ * the default. 0 is a valid configured value, not "unset" — it disables the
+ * limit entirely (checkRateLimit's `elapsed >= windowMs` is trivially true
+ * whenever windowMs is 0, so every request is allowed).
+ */
 function getRateLimitWindowMs(): number {
   const raw = getSetting(RATE_LIMIT_WINDOW_MS_KEY);
   const parsed = raw === undefined ? NaN : Number(raw);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RATE_LIMIT_WINDOW_MS;
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : DEFAULT_RATE_LIMIT_WINDOW_MS;
 }
 
 /**

@@ -95,7 +95,8 @@ function parseActiveMode(): ActiveMode {
 /** Reads every app_settings value covered by P3.2, applying documented defaults. */
 export function getAllAppSettings(): AppSettingsResponse {
   return {
-    rateLimitWindowMs: parseNumberSetting(RATE_LIMIT_WINDOW_MS_KEY, DEFAULT_RATE_LIMIT_WINDOW_MS, true),
+    // minExclusive: false — 0 is a valid, meaningful value (disables the rate limit).
+    rateLimitWindowMs: parseNumberSetting(RATE_LIMIT_WINDOW_MS_KEY, DEFAULT_RATE_LIMIT_WINDOW_MS, false),
     explicitFilterEnabled: (getSetting(EXPLICIT_FILTER_ENABLED_KEY) ?? DEFAULT_EXPLICIT_FILTER_ENABLED) !== "false",
     minDurationMs: parseNumberSetting(MIN_DURATION_MS_KEY, DEFAULT_MIN_DURATION_MS, false),
     maxDurationMs: parseNumberSetting(MAX_DURATION_MS_KEY, DEFAULT_MAX_DURATION_MS, true),
@@ -137,10 +138,12 @@ export function validateAppSettingsUpdate(body: unknown): ValidationResult {
   const b = body as Record<string, unknown>;
 
   if ("rateLimitWindowMs" in b) {
-    if (isPositiveFiniteNumber(b.rateLimitWindowMs)) {
+    // 0 is a valid, meaningful value here — it disables the rate limit
+    // entirely (see getRateLimitWindowMs in rateLimiter.ts).
+    if (isNonNegativeFiniteNumber(b.rateLimitWindowMs)) {
       value.rateLimitWindowMs = b.rateLimitWindowMs;
     } else {
-      errors.push("rateLimitWindowMs must be a positive number");
+      errors.push("rateLimitWindowMs must be a non-negative number");
     }
   }
 

@@ -187,11 +187,22 @@ describe("PUT /api/admin/settings", () => {
     expect(((await getRes.json()) as any).allowPauseResume).toBeNull();
   });
 
-  it("rejects a non-positive rateLimitWindowMs", async () => {
+  it("accepts a rateLimitWindowMs of 0 (disables the rate limit)", async () => {
     const res = await fetch(`${baseUrl}/api/admin/settings`, {
       method: "PUT",
       headers: { "content-type": "application/json", "x-admin-token": adminToken },
       body: JSON.stringify({ rateLimitWindowMs: 0 }),
+    });
+    const body = (await res.json()) as any;
+    expect(res.status).toBe(200);
+    expect(body.rateLimitWindowMs).toBe(0);
+  });
+
+  it("rejects a negative rateLimitWindowMs", async () => {
+    const res = await fetch(`${baseUrl}/api/admin/settings`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", "x-admin-token": adminToken },
+      body: JSON.stringify({ rateLimitWindowMs: -1 }),
     });
     const body = (await res.json()) as any;
     expect(res.status).toBe(400);
