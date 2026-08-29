@@ -201,6 +201,18 @@ export interface TrustModeState {
   pauseResume: boolean
   skip: boolean
   volume: boolean
+  /**
+   * Whether a native "Jukebox device" (Android build with local
+   * system-volume control) is registered and currently connected. When both
+   * are true, volume commands get routed by the backend to that device over
+   * SSE instead of Spotify's Volume API, so the guest-facing volume control
+   * should be treated as available even if the resolved Spotify device
+   * itself reports supports_volume: false. See PlaybackControls.tsx.
+   */
+  jukeboxDevice: {
+    registered: boolean
+    online: boolean
+  }
 }
 
 /**
