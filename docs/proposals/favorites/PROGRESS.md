@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved).
 All work happens on `feature/favorites` — confirm you're on that branch
 before making any changes.
 
-## Status: Phase F0+F1+F2 done, starting F3 (heart control + integration)
+## Status: Phase F0-F3 done, starting F4 (Favorites list on Find Music)
 
 ## Task Table
 
@@ -23,7 +23,11 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | F1.2 | Guest profile route + queue attribution join | done | `PATCH /api/session/me` (nickname/avatar); `POST /api/session` now returns them too; `listQueueEntries()` left-joins `guest_sessions`, adding `adderNickname`/`adderAvatar` (null when unset/unattributed) — **these are the exact field names F3.3 must consume** |
 | F2.1 | API client + avatar palette | done | `getFavorites`/`addFavorite`/`removeFavorite`/`getFavoritesStatus`/`updateGuestProfile` added to `frontend/src/lib/api.ts`; `frontend/src/lib/avatars.ts` exports `AVATAR_PALETTE` (20 emoji) |
 | F2.2 | "Me" page + nav entry | done | `frontend/src/pages/MePage.tsx` + `/me` route; `NAV_ITEMS` gained a 5th "Me" entry; `SessionContext` now carries `nickname`/`avatar`/`setProfile()`. Verified live (nickname/avatar round-trip survives reload); screenshot compositing unavailable this session, verification was DOM/network-inspection based |
-| F3.1 | `FavoriteButton` + `useFavoritesStatus` hook | todo | Depends on F2.1 (done) |
+| F3.1 | `FavoriteButton` + `useFavoritesStatus` hook | done | `frontend/src/components/favorites/FavoriteButton.tsx` (gray/amber/red heart) + `frontend/src/hooks/useFavoritesStatus.ts` (batch fetch, SSE re-sync on new `favorites-update` event, optimistic toggle w/ rollback). Verified via temporary StyleGuide mount (removed after), DOM/computed-style inspection |
+| F3.2 | Now Playing integration | done | Heart next to the title in `NowPlaying.tsx`; its `stopPropagation` (built into `FavoriteButton`) confirmed to not also toggle the card's expand/collapse |
+| F3.3 | Queue + attribution integration | done | `QueueList.tsx` heart per row + adder avatar/nickname (rendered only when set) via `adderNickname`/`adderAvatar` added to the frontend `QueueEntry` type. **Not fully live-verified** — see Open Questions below |
+| F3.4 | History (Leaderboard + Recently Played) integration | done | Heart added to both `LeaderboardRow` and `RecentlyPlayedRow`, each with its own independent `useFavoritesStatus` instance (both sync via the shared SSE event) |
+| F4.1 | Favorites list on Find Music | todo | Depends on F3.1 (done) |
 | F3.2 | Now Playing integration | todo | Depends on F3.1 |
 | F3.3 | Queue + attribution integration | todo | Depends on F3.1, F1.2 |
 | F3.4 | History (Leaderboard + Recently Played) integration | todo | Depends on F3.1 |
@@ -34,14 +38,48 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 ## Open Questions / Blockers
 
-*(none currently — the "Scoping decisions made while planning" section of
-IMPLEMENTATION_PLAN.md resolved DESIGN_SPEC's two open questions before this
-plan was written)*
+- **Dev environment's Spotify credentials appear broken** — `GET /api/search`
+  returns 502 (`Spotify token refresh failed: invalid_client`) in this
+  session's shared dev backend, discovered during F3.3's live verification
+  attempt. This blocks queueing anything for real, which in turn blocked a
+  full live end-to-end check of F3.3 (queue row heart + attribution) and
+  will likely also block F5.2's planned manual verification pass. Not
+  something this proposal can fix (it's a credentials/environment issue,
+  not a code issue) — worth checking whether this is a known/expected state
+  of this dev environment, or an actual regression worth a separate fix.
+  F3.3's code is still believed correct (typecheck clean, backend contract
+  double-checked by reading the F1.2 source directly, matches every other
+  integration's pattern) — just not confirmed by an actual browser
+  click-through with a real queued track.
 
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — Phase F3 complete (F3.1 solo, then F3.2/F3.3/F3.4 as three
+  parallel subagents touching disjoint files — `NowPlaying.tsx`,
+  `QueueList.tsx`+`api.ts`, `Leaderboard.tsx`+`RecentlyPlayed.tsx` — no
+  conflicts), verified (diff read + combined `tsc -b` clean across all
+  three) and committed (`5028cfc` for F3.1, `4d29351` for F3.2-F3.4). Hearts
+  now appear on every surface the design spec calls for: Now Playing hero,
+  each Up Next row (plus adder attribution — avatar/nickname, shown only
+  when the adder set one), and both History sub-lists. F3.4's subagent
+  found the current seed data has zero track-id overlap between Leaderboard
+  and Recently Played, so cross-list sync couldn't be visually demonstrated
+  end-to-end this session — only that both independently call the same
+  `GET /api/favorites/status` endpoint, which is what makes that sync work;
+  not a code gap, just an unexercised path with current data.
+  **Worth flagging:** F3.3's subagent discovered this session's shared dev
+  backend has broken Spotify credentials (`GET /api/search` → 502
+  `invalid_client`), which blocks queueing anything for real and prevented
+  a full live click-through of the queue-row heart+attribution. See Open
+  Questions above — this will likely also affect F5.2's planned manual
+  verification pass and may be worth checking with the user before then.
+  F4 (Favorites list on Find Music) is next — no blockers for starting it,
+  though its own live verification may hit the same Spotify-credentials
+  wall for the "Add to Queue" part of that page specifically (favoriting/
+  listing/sorting/filtering don't depend on Spotify search, only requeueing
+  does).
 - **2026-08-29** — F2.1+F2.2 complete via one subagent (small, tightly
   sequential tasks — F2.2 depends directly on F2.1's API functions, so
   handled together rather than as two round-trips), verified (diff read +
