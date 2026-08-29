@@ -20,6 +20,18 @@ export interface QueueEntry {
   addedAt: string;
 }
 
+/**
+ * `listQueueEntries()` widens `QueueEntry` with the adder's profile fields
+ * (joined from `guest_sessions`), so the frontend can show who queued a
+ * track without a second request. Both are `null` whenever
+ * `added_by_session_id` is null (no attributed guest) or the guest never
+ * set a nickname/avatar — never a placeholder value.
+ */
+export interface QueueEntryWithAdder extends QueueEntry {
+  adderNickname: string | null;
+  adderAvatar: string | null;
+}
+
 interface QueueEntryRow {
   id: number;
   spotify_track_id: string;
@@ -29,6 +41,11 @@ interface QueueEntryRow {
   duration_ms: number;
   added_by_session_id: string | null;
   added_at: string;
+}
+
+interface QueueEntryWithAdderRow extends QueueEntryRow {
+  adder_nickname: string | null;
+  adder_avatar: string | null;
 }
 
 function toQueueEntry(row: QueueEntryRow): QueueEntry {
@@ -41,6 +58,14 @@ function toQueueEntry(row: QueueEntryRow): QueueEntry {
     durationMs: row.duration_ms,
     addedBySessionId: row.added_by_session_id,
     addedAt: row.added_at,
+  };
+}
+
+function toQueueEntryWithAdder(row: QueueEntryWithAdderRow): QueueEntryWithAdder {
+  return {
+    ...toQueueEntry(row),
+    adderNickname: row.adder_nickname,
+    adderAvatar: row.adder_avatar,
   };
 }
 
@@ -68,13 +93,24 @@ export function insertQueueEntry(entry: QueueEntryInput): number {
   return Number(result.lastInsertRowid);
 }
 
-/** Returns all queue_entries rows in FIFO/queue order (ascending id). */
-export function listQueueEntries(): QueueEntry[] {
+/**
+ * Returns all queue_entries rows in FIFO/queue order (ascending id), each
+ * widened with the adder's `adderNickname`/`adderAvatar` (LEFT JOINed from
+ * guest_sessions, since added_by_session_id can be null).
+ */
+export function listQueueEntries(): QueueEntryWithAdder[] {
   const rows = db
-    .prepare<[], QueueEntryRow>("SELECT * FROM queue_entries ORDER BY id ASC")
+    .prepare<[], QueueEntryWithAdderRow>(
+      `SELECT queue_entries.*,
+              guest_sessions.nickname AS adder_nickname,
+              guest_sessions.avatar AS adder_avatar
+       FROM queue_entries
+       LEFT JOIN guest_sessions ON queue_entries.added_by_session_id = guest_sessions.session_id
+       ORDER BY queue_entries.id ASC`
+    )
     .all();
 
-  return rows.map(toQueueEntry);
+  return rows.map(toQueueEntryWithAdder);
 }
 
 /** Deletes a single queue_entries row by id. Returns whether a row was actually deleted. */
