@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved).
 All work happens on `feature/favorites` — confirm you're on that branch
 before making any changes.
 
-## Status: Phase F0-F3 done, starting F4 (Favorites list on Find Music)
+## Status: Phase F0-F4 done (all implementation complete); F5 (verification/close-out) next
 
 ## Task Table
 
@@ -27,14 +27,10 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | F3.2 | Now Playing integration | done | Heart next to the title in `NowPlaying.tsx`; its `stopPropagation` (built into `FavoriteButton`) confirmed to not also toggle the card's expand/collapse |
 | F3.3 | Queue + attribution integration | done | `QueueList.tsx` heart per row + adder avatar/nickname (rendered only when set) via `adderNickname`/`adderAvatar` added to the frontend `QueueEntry` type. **Not fully live-verified** — see Open Questions below |
 | F3.4 | History (Leaderboard + Recently Played) integration | done | Heart added to both `LeaderboardRow` and `RecentlyPlayedRow`, each with its own independent `useFavoritesStatus` instance (both sync via the shared SSE event) |
-| F4.1 | Favorites list on Find Music | todo | Depends on F3.1 (done) |
-| F3.2 | Now Playing integration | todo | Depends on F3.1 |
-| F3.3 | Queue + attribution integration | todo | Depends on F3.1, F1.2 |
-| F3.4 | History (Leaderboard + Recently Played) integration | todo | Depends on F3.1 |
-| F4.1 | Favorites list on Find Music | todo | Depends on F3.1 |
-| F5.1 | Backend test sweep | todo | Depends on F1.1, F1.2 |
-| F5.2 | Manual verification pass | todo | Depends on all F2-F4 |
-| F5.3 | Close out (backlog, PROGRESS.md, merge) | todo | Requires explicit user go-ahead to merge |
+| F4.1 | Favorites list on Find Music | done | `SearchAndQueue.tsx` gained a Search/Favorites tab toggle; Favorites tab has sort (recent/name/artist), substring filter, two distinct empty states, optimistic unfavorite-removal, and reuses the existing add-to-queue toast flow via a new `FavoriteRow.tsx` (sibling to `TrackRow`, not a rework) |
+| F5.1 | Backend test sweep | done | `npm test` in `backend/`: 35 files, 292 tests, all green; `tsc --noEmit` clean. No backend changes since F1, so this just reconfirms nothing regressed |
+| F5.2 | Manual verification pass | blocked | **Blocked on this dev environment's broken Spotify credentials** (`GET /api/search` → 502 `invalid_client`) — blocks real search/queue/play, which most of the guest flow (queueing, Now Playing, play history) depends on. User is checking on this separately. Favoriting/listing/sorting/filtering/unfavoriting/attribution-display don't themselves need Spotify and have already been spot-verified per-task; what's missing is one continuous real end-to-end walkthrough |
+| F5.3 | Close out (backlog, PROGRESS.md, merge) | todo | Depends on F5.2; requires explicit user go-ahead to merge regardless |
 
 ## Open Questions / Blockers
 
@@ -56,6 +52,26 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — F4.1 complete via a subagent (Favorites tab on Find
+  Music: sort/filter/empty-states/optimistic-unfavorite/add-to-queue, plus
+  the new `FavoriteRow.tsx` component and `SearchPage.tsx`/`SearchAndQueue.tsx`
+  threading `subscribe` through for the first time), verified (diff read +
+  `tsc -b` clean + live browser check of the real, Spotify-independent parts:
+  tab toggle, real `GET /api/favorites` empty state, sort/filter against
+  mocked data since this dev environment can't produce real favorites right
+  now, real `DELETE /api/favorites/:id` unfavorite) and committed
+  (`69b04c6`). Then ran F5.1 (backend test sweep) directly myself since it
+  needed no new code — `npm test`: 35 files/292 tests green, `tsc --noEmit`
+  clean, unchanged since F1 as expected.
+  **All implementation (F0-F4) is now complete.** Only F5.2 (manual
+  verification) and F5.3 (close-out/merge) remain. F5.2 is marked `blocked`
+  in the task table — this dev environment's Spotify credentials are broken
+  (discovered during F3.3, confirmed again during F4.1), which blocks real
+  search/queue/playback and therefore a genuine continuous end-to-end
+  walkthrough of the guest flow. The user is checking on this separately in
+  parallel with this session. Once credentials are working, F5.2 is just a
+  live click-through per its IMPLEMENTATION_PLAN.md acceptance criteria —
+  no code changes expected unless it surfaces a real bug.
 - **2026-08-29** — Phase F3 complete (F3.1 solo, then F3.2/F3.3/F3.4 as three
   parallel subagents touching disjoint files — `NowPlaying.tsx`,
   `QueueList.tsx`+`api.ts`, `Leaderboard.tsx`+`RecentlyPlayed.tsx` — no
