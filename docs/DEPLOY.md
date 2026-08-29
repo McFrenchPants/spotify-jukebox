@@ -46,13 +46,15 @@ nano .env   # or vim/whatever's available
 
 Fill in:
 ```
-SPOTIFY_CLIENT_ID=<same client id as local dev>
-SPOTIFY_CLIENT_SECRET=<same client secret as local dev>
+SPOTIFY_CLIENT_ID=<a DIFFERENT Spotify app's client id than local dev — see below>
+SPOTIFY_CLIENT_SECRET=<that same app's client secret>
 SPOTIFY_REDIRECT_URI=http://127.0.0.1:8085/api/auth/callback
 ADMIN_PIN=<pick a real PIN — don't leave "change-me">
 PORT=8085
 DB_PATH=./data/jukebox.db
 ```
+
+**Use a separate Spotify Developer app for this deployment than local dev uses**, even though both talk to the same Spotify account. Spotify's rate limit is bucketed per client ID — if this deployment and a local dev instance share one client ID/refresh token and both poll at once, a 429 on one can effectively block both (this happened in practice; see `backend/src/spotify/rateLimitBackoff.ts` and README.md's "Running locally" step 1). Register a second app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) for this deployment, with its own redirect URI (`http://127.0.0.1:8085/api/auth/callback`, same as above — the URI can match local dev's since only the client ID/secret need to differ), and complete Step 4 below for it separately rather than reusing local dev's refresh token.
 (`PORT`/`DB_PATH` here don't actually matter — `docker-compose.yml` pins
 both regardless — but fill them in for consistency in case that ever
 changes.)

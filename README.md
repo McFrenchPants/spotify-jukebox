@@ -36,11 +36,13 @@ Three ways to run this, depending on your setup:
 
 Either deployment method serves guests at `http://<host-lan-ip>:8085` — see [docs/LAN_ACCESS.md](docs/LAN_ACCESS.md) for finding that URL and getting the admin panel's QR code to point at it.
 
-**Tip for either Docker-based method**: if you've already completed the one-time Spotify consent somewhere else (e.g. local dev), you can skip repeating that browser flow — copy the `spotify_refresh_token` value out of that setup's SQLite `app_settings` table and paste it into the new deployment's `SPOTIFY_REFRESH_TOKEN` config (env var for Docker Compose, or the Add-on's options form). See `backend/src/config/seedRefreshToken.ts`.
+**Tip for either Docker-based method**: if you've already completed the one-time Spotify consent for that *same* Spotify Developer app somewhere else (e.g. another deployment using the same client ID/secret), you can skip repeating that browser flow — copy the `spotify_refresh_token` value out of that setup's SQLite `app_settings` table and paste it into the new deployment's `SPOTIFY_REFRESH_TOKEN` config (env var for Docker Compose, or the Add-on's options form). See `backend/src/config/seedRefreshToken.ts`. This only works across deployments sharing the same client ID — a refresh token is bound to the app that issued it, so it can't be reused with a *different* Spotify app's credentials (see the "use a separate Spotify app for local dev" note below). Don't use this to reuse local dev's token for production, or vice versa.
 
 ## Running locally
 
-1. Create a Spotify Developer app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and note its client ID/secret. Add a redirect URI matching what you'll set below (e.g. `http://localhost:8085/api/auth/callback`).
+1. Create a Spotify Developer app at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and note its client ID/secret. Add a redirect URI matching what you'll set below (e.g. `http://127.0.0.1:8085/api/auth/callback`).
+
+   **Use a separate Spotify app for local dev than whatever your production deployment (Docker/HA Add-on) uses**, even though it's the same Spotify account either way. Spotify rate-limits per client ID, not per account, so two instances sharing one client ID/refresh token and polling simultaneously can trip and share the same 429 window — this happened in practice (local dev + the HA Add-on both polling at once) and is why `backend/src/spotify/rateLimitBackoff.ts` exists. Registering a second app for dev gives it its own independent rate-limit bucket, so leaving a dev backend running never risks production's polling (or vice versa). Everything else (`ADMIN_PIN`, `PORT`, `SPOTIFY_REDIRECT_URI`) can safely be identical between the two — only `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` (and therefore each one's own `spotify_refresh_token`, obtained separately per Step 5 below) need to differ.
 2. Copy the env template and fill in real values — **never commit `.env`**:
    ```bash
    cd backend
