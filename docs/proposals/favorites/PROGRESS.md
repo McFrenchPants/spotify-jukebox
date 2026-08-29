@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved).
 All work happens on `feature/favorites` — confirm you're on that branch
 before making any changes.
 
-## Status: Phase F0 in progress
+## Status: Phase F0 done, starting F1
 
 ## Task Table
 
@@ -17,9 +17,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| F0.1 | Schema (guest_sessions columns + favorites table) | todo | |
-| F0.2 | DB module (`favorites.ts` + `guestSessions.ts` updates) | todo | Depends on F0.1 |
-| F1.1 | Favorites routes | todo | Depends on F0.2 |
+| F0.1 | Schema (guest_sessions columns + favorites table) | done | `addColumnIfMissing()` helper in `backend/src/db/index.ts` for the idempotent `ALTER TABLE`; `favorites` table + 2 indexes added to the existing migration block |
+| F0.2 | DB module (`favorites.ts` + `guestSessions.ts` updates) | done | `backend/src/db/favorites.ts` (add/remove/list/batch-status) + `updateGuestProfile()` in `guestSessions.ts`; 16 new tests, all passing (272 total backend tests green) |
+| F1.1 | Favorites routes | todo | Depends on F0.2 (done) |
 | F1.2 | Guest profile route + queue attribution join | todo | Depends on F0.2 |
 | F2.1 | API client + avatar palette | todo | Depends on F1.1/F1.2 (calls the new endpoints) |
 | F2.2 | "Me" page + nav entry | todo | Depends on F2.1 |
@@ -42,6 +42,17 @@ plan was written)*
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — F0.1+F0.2 complete via a subagent, verified (diff read +
+  `tsc --noEmit` clean + full backend test suite: 34 files/272 tests
+  passing) and committed (`f3b96ae`). Data model is now in place: `favorites`
+  table with a `UNIQUE(guest_session_id, spotify_track_id)` constraint (so
+  `addFavorite` is a safe no-op on a repeat call via `ON CONFLICT DO
+  NOTHING`), `nickname`/`avatar` columns added to `guest_sessions`
+  idempotently (checked via `PRAGMA table_info` since that table already
+  exists in production DBs predating this migration — plain `CREATE TABLE IF
+  NOT EXISTS` wouldn't retrofit columns onto it). `getFavoriteStatusForTracks`
+  does the batch "mine vs. anyone's" lookup needed for the heart-coloring UI
+  in one query. F1 (backend routes) is next — no blockers, F0.2 is complete.
 - **2026-08-29** — Plan created (`IMPLEMENTATION_PLAN.md`) and this tracker
   initialized, via `/continue-development` picking up BACKLOG.md item 3 per
   explicit user request (design spec was already pre-approved, so scaffolding
