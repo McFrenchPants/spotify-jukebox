@@ -531,6 +531,43 @@ export async function selectDevice(token: string, deviceId: string): Promise<Dev
 }
 
 /* -------------------------------------------------------------------- */
+/* M3.2 — Jukebox device (native Android bridge) registration.          */
+/* -------------------------------------------------------------------- */
+
+/** GET /api/admin/jukebox-device — requires the admin token. */
+export async function getJukeboxDevice(token: string): Promise<{ clientId: string | null }> {
+  const res = await fetch('/api/admin/jukebox-device', {
+    headers: { [ADMIN_TOKEN_HEADER]: token },
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load Jukebox device: ${res.status}`)
+  }
+
+  return (await res.json()) as { clientId: string | null }
+}
+
+/** POST /api/admin/jukebox-device/register — requires the admin token. */
+export async function registerJukeboxDevice(token: string, clientId: string): Promise<{ clientId: string }> {
+  const res = await fetch('/api/admin/jukebox-device/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      [ADMIN_TOKEN_HEADER]: token,
+    },
+    body: JSON.stringify({ clientId }),
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to register Jukebox device: ${res.status}`)
+  }
+
+  return (await res.json()) as { clientId: string }
+}
+
+/* -------------------------------------------------------------------- */
 /* F2 — Favorites + guest profile.                                      */
 /* -------------------------------------------------------------------- */
 
