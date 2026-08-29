@@ -32,3 +32,6 @@ design work before implementation — mirrors the process the original MVP used
   build (via Capacitor) for the bridge device, with local system-volume
   control to work around Spotify's `supports_volume: false` limitation for
   phone Connect receivers.
+- [landscape-layout](landscape-layout/DESIGN_SPEC.md) — responsive layout
+  (nav + content width) for phone landscape, tablet, and desktop, on top of
+  today's phone-portrait-only shell.

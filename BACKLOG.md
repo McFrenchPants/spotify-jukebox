@@ -16,11 +16,17 @@ or whether a paid API (Musixmatch, Genius) is the more reliable route.
 Licensing/ToS should be checked before committing to a provider.
 
 ## 2. Landscape layout for the bridge device
-**Status:** idea
+**Status:** design spec reviewed, ready for implementation plan
 
-The guest UI is currently designed for portrait orientation only. Add an
-alternate layout for landscape, since the bridge tablet could be mounted
-either way.
+Reframed during scoping: phone stays the primary target for both the bridge
+device and guests, but the app should respond well to tablets and desktop
+too, not just handle a landscape-orientation special case. Design spec:
+[docs/proposals/landscape-layout/DESIGN_SPEC.md](docs/proposals/landscape-layout/DESIGN_SPEC.md) —
+nav switches to a fixed icon+label left rail at `sm` (640px), content width
+steps from 512px → 672px → capped at 1200px. Still needs a
+`feature/landscape-layout` branch before implementation starts (held off
+since another session has unrelated proposal work uncommitted in this same
+working directory).
 
 ## 3. Favorites / like a song
 **Status:** idea
