@@ -20,9 +20,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| M0.1 | Add Capacitor to `frontend` | todo | |
+| M0.1 | Add Capacitor to `frontend` | done | `frontend/capacitor.config.ts` (app id `com.mcfrench.guestjukebox`, `webDir: 'dist'`), `frontend/android/` native project. `npx cap sync android` verified clean — no Android SDK/Gradle invocation needed for a plain sync with no native plugins yet, so no environment-limitation caveat here (that will likely surface at M4.1 when `gradlew assembleDebug` is actually run). `npm run build` output unchanged (same file names/hashes). |
 | M0.2 | Document Android build prerequisites | todo | |
-| M1.1 | Jukebox device registration endpoints | todo | |
+| M1.1 | Jukebox device registration endpoints | done | `backend/src/db/jukeboxDevice.ts` (new `app_settings` key, no new table) + `GET`/`POST /api/admin/jukebox-device*` in `admin.ts`, both `requireAdminAuth`-gated. 303 backend tests passing (11 new), `tsc --noEmit` clean. |
 | M1.2 | Jukebox-device online/offline tracking | todo | Depends on M1.1 |
 | M1.3 | Volume command routing endpoint | todo | Depends on M1.1, M1.2 |
 | M1.4 | Expose registered/online/offline state to frontend | todo | Depends on M1.2 |
