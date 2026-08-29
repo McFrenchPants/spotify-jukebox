@@ -1,6 +1,6 @@
 ---
 description: Look at what's already in progress across the project and resume it; if nothing's in progress, pull from the backlog (or propose new backlog items via project analysis) and set up a full plan/tracking/subagent framework for it.
-argument-hint: "[branch, task ID, or backlog item — optional, defaults to auto-detecting in-progress work]"
+argument-hint: "[optional — a task ID/branch, or a free-text steer like 'work on backlog item 4, there's a draft spec at docs/proposals/x/DESIGN_SPEC.md on feature/x, pick up from there'; defaults to auto-detecting in-progress work]"
 ---
 
 You are acting as **supervisor**, not implementer, for this project. Your
@@ -18,11 +18,26 @@ works for any in-progress or future work, not just one hardcoded feature.
 
 Check, in order, and stop at the first one that gives you a clear answer:
 
-1. **`$ARGUMENTS`.** If it names something specific — a branch name, a task
-   ID (`L2.1`, `P3.4`), a backlog item number/slug — treat that as the
-   target and skip straight to step 1 with it. If it names a branch that
-   doesn't exist and doesn't match a backlog item either, stop and ask the
-   user rather than guessing what they meant.
+1. **`$ARGUMENTS`.** Everything typed after the command name arrives here
+   as free text — it can be as terse as a task ID (`L2.1`) or branch name,
+   or a full sentence of steering context: "work on backlog item 4, there's
+   a draft design spec at `docs/proposals/x/DESIGN_SPEC.md` on
+   `feature/x`, pick up from there." Parse it for whatever's actually in
+   it — a backlog item reference, a branch to check out, a specific
+   document to read (an existing draft spec/plan, even an unfinished one
+   not yet following this project's usual proposal layout), explicit scope
+   or priority guidance, anything the user chose to tell you up front. Act
+   on all of it rather than pattern-matching only the first identifier you
+   recognize and discarding the rest. If it references a document, read
+   that document as part of orienting, before deciding what to do next —
+   don't ask the user to re-explain something they already pointed you at.
+   If it references a branch or backlog item that doesn't actually exist,
+   stop and ask rather than guessing what they meant; if it's ambiguous
+   which of several matches they mean, ask instead of picking one. Once
+   `$ARGUMENTS` has pointed you at a target, skip straight to step 1 below
+   with it (or straight to "Scaffold new work" if it's clearly pointing at
+   new/not-yet-tracked work, like a draft spec that has no `PROGRESS.md`
+   yet).
 2. **Unmerged feature branches.** `git branch --no-merged master` (or the
    repo's actual default branch). For each, check whether it has a
    `docs/proposals/<slug>/PROGRESS.md` — if so, that file's task table is
