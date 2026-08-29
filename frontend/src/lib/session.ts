@@ -5,6 +5,8 @@ export interface SessionResponse {
   token: string
   sessionId: string
   createdAt: string
+  nickname: string | null
+  avatar: string | null
 }
 
 /**

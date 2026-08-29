@@ -515,3 +515,112 @@ export async function selectDevice(token: string, deviceId: string): Promise<Dev
 
   return (await res.json()) as Device
 }
+
+/* -------------------------------------------------------------------- */
+/* F2 — Favorites + guest profile.                                      */
+/* -------------------------------------------------------------------- */
+
+/** One entry in the favorites list returned by GET /api/favorites. */
+export interface FavoriteTrack {
+  id: number
+  guestSessionId: string
+  spotifyTrackId: string
+  trackName: string
+  artistName: string
+  albumArtUrl: string | null
+  durationMs: number
+  favoritedAt: string
+}
+
+/** GET /api/favorites — requires the guest token from useSession(). */
+export async function getFavorites(guestToken: string): Promise<FavoriteTrack[]> {
+  const res = await fetch('/api/favorites', {
+    headers: { [GUEST_TOKEN_HEADER]: guestToken },
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load favorites: ${res.status}`)
+  }
+
+  return (await res.json()) as FavoriteTrack[]
+}
+
+/** POST /api/favorites — requires the guest token from useSession(). */
+export async function addFavorite(trackId: string, guestToken: string): Promise<Track> {
+  const res = await fetch('/api/favorites', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      [GUEST_TOKEN_HEADER]: guestToken,
+    },
+    body: JSON.stringify({ trackId }),
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Could not add favorite: ${res.status}`)
+  }
+
+  return (await res.json()) as Track
+}
+
+/** DELETE /api/favorites/:trackId — requires the guest token from useSession(). Expects 204, no body to parse. */
+export async function removeFavorite(trackId: string, guestToken: string): Promise<void> {
+  const res = await fetch(`/api/favorites/${encodeURIComponent(trackId)}`, {
+    method: 'DELETE',
+    headers: { [GUEST_TOKEN_HEADER]: guestToken },
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Could not remove favorite: ${res.status}`)
+  }
+}
+
+/**
+ * GET /api/favorites/status?trackIds=a,b,c — no guest token required.
+ * Empty input short-circuits to `{}` without a network round-trip.
+ */
+export async function getFavoritesStatus(
+  trackIds: string[]
+): Promise<Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean }>> {
+  if (trackIds.length === 0) return {}
+
+  const res = await fetch(`/api/favorites/status?trackIds=${trackIds.map(encodeURIComponent).join(',')}`)
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load favorite status: ${res.status}`)
+  }
+
+  return (await res.json()) as Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean }>
+}
+
+/** PATCH /api/session/me — requires the guest token from useSession(). Response mirrors POST /api/session's shape. */
+export async function updateGuestProfile(
+  updates: { nickname?: string; avatar?: string },
+  guestToken: string
+): Promise<{ token: string; sessionId: string; createdAt: string; nickname: string | null; avatar: string | null }> {
+  const res = await fetch('/api/session/me', {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      [GUEST_TOKEN_HEADER]: guestToken,
+    },
+    body: JSON.stringify(updates),
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Could not update profile: ${res.status}`)
+  }
+
+  return (await res.json()) as {
+    token: string
+    sessionId: string
+    createdAt: string
+    nickname: string | null
+    avatar: string | null
+  }
+}

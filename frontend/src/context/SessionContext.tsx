@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { bootstrapSession } from '../lib/session'
 import { Skeleton } from '../components/ui/Skeleton'
 
@@ -7,6 +7,16 @@ export interface SessionContextValue {
   sessionId: string | null
   isLoading: boolean
   error: string | null
+  nickname: string | null
+  avatar: string | null
+  /**
+   * Merges the given fields into local state. Plain local setter — does NOT
+   * make a network call itself. Callers PATCH via `updateGuestProfile` from
+   * api.ts first, then call this with what was actually saved (mirrors the
+   * optimistic-update-after-success pattern used elsewhere, e.g.
+   * SearchAndQueue.tsx's handleAdd).
+   */
+  setProfile: (updates: { nickname?: string; avatar?: string }) => void
 }
 
 const SessionContext = createContext<SessionContextValue | undefined>(undefined)
@@ -23,6 +33,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [nickname, setNickname] = useState<string | null>(null)
+  const [avatar, setAvatar] = useState<string | null>(null)
+
+  const setProfile = useCallback((updates: { nickname?: string; avatar?: string }) => {
+    if (updates.nickname !== undefined) setNickname(updates.nickname)
+    if (updates.avatar !== undefined) setAvatar(updates.avatar)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -32,6 +49,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         if (cancelled) return
         setToken(session.token)
         setSessionId(session.sessionId)
+        setNickname(session.nickname)
+        setAvatar(session.avatar)
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -66,7 +85,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <SessionContext.Provider value={{ token, sessionId, isLoading, error }}>
+    <SessionContext.Provider value={{ token, sessionId, isLoading, error, nickname, avatar, setProfile }}>
       {children}
     </SessionContext.Provider>
   )
