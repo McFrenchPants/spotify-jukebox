@@ -16,17 +16,20 @@ or whether a paid API (Musixmatch, Genius) is the more reliable route.
 Licensing/ToS should be checked before committing to a provider.
 
 ## 2. Landscape layout for the bridge device
-**Status:** design spec reviewed, ready for implementation plan
+**Status:** done
 
 Reframed during scoping: phone stays the primary target for both the bridge
 device and guests, but the app should respond well to tablets and desktop
 too, not just handle a landscape-orientation special case. Design spec:
 [docs/proposals/landscape-layout/DESIGN_SPEC.md](docs/proposals/landscape-layout/DESIGN_SPEC.md) —
 nav switches to a fixed icon+label left rail at `sm` (640px), content width
-steps from 512px → 672px → capped at 1200px. Still needs a
-`feature/landscape-layout` branch before implementation starts (held off
-since another session has unrelated proposal work uncommitted in this same
-working directory).
+steps from 512px → 672px → capped at 1200px, and HistoryPage/SettingsPage/
+NowPlaying reflow side-by-side at `lg` (1024px). Implemented on
+`feature/landscape-layout` and merged to `master`. Verified via browser-
+emulation DOM/computed-style checks across phone portrait/landscape,
+tablet, and desktop widths (screenshot capture wasn't available in the
+implementing session's environment); a final pass on the actual bridge
+Pixel 7 Pro hardware is still worth doing but isn't blocking.
 
 ## 3. Favorites / like a song
 **Status:** idea

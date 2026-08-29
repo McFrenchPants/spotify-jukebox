@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (all resolved, §7).
 All work happens on `feature/landscape-layout` — confirm you're on that
 branch before making any changes.
 
-## Status: L4.1 done, L4.2 (close-out/merge) needs a user go-ahead
+## Status: All phases done, merged to `master`
 
 ## Task Table
 
@@ -28,7 +28,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | L3.2 | SettingsPage pairing at `lg` | done | User confirmed doing it rather than cutting it. Two `flex flex-col gap-6 lg:flex-row` rows: `SettingsForm`+`DeviceSelector`, `QueueModeration`+`GuestUrlCard`, each child `lg:w-1/2`. Verified by code review only — PIN gate blocks live rendering without entering a credential, which is out of bounds |
 | L3.3 | NowPlaying expanded-card revisit | done | Did NOT resolve to "no change needed" — measured the expanded card's track-info column stretching to ~767px with a disproportionate hairline progress bar at 1200px, judged as genuine dead space (unlike sibling Card-rows). Applied `lg:flex`/`lg:w-1/2` split (art+info left, artist+genre right, `lg:border-l`) gated on `expanded && detailArtist` so collapsed/loading states are untouched |
 | L4.1 | Cross-size manual verification pass | done | Checked all 4 pages at 375×812, 750×400, 768×1024, 1024×768, 640×900, 1440×900 via DOM/computed-style inspection (screenshot compositing unavailable all session — acceptance criteria's "screenshots attached" couldn't be literally satisfied in this environment, flagged as a gap below). No regressions found; phone-portrait (375px) confirmed pixel-identical (nav, padding, width all match pre-proposal values). Real-hardware bridge-phone check still not done — non-blocking caveat, carried forward |
-| L4.2 | Close out (backlog, PROGRESS.md, merge) | todo | depends on L4.1 (done) — ready, but ends in a merge to `master`; supervisor is holding for explicit user go-ahead before executing the merge (and before deciding whether root `PROGRESS.md` needs an entry) rather than doing it unattended |
+| L4.2 | Close out (backlog, PROGRESS.md, merge) | done | User caught a real bug during manual testing before authorizing close-out (see session log) — fixed as part of L2.2's lineage before merging. `BACKLOG.md` item 2 → `done`; root `PROGRESS.md` got a Post-Launch entry (judged significant enough). Merged `feature/landscape-layout` → `master` |
 
 ## Open Questions / Blockers
 
@@ -38,6 +38,37 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — L4.2 complete, proposal closed out and merged. Before
+  authorizing L4.2, the user manually tested the running app themselves
+  (on a large desktop display) and caught something the L4.1 subagent's
+  DOM/computed-style verification had missed: the volume slider and the
+  search input — both width-capped without a centering rule back in
+  L2.2's QA sweep — rendered flush-left instead of centered like their
+  sibling controls, only obvious to a human eye scanning the page, not
+  to a computed-width check. Fixed directly (not delegated, per the
+  "small fix to something a subagent got wrong" carve-out): the volume
+  slider needed `lg:mx-auto` (works because it's a flex item — flex
+  items honor `margin:auto` on the cross axis); the search input needed
+  both `mx-auto` **and** `block` (inputs are `inline-block` by default,
+  and margin-auto centering only works on block-level boxes). Verified
+  live in-browser at 1440px (both now center, confirmed via
+  `getBoundingClientRect()` gap measurements) and at 375px (unchanged,
+  full-width, no regression). `tsc -b` clean throughout. Committed
+  (`08550f7`) before proceeding.
+  This is worth a standing note for future proposals: this session's
+  Browser pane never regained screenshot compositing across the entire
+  proposal, so all verification here was DOM/computed-style inspection
+  rather than actual visual review — which is exactly the kind of bug
+  (correct dimensions, wrong alignment) that method is blind to. If a
+  future session's Browser pane can screenshot, prefer that for
+  layout/visual tasks.
+  Then closed out: `BACKLOG.md` item 2 → `done` (with a summary of what
+  shipped and the still-open real-hardware caveat); added a Post-Launch
+  entry + session-log entry to the root `PROGRESS.md` (judged
+  significant enough per the proposals process); merged
+  `feature/landscape-layout` into `master`. Real-hardware verification
+  (actual bridge Pixel 7 Pro) remains a non-blocking open follow-up, not
+  performed this session.
 - **2026-08-29** — L4.1 complete (verification-only, no code changes) via
   a subagent, swept all four pages at six widths (375×812 phone
   portrait, 750×400 phone landscape, 768×1024 and 1024×768 tablet both
