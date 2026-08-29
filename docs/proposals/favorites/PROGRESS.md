@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved).
 All work happens on `feature/favorites` — confirm you're on that branch
 before making any changes.
 
-## Status: F5.2 done (found + fixed a real bug); closing out
+## Status: Done — pushed for PR review, not yet merged
 
 ## Task Table
 
@@ -30,7 +30,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | F4.1 | Favorites list on Find Music | done | `SearchAndQueue.tsx` gained a Search/Favorites tab toggle; Favorites tab has sort (recent/name/artist), substring filter, two distinct empty states, optimistic unfavorite-removal, and reuses the existing add-to-queue toast flow via a new `FavoriteRow.tsx` (sibling to `TrackRow`, not a rework) |
 | F5.1 | Backend test sweep | done | `npm test` in `backend/`: 35 files, 292 tests, all green; `tsc --noEmit` clean. No backend changes since F1, so this just reconfirms nothing regressed |
 | F5.2 | Manual verification pass | done | All 7 acceptance checks passed with real Spotify playback. **Found and fixed a real bug** (not just a verification gap): `getFavoritesStatus()` never sent `x-guest-token`, so `favoritedByMe` could never resolve `true` for the viewing guest — every heart in the app was stuck at gray/amber. Fixed in `frontend/src/lib/api.ts` + `useFavoritesStatus.ts` (`caf3d7a`), re-verified live after the fix |
-| F5.3 | Close out (backlog, PROGRESS.md, merge) | in-progress | User wants a pushed branch + PR for their own review/merge, not an automatic merge — see session log |
+| F5.3 | Close out (backlog, PROGRESS.md, merge) | done | `BACKLOG.md` #3 → done; `config.yaml` → 1.0.12 + matching `CHANGELOG.md` entry (`86bd36c`); branch pushed to `origin/feature/favorites` — **not merged to `master`**, per explicit user instruction (PR review first) |
 
 ## Open Questions / Blockers
 
@@ -54,6 +54,18 @@ device) all responding correctly with no new refresh errors.
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — Closed out: `BACKLOG.md` #3 → `done`, `config.yaml` →
+  `1.0.12`, matching `CHANGELOG.md` entry written in the project's
+  established end-user-facing style (`86bd36c`). Final sanity pass before
+  pushing: clean working tree, backend suite green (35 files/292 tests),
+  both `tsc` checks clean. Pushed `feature/favorites` to
+  `origin/feature/favorites` — **did not merge to `master`**, per the
+  user's explicit instruction to push + let them open/review/merge the PR
+  themselves (their own review gates the actual Home Assistant deploy).
+  GitHub's push output includes a direct PR-creation link:
+  https://github.com/McFrenchPants/spotify-jukebox/pull/new/feature/favorites
+  **The Favorites proposal is fully done from this session's side** —
+  nothing left to do here unless the user's PR review surfaces something.
 - **2026-08-29** — Spotify credentials fixed (root cause: stored refresh
   token belonged to a different/rotated Spotify app than `.env`'s current
   client_id, producing `invalid_client` on every token refresh; fixed by
