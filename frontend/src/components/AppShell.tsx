@@ -117,7 +117,7 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
           className="px-4 pb-2"
           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
         >
-          <div className={`mx-auto flex w-full ${CONTENT_MAX_WIDTH} items-center justify-between`}>
+          <div className={`mx-auto flex w-full ${CONTENT_MAX_WIDTH} items-center justify-between sm:pl-48`}>
             <div className="h-10 w-10 shrink-0" aria-hidden="true" />
             <p className="text-title text-text-primary">French&rsquo;s Jukebox</p>
             <Link
@@ -131,12 +131,11 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
         </header>
 
         <main
-          className={`mx-auto w-full ${CONTENT_MAX_WIDTH} flex-1 px-4 pb-6`}
-          style={{
-            paddingBottom: bottomBar
-              ? 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)'
-              : 'calc(env(safe-area-inset-bottom, 0px) + 1.5rem)',
-          }}
+          className={`mx-auto w-full ${CONTENT_MAX_WIDTH} flex-1 px-4 sm:pl-48 ${
+            bottomBar
+              ? 'pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] sm:pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'
+              : 'pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'
+          }`}
         >
           {children}
         </main>
