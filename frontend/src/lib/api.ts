@@ -1,5 +1,19 @@
+import { getApiBaseUrl } from './backendUrl'
+
 const GUEST_TOKEN_HEADER = 'x-guest-token'
 const ADMIN_TOKEN_HEADER = 'x-admin-token'
+
+/**
+ * Prefixes `path` with the configured backend base URL. On a plain
+ * web/browser deployment `getApiBaseUrl()` is `''`, so this returns `path`
+ * unchanged — byte-identical to every fetch call before this helper existed.
+ * On the native Android build it resolves against the user-configured LAN
+ * backend URL (see lib/backendUrl.ts) since there's no same-origin backend
+ * for a relative path to resolve against there.
+ */
+function apiUrl(path: string): string {
+  return `${getApiBaseUrl()}${path}`
+}
 
 export interface Track {
   id: string
@@ -83,7 +97,7 @@ export interface QueueEntry {
 
 /** GET /api/search?q= — no guest token required (open read). */
 export async function searchTracks(query: string): Promise<Track[]> {
-  const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`)
+  const res = await fetch(apiUrl(`/api/search?q=${encodeURIComponent(query)}`))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -99,7 +113,7 @@ export async function searchTracks(query: string): Promise<Track[]> {
  * `now-playing` SSE event arrives (P4.3).
  */
 export async function getNowPlaying(): Promise<NowPlayingState> {
-  const res = await fetch('/api/now-playing')
+  const res = await fetch(apiUrl('/api/now-playing'))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -115,7 +129,7 @@ export async function getNowPlaying(): Promise<NowPlayingState> {
  * `queue-update` SSE event rather than reconstructed from deltas (P4.3).
  */
 export async function getQueue(): Promise<QueueEntry[]> {
-  const res = await fetch('/api/queue')
+  const res = await fetch(apiUrl('/api/queue'))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -153,7 +167,7 @@ export interface RecentlyPlayedEntry {
  */
 export async function getLeaderboard(limit?: number): Promise<LeaderboardEntry[]> {
   const qs = limit !== undefined ? `?limit=${encodeURIComponent(limit)}` : ''
-  const res = await fetch(`/api/leaderboard${qs}`)
+  const res = await fetch(apiUrl(`/api/leaderboard${qs}`))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -169,7 +183,7 @@ export async function getLeaderboard(limit?: number): Promise<LeaderboardEntry[]
  * never misses a track just because it isn't in the top N).
  */
 export async function getTrackPlayCount(trackId: string): Promise<number> {
-  const res = await fetch(`/api/leaderboard/track/${encodeURIComponent(trackId)}`)
+  const res = await fetch(apiUrl(`/api/leaderboard/track/${encodeURIComponent(trackId)}`))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -186,7 +200,7 @@ export async function getTrackPlayCount(trackId: string): Promise<number> {
  */
 export async function getRecentlyPlayed(limit?: number): Promise<RecentlyPlayedEntry[]> {
   const qs = limit !== undefined ? `?limit=${encodeURIComponent(limit)}` : ''
-  const res = await fetch(`/api/recent${qs}`)
+  const res = await fetch(apiUrl(`/api/recent${qs}`))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -225,7 +239,7 @@ export interface TrustModeState {
  * yet (known gap, see PlaybackControls.tsx).
  */
 export async function getTrustMode(): Promise<TrustModeState> {
-  const res = await fetch('/api/trust-mode')
+  const res = await fetch(apiUrl('/api/trust-mode'))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -240,7 +254,7 @@ export async function getTrustMode(): Promise<TrustModeState> {
  * header — the gate is the global trust mode, not per-guest identity.
  */
 async function postPlaybackAction(path: string, body?: unknown): Promise<void> {
-  const res = await fetch(path, {
+  const res = await fetch(apiUrl(path), {
     method: 'POST',
     headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
     body: body !== undefined ? JSON.stringify(body) : undefined,
@@ -279,7 +293,7 @@ export function setVolume(volumePercent: number): Promise<void> {
 
 /** POST /api/queue — requires the guest token from useSession(). */
 export async function queueTrack(trackId: string, guestToken: string): Promise<Track> {
-  const res = await fetch('/api/queue', {
+  const res = await fetch(apiUrl('/api/queue'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -319,7 +333,7 @@ export interface ArtistInfo {
 
 /** GET /api/artist/:id — public, unauthenticated. */
 export async function getArtist(artistId: string): Promise<ArtistInfo> {
-  const res = await fetch(`/api/artist/${encodeURIComponent(artistId)}`)
+  const res = await fetch(apiUrl(`/api/artist/${encodeURIComponent(artistId)}`))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -341,7 +355,7 @@ export interface AdminLoginResult {
 
 /** POST /api/admin/login — public (this is the auth entry point itself). */
 export async function adminLogin(pin: string): Promise<AdminLoginResult> {
-  const res = await fetch('/api/admin/login', {
+  const res = await fetch(apiUrl('/api/admin/login'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ pin }),
@@ -374,7 +388,7 @@ export type AdminSettingsUpdate = Omit<AdminSettings, 'spotifyDeviceId'>
 
 /** GET /api/admin/settings — requires the admin token from adminLogin(). */
 export async function getAdminSettings(token: string): Promise<AdminSettings> {
-  const res = await fetch('/api/admin/settings', {
+  const res = await fetch(apiUrl('/api/admin/settings'), {
     headers: { [ADMIN_TOKEN_HEADER]: token },
   })
 
@@ -405,7 +419,7 @@ export async function updateAdminSettings(
   token: string,
   partial: Partial<AdminSettingsUpdate>
 ): Promise<AdminSettings> {
-  const res = await fetch('/api/admin/settings', {
+  const res = await fetch(apiUrl('/api/admin/settings'), {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -427,7 +441,7 @@ export async function updateAdminSettings(
 
 /** GET /api/admin/queue — requires the admin token. Same entry shape as GET /api/queue. */
 export async function getAdminQueue(token: string): Promise<QueueEntry[]> {
-  const res = await fetch('/api/admin/queue', {
+  const res = await fetch(apiUrl('/api/admin/queue'), {
     headers: { [ADMIN_TOKEN_HEADER]: token },
   })
 
@@ -441,7 +455,7 @@ export async function getAdminQueue(token: string): Promise<QueueEntry[]> {
 
 /** DELETE /api/admin/queue/:id — requires the admin token. */
 export async function deleteAdminQueueEntry(token: string, id: number): Promise<void> {
-  const res = await fetch(`/api/admin/queue/${id}`, {
+  const res = await fetch(apiUrl(`/api/admin/queue/${id}`), {
     method: 'DELETE',
     headers: { [ADMIN_TOKEN_HEADER]: token },
   })
@@ -454,7 +468,7 @@ export async function deleteAdminQueueEntry(token: string, id: number): Promise<
 
 /** POST /api/admin/queue/clear — requires the admin token. */
 export async function clearAdminQueue(token: string): Promise<void> {
-  const res = await fetch('/api/admin/queue/clear', {
+  const res = await fetch(apiUrl('/api/admin/queue/clear'), {
     method: 'POST',
     headers: { [ADMIN_TOKEN_HEADER]: token },
   })
@@ -472,7 +486,7 @@ export async function postBlacklist(
   token: string,
   body: { type: BlacklistType; value: string }
 ): Promise<void> {
-  const res = await fetch('/api/admin/blacklist', {
+  const res = await fetch(apiUrl('/api/admin/blacklist'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -501,7 +515,7 @@ export interface Device {
 
 /** GET /api/device — public, no admin token needed. */
 export async function getDevice(): Promise<{ resolved: Device | null; devices: Device[] }> {
-  const res = await fetch('/api/device')
+  const res = await fetch(apiUrl('/api/device'))
 
   if (!res.ok) {
     const body = await parseErrorBody(res)
@@ -513,7 +527,7 @@ export async function getDevice(): Promise<{ resolved: Device | null; devices: D
 
 /** POST /api/device/select — requires the admin token. */
 export async function selectDevice(token: string, deviceId: string): Promise<Device> {
-  const res = await fetch('/api/device/select', {
+  const res = await fetch(apiUrl('/api/device/select'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -536,7 +550,7 @@ export async function selectDevice(token: string, deviceId: string): Promise<Dev
 
 /** GET /api/admin/jukebox-device — requires the admin token. */
 export async function getJukeboxDevice(token: string): Promise<{ clientId: string | null }> {
-  const res = await fetch('/api/admin/jukebox-device', {
+  const res = await fetch(apiUrl('/api/admin/jukebox-device'), {
     headers: { [ADMIN_TOKEN_HEADER]: token },
   })
 
@@ -550,7 +564,7 @@ export async function getJukeboxDevice(token: string): Promise<{ clientId: strin
 
 /** POST /api/admin/jukebox-device/register — requires the admin token. */
 export async function registerJukeboxDevice(token: string, clientId: string): Promise<{ clientId: string }> {
-  const res = await fetch('/api/admin/jukebox-device/register', {
+  const res = await fetch(apiUrl('/api/admin/jukebox-device/register'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -585,7 +599,7 @@ export interface FavoriteTrack {
 
 /** GET /api/favorites — requires the guest token from useSession(). */
 export async function getFavorites(guestToken: string): Promise<FavoriteTrack[]> {
-  const res = await fetch('/api/favorites', {
+  const res = await fetch(apiUrl('/api/favorites'), {
     headers: { [GUEST_TOKEN_HEADER]: guestToken },
   })
 
@@ -599,7 +613,7 @@ export async function getFavorites(guestToken: string): Promise<FavoriteTrack[]>
 
 /** POST /api/favorites — requires the guest token from useSession(). */
 export async function addFavorite(trackId: string, guestToken: string): Promise<Track> {
-  const res = await fetch('/api/favorites', {
+  const res = await fetch(apiUrl('/api/favorites'), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -618,7 +632,7 @@ export async function addFavorite(trackId: string, guestToken: string): Promise<
 
 /** DELETE /api/favorites/:trackId — requires the guest token from useSession(). Expects 204, no body to parse. */
 export async function removeFavorite(trackId: string, guestToken: string): Promise<void> {
-  const res = await fetch(`/api/favorites/${encodeURIComponent(trackId)}`, {
+  const res = await fetch(apiUrl(`/api/favorites/${encodeURIComponent(trackId)}`), {
     method: 'DELETE',
     headers: { [GUEST_TOKEN_HEADER]: guestToken },
   })
@@ -642,7 +656,7 @@ export async function getFavoritesStatus(
 ): Promise<Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean }>> {
   if (trackIds.length === 0) return {}
 
-  const res = await fetch(`/api/favorites/status?trackIds=${trackIds.map(encodeURIComponent).join(',')}`, {
+  const res = await fetch(apiUrl(`/api/favorites/status?trackIds=${trackIds.map(encodeURIComponent).join(',')}`), {
     headers: guestToken ? { [GUEST_TOKEN_HEADER]: guestToken } : undefined,
   })
 
@@ -659,7 +673,7 @@ export async function updateGuestProfile(
   updates: { nickname?: string; avatar?: string },
   guestToken: string
 ): Promise<{ token: string; sessionId: string; createdAt: string; nickname: string | null; avatar: string | null }> {
-  const res = await fetch('/api/session/me', {
+  const res = await fetch(apiUrl('/api/session/me'), {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',

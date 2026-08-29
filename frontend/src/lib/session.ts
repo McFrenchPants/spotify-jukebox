@@ -1,3 +1,5 @@
+import { getApiBaseUrl } from './backendUrl'
+
 const GUEST_TOKEN_HEADER = 'x-guest-token'
 const STORAGE_KEY = 'jukebox_guest_token'
 
@@ -27,7 +29,7 @@ export async function bootstrapSession(): Promise<SessionResponse> {
     headers[GUEST_TOKEN_HEADER] = existingToken
   }
 
-  const res = await fetch('/api/session', {
+  const res = await fetch(`${getApiBaseUrl()}/api/session`, {
     method: 'POST',
     headers,
   })
