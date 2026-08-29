@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../ui/Card'
-import { getArtist, getTrackPlayCount, getNowPlaying, type ArtistInfo, type NowPlayingState } from '../../lib/api'
+import { getArtist, getTrackPlayCount, getNowPlaying, type ArtistInfo, type NowPlayingState, type Track } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
+import { useFavoritesStatus } from '../../hooks/useFavoritesStatus'
+import { FavoriteButton } from '../favorites/FavoriteButton'
 
 /** Matches --duration-slow in index.css — the crossfade should ride the same token. */
 const CROSSFADE_MS = 320
@@ -181,6 +183,9 @@ export function NowPlaying({
     }
   }, [expanded, displaySnapshot?.trackId, displaySnapshot?.artistId])
 
+  const favoritesTrackIds = displaySnapshot?.trackId ? [displaySnapshot.trackId] : []
+  const { status: favoritesStatus, toggle: toggleFavorite } = useFavoritesStatus(favoritesTrackIds, subscribe)
+
   if (!displaySnapshot || !displaySnapshot.isPlaying || !displaySnapshot.trackId) {
     return (
       <Card className="flex flex-col items-center gap-1 py-8 text-center">
@@ -240,8 +245,29 @@ export function NowPlaying({
           )}
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-body font-semibold text-text-primary">{displaySnapshot.name}</p>
-            <p className="truncate text-caption text-text-secondary">{displaySnapshot.artist}</p>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-body font-semibold text-text-primary">{displaySnapshot.name}</p>
+                <p className="truncate text-caption text-text-secondary">{displaySnapshot.artist}</p>
+              </div>
+              <FavoriteButton
+                className="mt-0.5 shrink-0"
+                size="md"
+                favoritedByMe={favoritesStatus[displaySnapshot.trackId]?.favoritedByMe ?? false}
+                favoritedByAnyone={favoritesStatus[displaySnapshot.trackId]?.favoritedByAnyone ?? false}
+                onToggle={() => {
+                  const track: Track = {
+                    id: displaySnapshot.trackId as string,
+                    name: displaySnapshot.name ?? '',
+                    artist: displaySnapshot.artist ?? '',
+                    albumArt: displaySnapshot.albumArt ?? null,
+                    durationMs: displaySnapshot.durationMs ?? 0,
+                    explicit: false,
+                  }
+                  toggleFavorite(track)
+                }}
+              />
+            </div>
 
             <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-overlay">
               <div className="h-full rounded-full bg-accent transition-fast" style={{ width: `${pct}%` }} />

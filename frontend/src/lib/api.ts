@@ -77,6 +77,8 @@ export interface QueueEntry {
   durationMs: number
   addedBySessionId: string | null
   addedAt: string
+  adderNickname: string | null
+  adderAvatar: string | null
 }
 
 /** GET /api/search?q= — no guest token required (open read). */

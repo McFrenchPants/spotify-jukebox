@@ -4,6 +4,8 @@ import { Skeleton } from '../ui/Skeleton'
 import { ApiError, getQueue, type QueueEntry } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
+import { FavoriteButton } from '../favorites/FavoriteButton'
+import { useFavoritesStatus, type FavoriteStatusEntry } from '../../hooks/useFavoritesStatus'
 
 const SKELETON_ROWS = 3
 
@@ -26,7 +28,17 @@ function QueueSkeletonRow() {
 }
 
 /** Read-only row matching TrackRow's visual pattern (art, name, artist, duration) minus the Add action. */
-function QueueRow({ entry }: { entry: QueueEntry }) {
+function QueueRow({
+  entry,
+  favoriteStatus,
+  onToggleFavorite,
+}: {
+  entry: QueueEntry
+  favoriteStatus: FavoriteStatusEntry
+  onToggleFavorite: () => void
+}) {
+  const hasAttribution = entry.adderNickname !== null || entry.adderAvatar !== null
+
   return (
     <Card noPadding className="flex items-center gap-3 p-3">
       {entry.albumArtUrl ? (
@@ -53,6 +65,21 @@ function QueueRow({ entry }: { entry: QueueEntry }) {
         <p className="truncate text-caption text-text-secondary">
           {entry.artistName} · {formatDuration(entry.durationMs)}
         </p>
+      </div>
+
+      <div className="flex shrink-0 flex-col items-end gap-1">
+        <FavoriteButton
+          favoritedByMe={favoriteStatus.favoritedByMe}
+          favoritedByAnyone={favoriteStatus.favoritedByAnyone}
+          onToggle={onToggleFavorite}
+          size="sm"
+        />
+        {hasAttribution && (
+          <span className="flex items-center gap-1 text-caption text-text-muted">
+            {entry.adderAvatar && <span className="text-lg leading-none">{entry.adderAvatar}</span>}
+            {entry.adderNickname && <span className="truncate">{entry.adderNickname}</span>}
+          </span>
+        )}
       </div>
     </Card>
   )
@@ -85,6 +112,8 @@ export function QueueList({ subscribe, refreshKey }: QueueListProps) {
 
   useEffect(() => subscribe('queue-update', () => load()), [subscribe, load])
 
+  const { status, toggle } = useFavoritesStatus(queue?.map((e) => e.spotifyTrackId) ?? [], subscribe)
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-caption font-semibold uppercase tracking-wide text-text-muted">Up next</p>
@@ -113,7 +142,21 @@ export function QueueList({ subscribe, refreshKey }: QueueListProps) {
       {queue !== null && queue.length > 0 && (
         <div className="flex flex-col gap-2">
           {queue.map((entry) => (
-            <QueueRow key={entry.id} entry={entry} />
+            <QueueRow
+              key={entry.id}
+              entry={entry}
+              favoriteStatus={status[entry.spotifyTrackId] ?? { favoritedByMe: false, favoritedByAnyone: false }}
+              onToggleFavorite={() =>
+                toggle({
+                  id: entry.spotifyTrackId,
+                  name: entry.trackName,
+                  artist: entry.artistName,
+                  albumArt: entry.albumArtUrl,
+                  durationMs: entry.durationMs,
+                  explicit: false,
+                })
+              }
+            />
           ))}
         </div>
       )}

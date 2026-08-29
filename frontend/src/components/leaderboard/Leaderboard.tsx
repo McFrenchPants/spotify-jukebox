@@ -3,6 +3,8 @@ import { Card } from '../ui/Card'
 import { Skeleton } from '../ui/Skeleton'
 import { ApiError, getLeaderboard, type LeaderboardEntry } from '../../lib/api'
 import type { EventStream } from '../../hooks/useEventStream'
+import { FavoriteButton } from '../favorites/FavoriteButton'
+import { useFavoritesStatus, type FavoriteStatusEntry } from '../../hooks/useFavoritesStatus'
 
 const SKELETON_ROWS = 3
 
@@ -24,8 +26,18 @@ function LeaderboardSkeletonRow() {
   )
 }
 
-/** Ranked row: rank badge, art, name/artist, play count. */
-function LeaderboardRow({ rank, entry }: { rank: number; entry: LeaderboardEntry }) {
+/** Ranked row: rank badge, art, name/artist, play count, favorite toggle. */
+function LeaderboardRow({
+  rank,
+  entry,
+  favoriteStatus,
+  onToggleFavorite,
+}: {
+  rank: number
+  entry: LeaderboardEntry
+  favoriteStatus: FavoriteStatusEntry
+  onToggleFavorite: () => void
+}) {
   return (
     <Card noPadding className="flex items-center gap-3 p-3">
       <span className="w-6 shrink-0 text-center text-body font-semibold text-text-muted">
@@ -56,9 +68,17 @@ function LeaderboardRow({ rank, entry }: { rank: number; entry: LeaderboardEntry
         <p className="truncate text-caption text-text-secondary">{entry.artistName}</p>
       </div>
 
-      <span className="shrink-0 text-caption font-semibold text-text-muted">
-        {entry.playCount} {entry.playCount === 1 ? 'play' : 'plays'}
-      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-caption font-semibold text-text-muted">
+          {entry.playCount} {entry.playCount === 1 ? 'play' : 'plays'}
+        </span>
+        <FavoriteButton
+          size="sm"
+          favoritedByMe={favoriteStatus.favoritedByMe}
+          favoritedByAnyone={favoriteStatus.favoritedByAnyone}
+          onToggle={onToggleFavorite}
+        />
+      </div>
     </Card>
   )
 }
@@ -91,6 +111,11 @@ export function Leaderboard({ subscribe, refreshKey }: LeaderboardProps) {
 
   useEffect(() => subscribe('leaderboard-update', () => load()), [subscribe, load])
 
+  const { status: favoritesStatus, toggle: toggleFavorite } = useFavoritesStatus(
+    entries?.map((e) => e.spotifyTrackId) ?? [],
+    subscribe
+  )
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-caption font-semibold uppercase tracking-wide text-text-muted">
@@ -121,7 +146,24 @@ export function Leaderboard({ subscribe, refreshKey }: LeaderboardProps) {
       {entries !== null && entries.length > 0 && (
         <div className="flex flex-col gap-2">
           {entries.map((entry, i) => (
-            <LeaderboardRow key={entry.spotifyTrackId} rank={i + 1} entry={entry} />
+            <LeaderboardRow
+              key={entry.spotifyTrackId}
+              rank={i + 1}
+              entry={entry}
+              favoriteStatus={
+                favoritesStatus[entry.spotifyTrackId] ?? { favoritedByMe: false, favoritedByAnyone: false }
+              }
+              onToggleFavorite={() =>
+                toggleFavorite({
+                  id: entry.spotifyTrackId,
+                  name: entry.trackName,
+                  artist: entry.artistName,
+                  albumArt: entry.albumArtUrl,
+                  durationMs: 0,
+                  explicit: false,
+                })
+              }
+            />
           ))}
         </div>
       )}
