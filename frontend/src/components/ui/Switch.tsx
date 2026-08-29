@@ -21,23 +21,23 @@ export function Switch({ checked, onChange, offLabel, onLabel, disabled, ...rest
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="glass-inset relative flex h-9 w-[7.5rem] shrink-0 items-center rounded-full p-0.5 text-caption font-semibold transition-fast disabled:opacity-40 disabled:pointer-events-none"
+      className="glass-inset relative flex h-9 w-44 shrink-0 items-center rounded-full p-0.5 text-caption font-semibold transition-fast disabled:opacity-40 disabled:pointer-events-none"
       {...rest}
     >
       <span
-        className="glass-pill absolute top-0.5 h-8 w-[3.75rem] rounded-full transition-fast"
+        className="glass-pill absolute top-0.5 h-8 w-[5.5rem] rounded-full transition-fast"
         style={{
-          left: checked ? 'calc(100% - 3.75rem - 0.125rem)' : '0.125rem',
+          left: checked ? 'calc(100% - 5.5rem - 0.125rem)' : '0.125rem',
           background: checked
             ? 'linear-gradient(155deg, rgba(255,255,255,0.35), var(--color-accent) 70%)'
             : undefined,
         }}
         aria-hidden="true"
       />
-      <span className={`relative z-10 flex-1 text-center ${!checked ? 'text-text-primary' : 'text-text-muted'}`}>
+      <span className={`relative z-10 flex-1 truncate text-center ${!checked ? 'text-text-primary' : 'text-text-muted'}`}>
         {offLabel}
       </span>
-      <span className={`relative z-10 flex-1 text-center ${checked ? 'text-bg' : 'text-text-muted'}`}>
+      <span className={`relative z-10 flex-1 truncate text-center ${checked ? 'text-bg' : 'text-text-muted'}`}>
         {onLabel}
       </span>
     </button>

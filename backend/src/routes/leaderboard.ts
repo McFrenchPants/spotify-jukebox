@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getLeaderboard } from "../db/trackStats";
+import { getLeaderboard, getTrackPlayCount } from "../db/trackStats";
 
 export const leaderboardRouter = Router();
 
@@ -25,4 +25,14 @@ leaderboardRouter.get("/", (req, res) => {
   const limit = parseLimit(req.query.limit, DEFAULT_LIMIT);
   const entries = getLeaderboard(limit);
   res.status(200).json(entries);
+});
+
+/**
+ * Full all-time play count for one track, independent of leaderboard
+ * ranking — used by the Now Playing detail card, which needs a track's real
+ * count even when it's well outside the top N.
+ */
+leaderboardRouter.get("/track/:trackId", (req, res) => {
+  const playCount = getTrackPlayCount(req.params.trackId);
+  res.status(200).json({ spotifyTrackId: req.params.trackId, playCount });
 });

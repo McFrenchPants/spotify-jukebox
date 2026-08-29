@@ -107,3 +107,28 @@ describe("GET /api/leaderboard", () => {
     expect(body).toHaveLength(1);
   });
 });
+
+describe("GET /api/leaderboard/track/:trackId", () => {
+  it("returns a track's full play count even when it's outside the top N", async () => {
+    // Seed more distinct, more-played tracks than the leaderboard's default
+    // limit so track-obscure would never appear in a plain GET /api/leaderboard.
+    for (let i = 0; i < 10; i++) {
+      seedTrack(`track-popular-${i}`, `Popular ${i}`, "Artist A", 5);
+    }
+    seedTrack("track-obscure", "Obscure Song", "Artist B", 3);
+
+    const res = await fetch(`${baseUrl}/api/leaderboard/track/track-obscure`);
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ spotifyTrackId: "track-obscure", playCount: 3 });
+  });
+
+  it("returns a play count of 0 for a track with no history", async () => {
+    const res = await fetch(`${baseUrl}/api/leaderboard/track/never-played`);
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ spotifyTrackId: "never-played", playCount: 0 });
+  });
+});

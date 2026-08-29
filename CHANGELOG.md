@@ -2,6 +2,13 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.11
+
+- Fixed the play count on the expanded Now Playing card being wrong (or stuck at a low number) for any track outside the current top-10 most-played list — it previously looked the track up in that top-10 list and silently fell back to a low/zero count if it wasn't there. It now reads that track's real all-time play count directly instead.
+- Settings: the Playback Device section now sits directly above Queue Moderation instead of below it.
+- Settings: the Trust mode toggle's "Restricted" label no longer gets covered by the sliding "Trusted" pill graphic.
+- Widened the tap target on the expanded Now Playing card's artist link (the whole row is now tappable, not just the thin line of text) so it reliably opens search instead of occasionally missing and collapsing the card.
+
 ## 1.0.10
 
 - Full glassmorphism visual pass: cards, buttons, the bottom nav bar, inputs, sliders, modals, and toasts now share one consistent frosted-glass look (translucency, blur, and a soft top-edge highlight) instead of the previous mix of flat and partially-glass surfaces. The active tab in the bottom nav now sits inside a glass pill instead of just changing color.

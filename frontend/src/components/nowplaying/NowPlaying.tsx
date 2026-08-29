@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Card } from '../ui/Card'
-import { getArtist, getLeaderboard, getNowPlaying, type ArtistInfo, type NowPlayingState } from '../../lib/api'
+import { getArtist, getTrackPlayCount, getNowPlaying, type ArtistInfo, type NowPlayingState } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
@@ -167,11 +167,10 @@ export function NowPlaying({
         })
     }
 
-    getLeaderboard()
-      .then((entries) => {
+    getTrackPlayCount(displaySnapshot.trackId)
+      .then((playCount) => {
         if (cancelled) return
-        const match = entries.find((e) => e.spotifyTrackId === displaySnapshot.trackId)
-        setDetailPlayCount(match?.playCount ?? 0)
+        setDetailPlayCount(playCount)
       })
       .catch(() => {
         // Leave null — the play-count line just stays hidden.
@@ -253,7 +252,17 @@ export function NowPlaying({
 
       {expanded && detailArtist && (
         <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 text-left">
-          <div className="flex items-center gap-3">
+          {/* The whole row (not just the name text) is the tap target — a
+              thin one-line link was easy to miss by a few pixels on a phone,
+              landing the tap on this card's own expand/collapse handler
+              instead (well below the 44px touch-target minimum Button.tsx
+              uses elsewhere). min-h-11 plus -m-2/p-2 keeps the visual layout
+              unchanged while growing the actual hit area around it. */}
+          <Link
+            to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
+            onClick={(e) => e.stopPropagation()}
+            className="-m-2 flex min-h-11 items-center gap-3 rounded-md p-2 transition-fast active:bg-white/5"
+          >
             {detailArtist.imageUrl ? (
               <img
                 src={detailArtist.imageUrl}
@@ -262,16 +271,12 @@ export function NowPlaying({
               />
             ) : null}
             <div className="min-w-0 flex-1">
-              <Link
-                to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
-                onClick={(e) => e.stopPropagation()}
-                className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline"
-              >
+              <p className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline">
                 {detailArtist.name}
-              </Link>
+              </p>
               <p className="text-caption text-text-muted">{detailArtist.followers.toLocaleString()} followers</p>
             </div>
-          </div>
+          </Link>
 
           {detailArtist.genres.length > 0 && (
             <div className="flex flex-wrap gap-1.5">

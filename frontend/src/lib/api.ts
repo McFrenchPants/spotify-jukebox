@@ -162,6 +162,23 @@ export async function getLeaderboard(limit?: number): Promise<LeaderboardEntry[]
 }
 
 /**
+ * GET /api/leaderboard/track/:trackId — a single track's full all-time play
+ * count, independent of leaderboard ranking (unlike getLeaderboard(), this
+ * never misses a track just because it isn't in the top N).
+ */
+export async function getTrackPlayCount(trackId: string): Promise<number> {
+  const res = await fetch(`/api/leaderboard/track/${encodeURIComponent(trackId)}`)
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load play count: ${res.status}`)
+  }
+
+  const body = (await res.json()) as { playCount: number }
+  return body.playCount
+}
+
+/**
  * GET /api/recent?limit= — no guest token required (open read). Most-recent
  * first, not blacklist-filtered (it's a historical log).
  */

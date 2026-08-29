@@ -51,6 +51,23 @@ export function setTrackBlacklisted(spotifyTrackId: string, blacklisted: boolean
   ).run(spotifyTrackId, blacklisted ? 1 : 0);
 }
 
+/**
+ * Returns the full, all-time play_count for a single track directly from
+ * track_stats — unlike looking a track up in getLeaderboard()'s results,
+ * this isn't limited to however many top tracks were fetched, so it never
+ * misses a track just because it didn't rank. Returns 0 for a track with no
+ * row (never played).
+ */
+export function getTrackPlayCount(spotifyTrackId: string): number {
+  const row = db
+    .prepare<[string], { play_count: number }>(
+      "SELECT play_count FROM track_stats WHERE spotify_track_id = ?"
+    )
+    .get(spotifyTrackId);
+
+  return row?.play_count ?? 0;
+}
+
 export interface LeaderboardEntry {
   spotifyTrackId: string;
   trackName: string;

@@ -9,8 +9,8 @@ import { AdminAuthProvider, useAdminAuth } from '../context/AdminAuthContext'
 import type { RootLayoutContext } from '../components/RootLayout'
 
 /**
- * Authenticated admin view: settings form, queue moderation, device
- * selector, guest URL/QR — in that order (mode-affecting settings first,
+ * Authenticated admin view: settings form, device selector, queue
+ * moderation, guest URL/QR — in that order (mode-affecting settings first,
  * since that's the control the rest of the app's behavior depends on).
  */
 function AdminPanel() {
@@ -31,8 +31,8 @@ function AdminPanel() {
       </div>
 
       <SettingsForm token={token} />
-      <QueueModeration token={token} />
       <DeviceSelector token={token} subscribe={subscribe} />
+      <QueueModeration token={token} />
       <GuestUrlCard />
     </div>
   )
@@ -44,8 +44,8 @@ function SettingsPageInner() {
 }
 
 /**
- * Settings tab (P4.6) — PIN login, settings form (P3.2), queue moderation
- * (P3.4), device selector (P1.4), and QR/guest-URL display, all behind a
+ * Settings tab (P4.6) — PIN login, settings form (P3.2), device selector
+ * (P1.4), queue moderation (P3.4), and QR/guest-URL display, all behind a
  * PIN-gated admin session. AdminAuthProvider is scoped locally to this page
  * (not global in main.tsx) since only this tab needs admin auth.
  */
