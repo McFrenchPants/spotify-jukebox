@@ -581,15 +581,21 @@ export async function removeFavorite(trackId: string, guestToken: string): Promi
 }
 
 /**
- * GET /api/favorites/status?trackIds=a,b,c — no guest token required.
- * Empty input short-circuits to `{}` without a network round-trip.
+ * GET /api/favorites/status?trackIds=a,b,c — the guest token is optional
+ * (the backend returns favoritedByMe: false for every id without one), but
+ * must be sent whenever available or favoritedByMe can never come back true
+ * for the calling guest. Empty input short-circuits to `{}` without a
+ * network round-trip.
  */
 export async function getFavoritesStatus(
-  trackIds: string[]
+  trackIds: string[],
+  guestToken?: string | null
 ): Promise<Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean }>> {
   if (trackIds.length === 0) return {}
 
-  const res = await fetch(`/api/favorites/status?trackIds=${trackIds.map(encodeURIComponent).join(',')}`)
+  const res = await fetch(`/api/favorites/status?trackIds=${trackIds.map(encodeURIComponent).join(',')}`, {
+    headers: guestToken ? { [GUEST_TOKEN_HEADER]: guestToken } : undefined,
+  })
 
   if (!res.ok) {
     const body = await parseErrorBody(res)

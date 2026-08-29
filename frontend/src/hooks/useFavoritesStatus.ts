@@ -43,7 +43,7 @@ export function useFavoritesStatus(
       return next
     })
 
-    getFavoritesStatus(ids)
+    getFavoritesStatus(ids, token)
       .then((result) => {
         if (cancelled) return
         setStatus((prev) => ({ ...prev, ...result }))
@@ -55,12 +55,12 @@ export function useFavoritesStatus(
     return () => {
       cancelled = true
     }
-  }, [idsKey])
+  }, [idsKey, token])
 
   useEffect(() => {
     return subscribe('favorites-update', () => {
       const ids = idsKey === '' ? [] : idsKey.split(',')
-      getFavoritesStatus(ids)
+      getFavoritesStatus(ids, token)
         .then((result) => {
           // Merge in — don't wipe entries for ids outside the current list,
           // and don't touch ids not returned by this fetch.
@@ -70,7 +70,7 @@ export function useFavoritesStatus(
           // Ignore — status just stays as it was until the next successful sync.
         })
     })
-  }, [idsKey, subscribe])
+  }, [idsKey, subscribe, token])
 
   function toggle(track: Track) {
     if (!token) return // session not ready — shouldn't happen, App only renders once loaded
