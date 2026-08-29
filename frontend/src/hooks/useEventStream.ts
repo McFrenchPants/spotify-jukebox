@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { getOrCreateClientId } from '../lib/clientId'
 
 export type ConnectionState = 'connecting' | 'open' | 'closed'
 
@@ -11,6 +13,7 @@ const NAMED_EVENTS = [
   'leaderboard-update',
   'device-status',
   'favorites-update',
+  'jukebox-volume-command',
 ] as const
 
 /** How long the connection must be non-open before we surface the manual-refresh fallback. */
@@ -40,6 +43,22 @@ const DEFAULT_EVENTS_URL = import.meta.env.DEV
   ? `http://${window.location.hostname}:8085/api/events`
   : '/api/events'
 
+/**
+ * Builds the URL to connect to, appending `?clientId=<id>` only when running
+ * as a native (Capacitor) build. The backend uses this to recognize the
+ * connection as coming from the registered Jukebox device — see
+ * `isJukeboxDeviceOnline()` / the `jukebox-device-status` event on the
+ * backend. Ordinary web/browser guests have no reason to identify
+ * themselves this way, so on a plain web build this must stay byte-identical
+ * to `DEFAULT_EVENTS_URL` (no query string at all).
+ */
+function buildEventsUrl(): string {
+  if (!Capacitor.isNativePlatform()) {
+    return DEFAULT_EVENTS_URL
+  }
+  return `${DEFAULT_EVENTS_URL}?clientId=${encodeURIComponent(getOrCreateClientId())}`
+}
+
 export interface EventStream {
   connectionState: ConnectionState
   /** True once the connection has been non-open for more than a few seconds. */
@@ -55,7 +74,7 @@ export interface EventStream {
  * connection has been away from 'open' so callers can show a manual-refresh
  * affordance if the browser's built-in backoff isn't recovering quickly.
  */
-export function useEventStream(url = DEFAULT_EVENTS_URL): EventStream {
+export function useEventStream(url = buildEventsUrl()): EventStream {
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
   const [isStale, setIsStale] = useState(false)
   const listenersRef = useRef(new Map<string, Set<EventHandler>>())
