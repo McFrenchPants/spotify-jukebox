@@ -217,81 +217,91 @@ export function NowPlaying({
         }
       }}
     >
-      <div className="flex items-center gap-4">
-        {displaySnapshot.albumArt ? (
-          <img
-            src={displaySnapshot.albumArt}
-            alt=""
-            className={`shrink-0 rounded-md bg-surface-overlay object-cover transition-slow ${
-              expanded ? 'h-40 w-40' : 'h-16 w-16'
-            }`}
-          />
-        ) : (
-          <PlaceholderArt className={`transition-slow ${expanded ? 'h-40 w-40' : 'h-16 w-16'}`} />
-        )}
-
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-body font-semibold text-text-primary">{displaySnapshot.name}</p>
-          <p className="truncate text-caption text-text-secondary">{displaySnapshot.artist}</p>
-
-          <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-overlay">
-            <div className="h-full rounded-full bg-accent transition-fast" style={{ width: `${pct}%` }} />
-          </div>
-          <div className="mt-1 flex justify-between text-caption text-text-muted">
-            <span>{formatDuration(progressMs)}</span>
-            <span>-{formatDuration(remaining)}</span>
-          </div>
-
-          {expanded && detailPlayCount !== null && (
-            <p className="mt-3 inline-block rounded-full bg-surface-overlay px-3 py-1 text-caption text-text-secondary">
-              Played {detailPlayCount} {detailPlayCount === 1 ? 'time' : 'times'}
-            </p>
+      {/* At lg+, once the artist detail section has data, split the card
+          art/track-info and artist/genre sections side by side rather than
+          stacked — the wide lg content column (up to 1200px) otherwise
+          leaves the track-info column and its progress bar stretched far
+          past their natural content width, reading as dead space rather
+          than the "breathing room" sibling Card-row layouts get away with.
+          Below lg (and while the detail section hasn't loaded yet) this
+          stays a plain stacked column, pixel-identical to before. */}
+      <div className={expanded && detailArtist ? 'lg:flex lg:items-start lg:gap-6' : ''}>
+        <div className={`flex items-center gap-4 ${expanded && detailArtist ? 'lg:w-1/2' : ''}`}>
+          {displaySnapshot.albumArt ? (
+            <img
+              src={displaySnapshot.albumArt}
+              alt=""
+              className={`shrink-0 rounded-md bg-surface-overlay object-cover transition-slow ${
+                expanded ? 'h-40 w-40' : 'h-16 w-16'
+              }`}
+            />
+          ) : (
+            <PlaceholderArt className={`transition-slow ${expanded ? 'h-40 w-40' : 'h-16 w-16'}`} />
           )}
-        </div>
-      </div>
 
-      {expanded && detailArtist && (
-        <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 text-left">
-          {/* The whole row (not just the name text) is the tap target — a
-              thin one-line link was easy to miss by a few pixels on a phone,
-              landing the tap on this card's own expand/collapse handler
-              instead (well below the 44px touch-target minimum Button.tsx
-              uses elsewhere). min-h-11 plus -m-2/p-2 keeps the visual layout
-              unchanged while growing the actual hit area around it. */}
-          <Link
-            to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
-            onClick={(e) => e.stopPropagation()}
-            className="-m-2 flex min-h-11 items-center gap-3 rounded-md p-2 transition-fast active:bg-white/5"
-          >
-            {detailArtist.imageUrl ? (
-              <img
-                src={detailArtist.imageUrl}
-                alt=""
-                className="h-12 w-12 shrink-0 rounded-full bg-surface-overlay object-cover"
-              />
-            ) : null}
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline">
-                {detailArtist.name}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-body font-semibold text-text-primary">{displaySnapshot.name}</p>
+            <p className="truncate text-caption text-text-secondary">{displaySnapshot.artist}</p>
+
+            <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-overlay">
+              <div className="h-full rounded-full bg-accent transition-fast" style={{ width: `${pct}%` }} />
+            </div>
+            <div className="mt-1 flex justify-between text-caption text-text-muted">
+              <span>{formatDuration(progressMs)}</span>
+              <span>-{formatDuration(remaining)}</span>
+            </div>
+
+            {expanded && detailPlayCount !== null && (
+              <p className="mt-3 inline-block rounded-full bg-surface-overlay px-3 py-1 text-caption text-text-secondary">
+                Played {detailPlayCount} {detailPlayCount === 1 ? 'time' : 'times'}
               </p>
-              <p className="text-caption text-text-muted">{detailArtist.followers.toLocaleString()} followers</p>
-            </div>
-          </Link>
-
-          {detailArtist.genres.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {detailArtist.genres.map((genre) => (
-                <span
-                  key={genre}
-                  className="rounded-full bg-surface-overlay px-2.5 py-1 text-caption text-text-secondary"
-                >
-                  {genre}
-                </span>
-              ))}
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      )}
+
+        {expanded && detailArtist && (
+          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 text-left lg:mt-0 lg:w-1/2 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+            {/* The whole row (not just the name text) is the tap target — a
+                thin one-line link was easy to miss by a few pixels on a phone,
+                landing the tap on this card's own expand/collapse handler
+                instead (well below the 44px touch-target minimum Button.tsx
+                uses elsewhere). min-h-11 plus -m-2/p-2 keeps the visual layout
+                unchanged while growing the actual hit area around it. */}
+            <Link
+              to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
+              onClick={(e) => e.stopPropagation()}
+              className="-m-2 flex min-h-11 items-center gap-3 rounded-md p-2 transition-fast active:bg-white/5"
+            >
+              {detailArtist.imageUrl ? (
+                <img
+                  src={detailArtist.imageUrl}
+                  alt=""
+                  className="h-12 w-12 shrink-0 rounded-full bg-surface-overlay object-cover"
+                />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline">
+                  {detailArtist.name}
+                </p>
+                <p className="text-caption text-text-muted">{detailArtist.followers.toLocaleString()} followers</p>
+              </div>
+            </Link>
+
+            {detailArtist.genres.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {detailArtist.genres.map((genre) => (
+                  <span
+                    key={genre}
+                    className="rounded-full bg-surface-overlay px-2.5 py-1 text-caption text-text-secondary"
+                  >
+                    {genre}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </Card>
   )
 }
