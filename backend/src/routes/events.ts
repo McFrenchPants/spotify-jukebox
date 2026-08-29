@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { subscribe } from "../events/bus";
+import { clientConnected, clientDisconnected } from "../events/jukeboxDeviceOnline";
 
 export const eventsRouter = Router();
 
@@ -7,6 +8,13 @@ export const eventsRouter = Router();
 export const HEARTBEAT_INTERVAL_MS = 15000;
 
 eventsRouter.get("/", (req, res) => {
+  // Optional self-reported identifier, used only to track connect/disconnect
+  // of the Jukebox device (M1.2) for `isJukeboxDeviceOnline()`. This is a
+  // public, unauthenticated stream, so clientId is not — and must never be
+  // treated as — an auth mechanism; omitting it is fully backward compatible
+  // (no tracking, no jukebox-device-status events for that connection).
+  const clientId = typeof req.query.clientId === "string" ? req.query.clientId : undefined;
+
   res.status(200);
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
@@ -35,9 +43,16 @@ eventsRouter.get("/", (req, res) => {
     res.write(`: heartbeat\n\n`);
   }, HEARTBEAT_INTERVAL_MS);
 
+  if (clientId) {
+    clientConnected(clientId);
+  }
+
   const cleanup = () => {
     clearInterval(heartbeat);
     unsubscribe();
+    if (clientId) {
+      clientDisconnected(clientId);
+    }
   };
 
   req.on("close", cleanup);
