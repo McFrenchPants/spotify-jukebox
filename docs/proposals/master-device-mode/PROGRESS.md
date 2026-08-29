@@ -28,7 +28,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | M1.4 | Expose registered/online/offline state to frontend | todo | Depends on M1.2 |
 | M2.1 | Capacitor plugin: set system volume | todo | Depends on M0.1 |
 | M2.2 | Wire plugin into SSE volume-command listener | todo | Depends on M1.3, M2.1 |
-| M3.1 | Stable per-install client id | todo | |
+| M3.1 | Stable per-install client id | done | `frontend/src/lib/clientId.ts`, `getOrCreateClientId()`, `localStorage['jukebox_client_id']`. No frontend test runner exists in this project — verified manually via dev server (stable across reload). Build/lint clean. |
 | M3.2 | "Jukebox device" Settings toggle | todo | Depends on M1.1, M3.1 |
 | M3.3 | Route PlaybackControls volume UI through new state | todo | Depends on M1.4, M2.2 |
 | M4.1 | One-command Android build script | todo | Depends on M0.1, M0.2 |
