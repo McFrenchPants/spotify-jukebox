@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (all resolved, §7).
 All work happens on `feature/landscape-layout` — confirm you're on that
 branch before making any changes.
 
-## Status: Phase L2 done, L3 next
+## Status: Phase L3 done, L4 next
 
 ## Task Table
 
@@ -24,10 +24,10 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | L1.3 | Adjust `AppShell` spacing for the rail | done | `<main>` + header inner wrapper get `sm:pl-48`; `<main>`'s bottom-bar padding reservation now drops to the no-bottom-bar value at `sm`+ via Tailwind arbitrary-value classes (replaced the old inline-style padding since inline styles can't express `sm:` overrides) |
 | L2.1 | Apply three-tier width to the shell | done | `CONTENT_MAX_WIDTH` now `'max-w-lg sm:max-w-2xl lg:max-w-[1200px]'`; `AppShell.tsx` needed no changes, already consumed the shared constant |
 | L2.2 | QA sweep at the new widths | done | Capped 4 naked `w-full`/`flex-1` controls with no max of their own (search input `max-w-2xl`; volume slider, rate-limit slider, blacklist input each `lg:max-w-sm`). Card-row layouts (NowPlaying, Search results, History) already truncate correctly via `min-w-0 flex-1`, no changes needed. Two admin-page fixes (SettingsForm, QueueModeration) verified by code-pattern equivalence rather than live render — PIN gate blocks reaching those controls without entering a credential, which is out of bounds |
-| L3.1 | HistoryPage side-by-side at `lg` | todo | depends on L2 (done) — ready to start |
-| L3.2 | SettingsPage pairing at `lg` | todo | depends on L2; cuttable, confirm with user before spending time |
-| L3.3 | NowPlaying expanded-card revisit | todo | optional/stretch — may resolve to "no change needed" |
-| L4.1 | Cross-size manual verification pass | todo | depends on L1-L3; real-hardware check flagged as a caveat, not blocking |
+| L3.1 | HistoryPage side-by-side at `lg` | done | `Leaderboard`/`RecentlyPlayed` wrapped in `lg:w-1/2` divs inside `flex flex-col gap-6 lg:flex-row`; even 50/50 split chosen (both are single-column Card-row lists with no internal grid) |
+| L3.2 | SettingsPage pairing at `lg` | done | User confirmed doing it rather than cutting it. Two `flex flex-col gap-6 lg:flex-row` rows: `SettingsForm`+`DeviceSelector`, `QueueModeration`+`GuestUrlCard`, each child `lg:w-1/2`. Verified by code review only — PIN gate blocks live rendering without entering a credential, which is out of bounds |
+| L3.3 | NowPlaying expanded-card revisit | done | Did NOT resolve to "no change needed" — measured the expanded card's track-info column stretching to ~767px with a disproportionate hairline progress bar at 1200px, judged as genuine dead space (unlike sibling Card-rows). Applied `lg:flex`/`lg:w-1/2` split (art+info left, artist+genre right, `lg:border-l`) gated on `expanded && detailArtist` so collapsed/loading states are untouched |
+| L4.1 | Cross-size manual verification pass | todo | depends on L1-L3 (done) — ready to start; real-hardware check flagged as a caveat, not blocking |
 | L4.2 | Close out (backlog, PROGRESS.md, merge) | todo | depends on L4.1 |
 
 ## Open Questions / Blockers
@@ -38,6 +38,32 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — Phase L3 complete (L3.1, L3.2, L3.3), each via a
+  narrowly-scoped subagent, verified (diff read + `tsc -b` clean) and
+  committed separately (`0185dd8`, `551d74e`, `a8227c5`). L3.1
+  (HistoryPage) and L3.3 (NowPlaying) were live-verified via browser
+  DOM/computed-rect inspection at `lg` and sub-`lg` widths (screenshot
+  compositing still unavailable this session). L3.2 (SettingsPage) is
+  code-review-verified only — its content sits behind the admin PIN
+  gate, and entering a PIN/credential to get past it is off-limits per
+  this session's security policy; the diff mirrors the exact pattern
+  already live-verified in L3.1, which is a reasonable but weaker
+  confidence level, flagged explicitly. The user was asked and
+  confirmed doing L3.2 rather than cutting it (it had been flagged
+  cuttable in the plan). L3.3 is worth calling out: it did NOT resolve
+  to "no change needed" as the plan considered likely — the subagent
+  measured the expanded card's progress bar stretching to ~767px with
+  disproportionate whitespace at the 1200px cap and applied a
+  `lg:flex-row` split, same pattern as L3.1/L3.2, gated so it only
+  activates once the artist-detail data has loaded. Phase L4
+  (verification/close-out) is next: L4.1 is a cross-size manual pass
+  (mostly mechanical, already exercised piecemeal during L0-L3's own
+  verification, though a comprehensive pass hasn't been done as one
+  sweep) with a real-hardware bridge-phone check flagged as a caveat,
+  not a blocker; L4.2 is close-out (backlog note, final PROGRESS.md
+  update, merge) and depends on L4.1. Given L4.2 ends in a merge to
+  master, that's a natural point to loop the user in before it happens
+  rather than doing it unattended.
 - **2026-08-29** — Phase L2 complete (L2.1, L2.2), each via a
   narrowly-scoped subagent, verified (diff read + `tsc -b` clean +
   browser DOM/computed-width checks — screenshot compositing still
