@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { usePrefersReducedMotion } from '../hooks/usePrefersReducedMotion'
+import { CONTENT_MAX_WIDTH } from '../lib/layout'
 
 function SearchIcon() {
   return (
@@ -116,7 +117,7 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
           className="px-4 pb-2"
           style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 1rem)' }}
         >
-          <div className="mx-auto flex w-full max-w-lg items-center justify-between">
+          <div className={`mx-auto flex w-full ${CONTENT_MAX_WIDTH} items-center justify-between`}>
             <div className="h-10 w-10 shrink-0" aria-hidden="true" />
             <p className="text-title text-text-primary">French&rsquo;s Jukebox</p>
             <Link
@@ -130,7 +131,7 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
         </header>
 
         <main
-          className="mx-auto w-full max-w-lg flex-1 px-4 pb-6"
+          className={`mx-auto w-full ${CONTENT_MAX_WIDTH} flex-1 px-4 pb-6`}
           style={{
             paddingBottom: bottomBar
               ? 'calc(env(safe-area-inset-bottom, 0px) + 5.5rem)'
