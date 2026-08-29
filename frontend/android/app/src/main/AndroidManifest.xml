@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Master Device Mode: the backend runs over plain http:// on the LAN
+         (user-entered address, no TLS) by design. Android blocks cleartext
+         traffic app-wide by default from API 28+, which would otherwise
+         silently fail every fetch() to the configured backend URL. -->
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
+        android:usesCleartextTraffic="true"
         android:theme="@style/AppTheme">
 
         <activity
