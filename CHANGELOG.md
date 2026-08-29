@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.13
+
+- Fixed the bottom nav bar reading as transparent in some embedded views (e.g. a Home Assistant dashboard's "Website" card), letting page content behind it overlap and clash with the bar's own icons/labels. The bar is now solid enough to stay legible even where the intended frosted-glass blur effect doesn't render, and page content now fades out completely before it ever reaches the bar instead of relying on the blur alone to obscure it.
+
 ## 1.0.12
 
 - Added Favorites: guests can now tap a heart on any song — while it's playing, queued, or in the play history — to save it. The heart shows gray when nobody's favorited a song, amber when someone else has, and red when you have.

@@ -133,7 +133,7 @@ export function AppShell({ children, albumArtUrl, bottomBar }: AppShellProps) {
         <main
           className={`mx-auto w-full ${CONTENT_MAX_WIDTH} flex-1 px-4 sm:pl-48 ${
             bottomBar
-              ? 'pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] sm:pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'
+              ? 'fade-above-bottom-nav pb-[calc(env(safe-area-inset-bottom,0px)+5.5rem)] sm:pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'
               : 'pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]'
           }`}
         >

@@ -137,12 +137,38 @@ body {
 }
 
 /* Stronger blur + dimmer tint for large fixed chrome (nav bar, header) that
-   sits over constantly-scrolling content and needs to stay legible. */
+   sits over constantly-scrolling content and needs to stay legible. Opaque
+   enough on its own (independent of the backdrop-filter blur actually
+   rendering) that content never reads clearly through it even in a browser
+   context that doesn't apply backdrop-filter at all — some embedded/WebView
+   surfaces (e.g. a Home Assistant dashboard's "Webpage" card) silently drop
+   it rather than falling back gracefully. See also .fade-above-bottom-nav,
+   which stops scrollable content before it ever reaches this bar in the
+   first place, as a second line of defense against the same failure mode. */
 .glass-chrome {
-  background: linear-gradient(180deg, rgba(21, 21, 23, 0.55), rgba(10, 10, 11, 0.7));
+  background: linear-gradient(180deg, rgba(18, 18, 20, 0.82), rgba(8, 8, 9, 0.92));
   backdrop-filter: blur(24px) saturate(140%);
   -webkit-backdrop-filter: blur(24px) saturate(140%);
   border-color: rgba(255, 255, 255, 0.07);
+}
+
+/* Fades scrollable page content to fully transparent over the space
+   reserved for the fixed bottom nav bar (see AppShell.tsx's <main> padding),
+   so content can never visibly sit "under" the bar's own labels/icons —
+   belt-and-suspenders alongside .glass-chrome's own opacity/blur, for the
+   same embedded-browser failure mode described there. The fixed album-art
+   background (AppShell's separate z-0 layer) sits behind <main> and is
+   unaffected by this mask, so it stays visible through the faded area. Only
+   relevant below `sm`, where BottomNav (not SideNav) is in use. */
+.fade-above-bottom-nav {
+  mask-image: linear-gradient(to bottom, black calc(100% - 7rem), transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black calc(100% - 7rem), transparent 100%);
+}
+@media (min-width: 40rem) {
+  .fade-above-bottom-nav {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
 }
 
 /* Recessed surfaces: inputs, track backgrounds, anything meant to look
