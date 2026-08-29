@@ -30,10 +30,22 @@ function AdminPanel() {
         </Button>
       </div>
 
-      <SettingsForm token={token} />
-      <DeviceSelector token={token} subscribe={subscribe} />
-      <QueueModeration token={token} />
-      <GuestUrlCard />
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="lg:w-1/2">
+          <SettingsForm token={token} />
+        </div>
+        <div className="lg:w-1/2">
+          <DeviceSelector token={token} subscribe={subscribe} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="lg:w-1/2">
+          <QueueModeration token={token} />
+        </div>
+        <div className="lg:w-1/2">
+          <GuestUrlCard />
+        </div>
+      </div>
     </div>
   )
 }
