@@ -12,7 +12,7 @@ branch before making any changes. The branch was fast-forwarded to current
 `master` (`b49e7e3`) on 2026-08-29 before implementation started, since it
 had sat untouched (0 unique commits) since being cut.
 
-## Status: Phases M0-M4 done. M5.2 in progress — first real-hardware attempt found a real bug (missing backend-URL config + no CORS), now fixed and rebuilt; awaiting user retest. M5.3 (close-out/merge) remains after that.
+## Status: Phases M0-M4 done. M5.2 in progress — two real-hardware bugs found so far (missing backend-URL config + no CORS, then Android's default cleartext-HTTP block), both fixed and rebuilt; awaiting user retest. M5.3 (close-out/merge) remains after that.
 
 ## Task Table
 
@@ -52,6 +52,23 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — **Second real-hardware bug found and fixed.** After the
+  backend-URL/CORS fix below, the user retried with both a LAN IP
+  (`http://192.168.50.179:8085`) and a `.local` hostname
+  (`http://homeassistant.local:8085`) — both worked fine in a real browser
+  but the app's own first-run reachability check still failed with "couldn't
+  reach that address" for both. Root cause: Android blocks cleartext
+  (`http://`, non-TLS) network traffic app-wide by default starting API 28 —
+  this applies to the app's own `fetch()` calls, not just WebView page
+  navigation, and `AndroidManifest.xml` had no exception configured. Fixed
+  directly (small, precise, one attribute) rather than delegating: added
+  `android:usesCleartextTraffic="true"` to the `<application>` tag, with a
+  comment explaining why (the backend is plain HTTP by design — LAN-only,
+  user-entered address, no TLS available). First attempt at the edit broke
+  the manifest's XML (used `--` inside a comment body, invalid XML) —
+  caught immediately by the real `gradlew` build failing with a manifest
+  parse error; fixed and re-verified with a clean `BUILD SUCCESSFUL`. New
+  APK sent to the user for another retest.
 - **2026-08-29** — **Real-hardware testing (M5.2) found and fixed a genuine
   gap in the original plan**: the user installed the APK and hit an
   immediate crash — `Unexpected token '<', "<!doctype " is not valid JSON`.
