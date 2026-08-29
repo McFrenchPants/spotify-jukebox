@@ -5,7 +5,13 @@ export type ConnectionState = 'connecting' | 'open' | 'closed'
 type EventHandler = (data: unknown) => void
 
 /** Named SSE events the backend emits on /api/events (see events/bus.ts). */
-const NAMED_EVENTS = ['now-playing', 'queue-update', 'leaderboard-update', 'device-status'] as const
+const NAMED_EVENTS = [
+  'now-playing',
+  'queue-update',
+  'leaderboard-update',
+  'device-status',
+  'favorites-update',
+] as const
 
 /** How long the connection must be non-open before we surface the manual-refresh fallback. */
 const STALE_THRESHOLD_MS = 5000
