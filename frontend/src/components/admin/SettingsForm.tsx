@@ -185,7 +185,7 @@ export function SettingsForm({ token, onSaved }: SettingsFormProps) {
             step={1}
             value={Math.round(form.rateLimitWindowMs / MS_PER_MINUTE)}
             onChange={(e) => setForm({ ...form, rateLimitWindowMs: Number(e.target.value) * MS_PER_MINUTE })}
-            className="h-11 w-full accent-accent"
+            className="h-11 w-full accent-accent lg:max-w-sm"
           />
           <span className="w-16 shrink-0 text-right text-caption text-text-primary">
             {formatMinutes(Math.round(form.rateLimitWindowMs / MS_PER_MINUTE))}

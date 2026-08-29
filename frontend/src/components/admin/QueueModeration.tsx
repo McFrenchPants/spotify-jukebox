@@ -188,7 +188,7 @@ export function QueueModeration({ token }: QueueModerationProps) {
             value={blacklistValue}
             onChange={(e) => setBlacklistValue(e.target.value)}
             placeholder={blacklistType === 'artist' ? 'Artist name' : 'Spotify track id'}
-            className="glass-inset h-11 min-w-0 flex-1 rounded-md px-3 text-body text-text-primary outline-none focus-visible:border-accent"
+            className="glass-inset h-11 min-w-0 flex-1 rounded-md px-3 text-body text-text-primary outline-none focus-visible:border-accent lg:max-w-sm"
           />
         </div>
         <Button type="submit" variant="secondary" disabled={blacklistValue.trim() === '' || submittingBlacklist}>
