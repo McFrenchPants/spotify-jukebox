@@ -6,11 +6,14 @@ import { NAV_ITEMS } from './navItems'
  * by AppShell via its `bottomBar` prop so it stays mounted (and its active
  * state persists) across route changes within RootLayout's nested routes.
  * `/style-guide` is a separate top-level route and never renders this.
+ * Hidden `sm` and up (L1.2), where `SideNav` takes over — both stay mounted
+ * simultaneously so route-active state is consistent regardless of which is
+ * visually shown, and CSS breakpoints (not JS) decide which one renders.
  */
 export function BottomNav() {
   return (
     <nav
-      className="glass-chrome fixed inset-x-0 bottom-0 z-20 border-x-0 border-b-0"
+      className="glass-chrome fixed inset-x-0 bottom-0 z-20 border-x-0 border-b-0 sm:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
       aria-label="Primary"
     >

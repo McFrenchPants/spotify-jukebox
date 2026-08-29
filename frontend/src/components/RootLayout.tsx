@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { AppShell } from './AppShell'
 import { BottomNav } from './nav/BottomNav'
+import { SideNav } from './nav/SideNav'
 import { useEventStream, type EventStream } from '../hooks/useEventStream'
 
 /** Shared state/handlers threaded to every routed page via <Outlet context>. */
@@ -61,20 +62,23 @@ export function RootLayout() {
   }
 
   return (
-    <AppShell albumArtUrl={albumArt} bottomBar={<BottomNav />}>
-      <div className="flex flex-col gap-6 pt-2">
-        {showStaleBanner && (
-          <button
-            type="button"
-            onClick={handleManualRefresh}
-            className="self-center rounded-full border border-warning-muted bg-warning-muted px-3 py-1 text-caption text-warning transition-fast hover:opacity-90"
-          >
-            Live updates paused — tap to refresh
-          </button>
-        )}
+    <>
+      <SideNav />
+      <AppShell albumArtUrl={albumArt} bottomBar={<BottomNav />}>
+        <div className="flex flex-col gap-6 pt-2">
+          {showStaleBanner && (
+            <button
+              type="button"
+              onClick={handleManualRefresh}
+              className="self-center rounded-full border border-warning-muted bg-warning-muted px-3 py-1 text-caption text-warning transition-fast hover:opacity-90"
+            >
+              Live updates paused — tap to refresh
+            </button>
+          )}
 
-        <Outlet context={context} />
-      </div>
-    </AppShell>
+          <Outlet context={context} />
+        </div>
+      </AppShell>
+    </>
   )
 }
