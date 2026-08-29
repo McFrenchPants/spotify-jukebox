@@ -20,6 +20,8 @@ function fakeSession(sessionId: string): GuestSession {
     createdAt: new Date().toISOString(),
     lastRequestAt: new Date().toISOString(),
     totalRequests: 1,
+    nickname: null,
+    avatar: null,
   };
 }
 

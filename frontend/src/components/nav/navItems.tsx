@@ -46,9 +46,19 @@ function SettingsIcon({ className }: { className?: string }) {
   )
 }
 
+function MeIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M4.5 20a7.5 7.5 0 0 1 15 0" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Now Playing', icon: HomeIcon },
   { to: '/search', label: 'Find Music', icon: SearchIcon },
   { to: '/history', label: 'History', icon: HistoryIcon },
+  { to: '/me', label: 'Me', icon: MeIcon },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

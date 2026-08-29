@@ -16,6 +16,24 @@ db.pragma("journal_mode = WAL");
 db.pragma("foreign_keys = ON");
 
 /**
+ * Adds a column to an existing table if it isn't already present.
+ * SQLite has no `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, and re-running
+ * an ADD COLUMN for a column that already exists throws — so this checks
+ * `PRAGMA table_info(<table>)` first to keep migrations idempotent across
+ * repeated boots against a pre-existing database file.
+ */
+function addColumnIfMissing(table: string, column: string, columnDef: string): void {
+  const existingColumns = db
+    .prepare<[], { name: string }>(`PRAGMA table_info(${table})`)
+    .all()
+    .map((col) => col.name);
+
+  if (!existingColumns.includes(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${columnDef}`);
+  }
+}
+
+/**
  * Creates all tables required by the app if they don't already exist.
  * Safe to call on every boot (idempotent).
  */
@@ -70,10 +88,30 @@ export function runMigrations(): void {
       added_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
     );
 
+    CREATE TABLE IF NOT EXISTS favorites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      guest_session_id TEXT NOT NULL,
+      spotify_track_id TEXT NOT NULL,
+      track_name TEXT NOT NULL,
+      artist_name TEXT NOT NULL,
+      album_art_url TEXT,
+      duration_ms INTEGER NOT NULL,
+      favorited_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      UNIQUE(guest_session_id, spotify_track_id)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);
     CREATE INDEX IF NOT EXISTS idx_play_history_guest_session_id ON play_history(guest_session_id);
     CREATE INDEX IF NOT EXISTS idx_queue_entries_spotify_track_id ON queue_entries(spotify_track_id);
+    CREATE INDEX IF NOT EXISTS idx_favorites_guest_session_id ON favorites(guest_session_id);
+    CREATE INDEX IF NOT EXISTS idx_favorites_spotify_track_id ON favorites(spotify_track_id);
   `);
+
+  // guest_sessions already exists in production databases predating F0.1, so
+  // the CREATE TABLE IF NOT EXISTS above won't retroactively add these
+  // columns to an existing file — they're added idempotently here instead.
+  addColumnIfMissing("guest_sessions", "nickname", "nickname TEXT");
+  addColumnIfMissing("guest_sessions", "avatar", "avatar TEXT");
 }
 
 /**

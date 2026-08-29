@@ -4,6 +4,8 @@ import { Skeleton } from '../ui/Skeleton'
 import { ApiError, getRecentlyPlayed, type RecentlyPlayedEntry } from '../../lib/api'
 import { formatRelativeTime } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
+import { FavoriteButton } from '../favorites/FavoriteButton'
+import { useFavoritesStatus, type FavoriteStatusEntry } from '../../hooks/useFavoritesStatus'
 
 const SKELETON_ROWS = 3
 
@@ -25,8 +27,16 @@ function RecentlyPlayedSkeletonRow() {
   )
 }
 
-/** Read-only row: art, name/artist, relative "played X ago" timestamp. */
-function RecentlyPlayedRow({ entry }: { entry: RecentlyPlayedEntry }) {
+/** Row: art, name/artist, relative "played X ago" timestamp, favorite toggle. */
+function RecentlyPlayedRow({
+  entry,
+  favoriteStatus,
+  onToggleFavorite,
+}: {
+  entry: RecentlyPlayedEntry
+  favoriteStatus: FavoriteStatusEntry
+  onToggleFavorite: () => void
+}) {
   return (
     <Card noPadding className="flex items-center gap-3 p-3">
       {entry.albumArtUrl ? (
@@ -53,9 +63,15 @@ function RecentlyPlayedRow({ entry }: { entry: RecentlyPlayedEntry }) {
         <p className="truncate text-caption text-text-secondary">{entry.artistName}</p>
       </div>
 
-      <span className="shrink-0 text-caption text-text-muted">
-        {formatRelativeTime(entry.playedAt)}
-      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="text-caption text-text-muted">{formatRelativeTime(entry.playedAt)}</span>
+        <FavoriteButton
+          size="sm"
+          favoritedByMe={favoriteStatus.favoritedByMe}
+          favoritedByAnyone={favoriteStatus.favoritedByAnyone}
+          onToggle={onToggleFavorite}
+        />
+      </div>
     </Card>
   )
 }
@@ -89,6 +105,11 @@ export function RecentlyPlayed({ subscribe, refreshKey }: RecentlyPlayedProps) {
 
   useEffect(() => subscribe('leaderboard-update', () => load()), [subscribe, load])
 
+  const { status: favoritesStatus, toggle: toggleFavorite } = useFavoritesStatus(
+    entries?.map((e) => e.spotifyTrackId) ?? [],
+    subscribe
+  )
+
   return (
     <div className="flex flex-col gap-2">
       <p className="text-caption font-semibold uppercase tracking-wide text-text-muted">
@@ -118,7 +139,23 @@ export function RecentlyPlayed({ subscribe, refreshKey }: RecentlyPlayedProps) {
       {entries !== null && entries.length > 0 && (
         <div className="flex flex-col gap-2">
           {entries.map((entry, i) => (
-            <RecentlyPlayedRow key={`${entry.spotifyTrackId}-${entry.playedAt}-${i}`} entry={entry} />
+            <RecentlyPlayedRow
+              key={`${entry.spotifyTrackId}-${entry.playedAt}-${i}`}
+              entry={entry}
+              favoriteStatus={
+                favoritesStatus[entry.spotifyTrackId] ?? { favoritedByMe: false, favoritedByAnyone: false }
+              }
+              onToggleFavorite={() =>
+                toggleFavorite({
+                  id: entry.spotifyTrackId,
+                  name: entry.trackName,
+                  artist: entry.artistName,
+                  albumArt: entry.albumArtUrl,
+                  durationMs: entry.durationMs,
+                  explicit: false,
+                })
+              }
+            />
           ))}
         </div>
       )}

@@ -2,6 +2,12 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.12
+
+- Added Favorites: guests can now tap a heart on any song — while it's playing, queued, or in the play history — to save it. The heart shows gray when nobody's favorited a song, amber when someone else has, and red when you have.
+- Added a new "Me" tab where guests can optionally set a nickname and pick an avatar. Once set, songs you add to the queue show your nickname and avatar next to them so others can see who queued what.
+- The Find Music page now has a Favorites tab alongside search, listing everything you've favorited with sorting (by name, artist, or most recently favorited), a filter box, and one-tap re-queueing.
+
 ## 1.0.11
 
 - Fixed the play count on the expanded Now Playing card being wrong (or stuck at a low number) for any track outside the current top-10 most-played list — it previously looked the track up in that top-10 list and silently fell back to a low/zero count if it wasn't there. It now reads that track's real all-time play count directly instead.

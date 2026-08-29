@@ -329,4 +329,39 @@ describe("GET /api/queue", () => {
       artistName: TRACK_1.artist,
     });
   });
+
+  it("includes the adder's nickname/avatar when set, and null when never set", async () => {
+    vi.mocked(getTrack).mockResolvedValueOnce(TRACK_1);
+    const withProfile = await createGuestToken();
+    await fetch(`${baseUrl}/api/session/me`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", "x-guest-token": withProfile.token },
+      body: JSON.stringify({ nickname: "DJ Test", avatar: "avatar-3" }),
+    });
+    const res1 = await fetch(`${baseUrl}/api/queue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-guest-token": withProfile.token },
+      body: JSON.stringify({ trackId: "track-1" }),
+    });
+    expect(res1.status).toBe(201);
+
+    vi.mocked(getTrack).mockResolvedValueOnce(TRACK_2);
+    const withoutProfile = await createGuestToken();
+    const res2 = await fetch(`${baseUrl}/api/queue`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-guest-token": withoutProfile.token },
+      body: JSON.stringify({ trackId: "track-2" }),
+    });
+    expect(res2.status).toBe(201);
+
+    const queueRes = await fetch(`${baseUrl}/api/queue`);
+    const queueBody = (await queueRes.json()) as any[];
+    expect(queueBody).toHaveLength(2);
+
+    const entry1 = queueBody.find((e) => e.spotifyTrackId === "track-1");
+    expect(entry1).toMatchObject({ adderNickname: "DJ Test", adderAvatar: "avatar-3" });
+
+    const entry2 = queueBody.find((e) => e.spotifyTrackId === "track-2");
+    expect(entry2).toMatchObject({ adderNickname: null, adderAvatar: null });
+  });
 });

@@ -32,12 +32,17 @@ implementing session's environment); a final pass on the actual bridge
 Pixel 7 Pro hardware is still worth doing but isn't blocking.
 
 ## 3. Favorites / like a song
-**Status:** idea
+**Status:** done
 
-Let a guest heart/like a song to add it to a favorites list, and let them
-review favorites quickly to re-add them to the queue. Needs a data model
-(likely session- or device-scoped, not Spotify-account-scoped, since guests
-don't log in) and UI for both liking and browsing favorites.
+Design spec: [docs/proposals/favorites/DESIGN_SPEC.md](docs/proposals/favorites/DESIGN_SPEC.md).
+Guests can heart any track (Now Playing, Queue, History, search results) —
+gray/amber/red depending on whether nobody, someone else, or the viewing
+guest favorited it — backed by the existing per-browser guest-session
+identity (`guest_sessions` + `x-guest-token`), extended with an optional
+nickname/avatar settable on a new "Me" tab. Queued tracks show the adder's
+nickname/avatar when set. A dedicated Favorites tab on Find Music lists,
+sorts, filters, unfavorites, and re-queues. Implemented on
+`feature/favorites`; pushed for PR review, not yet merged to `master`.
 
 ## 4. On-demand QR code on the Now Playing screen
 **Status:** idea

@@ -8,6 +8,8 @@ interface GuestSessionRow {
   created_at: string;
   last_request_at: string;
   total_requests: number;
+  nickname: string | null;
+  avatar: string | null;
 }
 
 export interface GuestSession {
@@ -17,6 +19,8 @@ export interface GuestSession {
   createdAt: string;
   lastRequestAt: string;
   totalRequests: number;
+  nickname: string | null;
+  avatar: string | null;
 }
 
 function mapRow(row: GuestSessionRow): GuestSession {
@@ -27,6 +31,8 @@ function mapRow(row: GuestSessionRow): GuestSession {
     createdAt: row.created_at,
     lastRequestAt: row.last_request_at,
     totalRequests: row.total_requests,
+    nickname: row.nickname,
+    avatar: row.avatar,
   };
 }
 
@@ -73,4 +79,38 @@ export function createGuestSession(clientIp: string, userAgent: string | undefin
   ).run(sessionId, clientIp, userAgent ?? null);
 
   return findGuestSession(sessionId)!;
+}
+
+/**
+ * Partially updates a guest session's profile fields (nickname/avatar).
+ * Only the keys actually present in `updates` are SET, so passing just
+ * `{ nickname }` leaves `avatar` untouched and vice versa. If `updates` is
+ * empty, this is a no-op read (no UPDATE is issued) that just returns the
+ * current session. Returns undefined if no session matches the given id.
+ */
+export function updateGuestProfile(
+  sessionId: string,
+  updates: { nickname?: string; avatar?: string }
+): GuestSession | undefined {
+  const setClauses: string[] = [];
+  const values: string[] = [];
+
+  if (updates.nickname !== undefined) {
+    setClauses.push("nickname = ?");
+    values.push(updates.nickname);
+  }
+  if (updates.avatar !== undefined) {
+    setClauses.push("avatar = ?");
+    values.push(updates.avatar);
+  }
+
+  if (setClauses.length === 0) {
+    return findGuestSession(sessionId);
+  }
+
+  db.prepare(
+    `UPDATE guest_sessions SET ${setClauses.join(", ")} WHERE session_id = ?`
+  ).run(...values, sessionId);
+
+  return findGuestSession(sessionId);
 }
