@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved).
 All work happens on `feature/favorites` — confirm you're on that branch
 before making any changes.
 
-## Status: Phase F0-F4 done (all implementation complete); F5 (verification/close-out) next
+## Status: F5.2 done (found + fixed a real bug); closing out
 
 ## Task Table
 
@@ -29,8 +29,8 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | F3.4 | History (Leaderboard + Recently Played) integration | done | Heart added to both `LeaderboardRow` and `RecentlyPlayedRow`, each with its own independent `useFavoritesStatus` instance (both sync via the shared SSE event) |
 | F4.1 | Favorites list on Find Music | done | `SearchAndQueue.tsx` gained a Search/Favorites tab toggle; Favorites tab has sort (recent/name/artist), substring filter, two distinct empty states, optimistic unfavorite-removal, and reuses the existing add-to-queue toast flow via a new `FavoriteRow.tsx` (sibling to `TrackRow`, not a rework) |
 | F5.1 | Backend test sweep | done | `npm test` in `backend/`: 35 files, 292 tests, all green; `tsc --noEmit` clean. No backend changes since F1, so this just reconfirms nothing regressed |
-| F5.2 | Manual verification pass | todo | Unblocked — Spotify credentials fixed (root cause: stored refresh token belonged to a different/rotated Spotify app than `.env`'s current client_id, producing `invalid_client`; fixed by redoing the one-time OAuth consent flow at `/api/auth/login`). Confirmed live: search, `/api/now-playing`, `/api/device` (including the real Pixel 7 Pro bridge device) all working, no more refresh errors |
-| F5.3 | Close out (backlog, PROGRESS.md, merge) | todo | Depends on F5.2; requires explicit user go-ahead to merge regardless |
+| F5.2 | Manual verification pass | done | All 7 acceptance checks passed with real Spotify playback. **Found and fixed a real bug** (not just a verification gap): `getFavoritesStatus()` never sent `x-guest-token`, so `favoritedByMe` could never resolve `true` for the viewing guest — every heart in the app was stuck at gray/amber. Fixed in `frontend/src/lib/api.ts` + `useFavoritesStatus.ts` (`caf3d7a`), re-verified live after the fix |
+| F5.3 | Close out (backlog, PROGRESS.md, merge) | in-progress | User wants a pushed branch + PR for their own review/merge, not an automatic merge — see session log |
 
 ## Open Questions / Blockers
 
@@ -54,6 +54,24 @@ device) all responding correctly with no new refresh errors.
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — Spotify credentials fixed (root cause: stored refresh
+  token belonged to a different/rotated Spotify app than `.env`'s current
+  client_id, producing `invalid_client` on every token refresh; fixed by
+  the user redoing the one-time OAuth consent flow at `/api/auth/login`).
+  F5.2 (manual verification pass) then run via a subagent against the now-
+  working backend with real playback — all 7 acceptance checks passed,
+  and it found a genuine bug in the process: `getFavoritesStatus()` never
+  sent the guest token, so `favoritedByMe` could never come back `true` for
+  the viewing guest no matter what was actually favorited — every heart in
+  the app was structurally stuck at gray/amber. Fixed and re-verified live
+  (`caf3d7a`). **All implementation and verification work is now done.**
+  Per the user's explicit instruction, F5.3 will push `feature/favorites`
+  to `origin` and leave a PR-creation link for the user to review/merge
+  themselves — NOT an automatic merge to `master`, overriding this
+  project's own `docs/proposals/README.md` step 6 default (merge directly)
+  since an explicit user instruction takes precedence. `gh` CLI isn't
+  available in this environment, so the PR itself can't be created via API
+  — a direct GitHub compare-URL link is the substitute.
 - **2026-08-29** — F4.1 complete via a subagent (Favorites tab on Find
   Music: sort/filter/empty-states/optimistic-unfavorite/add-to-queue, plus
   the new `FavoriteRow.tsx` component and `SearchPage.tsx`/`SearchAndQueue.tsx`
