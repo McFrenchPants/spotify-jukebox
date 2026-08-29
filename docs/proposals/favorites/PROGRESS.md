@@ -29,24 +29,26 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | F3.4 | History (Leaderboard + Recently Played) integration | done | Heart added to both `LeaderboardRow` and `RecentlyPlayedRow`, each with its own independent `useFavoritesStatus` instance (both sync via the shared SSE event) |
 | F4.1 | Favorites list on Find Music | done | `SearchAndQueue.tsx` gained a Search/Favorites tab toggle; Favorites tab has sort (recent/name/artist), substring filter, two distinct empty states, optimistic unfavorite-removal, and reuses the existing add-to-queue toast flow via a new `FavoriteRow.tsx` (sibling to `TrackRow`, not a rework) |
 | F5.1 | Backend test sweep | done | `npm test` in `backend/`: 35 files, 292 tests, all green; `tsc --noEmit` clean. No backend changes since F1, so this just reconfirms nothing regressed |
-| F5.2 | Manual verification pass | blocked | **Blocked on this dev environment's broken Spotify credentials** (`GET /api/search` → 502 `invalid_client`) — blocks real search/queue/play, which most of the guest flow (queueing, Now Playing, play history) depends on. User is checking on this separately. Favoriting/listing/sorting/filtering/unfavoriting/attribution-display don't themselves need Spotify and have already been spot-verified per-task; what's missing is one continuous real end-to-end walkthrough |
+| F5.2 | Manual verification pass | todo | Unblocked — Spotify credentials fixed (root cause: stored refresh token belonged to a different/rotated Spotify app than `.env`'s current client_id, producing `invalid_client`; fixed by redoing the one-time OAuth consent flow at `/api/auth/login`). Confirmed live: search, `/api/now-playing`, `/api/device` (including the real Pixel 7 Pro bridge device) all working, no more refresh errors |
 | F5.3 | Close out (backlog, PROGRESS.md, merge) | todo | Depends on F5.2; requires explicit user go-ahead to merge regardless |
 
 ## Open Questions / Blockers
 
-- **Dev environment's Spotify credentials appear broken** — `GET /api/search`
-  returns 502 (`Spotify token refresh failed: invalid_client`) in this
-  session's shared dev backend, discovered during F3.3's live verification
-  attempt. This blocks queueing anything for real, which in turn blocked a
-  full live end-to-end check of F3.3 (queue row heart + attribution) and
-  will likely also block F5.2's planned manual verification pass. Not
-  something this proposal can fix (it's a credentials/environment issue,
-  not a code issue) — worth checking whether this is a known/expected state
-  of this dev environment, or an actual regression worth a separate fix.
-  F3.3's code is still believed correct (typecheck clean, backend contract
-  double-checked by reading the F1.2 source directly, matches every other
-  integration's pattern) — just not confirmed by an actual browser
-  click-through with a real queued track.
+*(none currently — the dev-environment Spotify credentials issue below was
+resolved and no longer blocks anything)*
+
+**Resolved:** dev environment's Spotify credentials were broken
+(`invalid_client` on token refresh) from F3.3 through the start of this
+session. Root cause: the stored `spotify_refresh_token` had been issued
+under a different (or since-rotated) Spotify Developer app than the
+`client_id`/`client_secret` currently in `.env` — Spotify rejects a
+refresh-token exchange with `invalid_client` when the token doesn't belong
+to the presenting client, confirmed by testing the exact stored refresh
+token directly against Spotify's token endpoint. Fixed by the user redoing
+the one-time admin OAuth consent flow at `/api/auth/login`, which mints a
+fresh refresh token tied to the current app. Confirmed working: search,
+`/api/now-playing`, `/api/device` (including the real Pixel 7 Pro bridge
+device) all responding correctly with no new refresh errors.
 
 ## Session Log
 
