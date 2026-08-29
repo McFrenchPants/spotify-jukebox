@@ -12,7 +12,7 @@ branch before making any changes. The branch was fast-forwarded to current
 `master` (`b49e7e3`) on 2026-08-29 before implementation started, since it
 had sat untouched (0 unique commits) since being cut.
 
-## Status: Phases M0, M1, M3 done; JDK 21 installed and a real Android build verified. M2 (native plugin) next.
+## Status: Phases M0-M4 done. Only M5.2 (real-hardware verification, needs the user) and M5.3 (close-out/merge) remain.
 
 ## Task Table
 
@@ -33,7 +33,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | M3.3 | Route PlaybackControls volume UI through new state | done | `TrustModeState.jukeboxDevice{registered,online}` added; `volumeAllowed` also true when Jukebox device registered+online (independent of Spotify `supports_volume`); Jukebox-device-offline forces ALL controls disabled with a new distinct caption, takes priority over the existing restricted/unsupported captions. All 3 states actually rendered live (2 via a temporary hardcoded `getTrustMode()` response, reverted) — none code-review-only. Build/lint clean, same baseline. |
 | M4.1 | One-command Android build script | done | `npm run build:android` (`frontend/scripts/build-android.js`) chains web build → `cap sync android` → Gradle `assembleDebug`, cross-platform gradlew selection, and auto-locates/injects a JDK 21 for just the Gradle step if the shell's default `java`/`JAVA_HOME` is older (exactly the wrinkle this environment hit). Re-verified independently — real `BUILD SUCCEEDED`, APK produced. |
 | M4.2 | Self-hoster documentation | done | [docs/MASTER_DEVICE_MODE.md](../MASTER_DEVICE_MODE.md): what/why, `npm run build:android`, sideload/install-unknown-sources caveat, registering via Settings, verifying it worked. `README.md` gained exactly one added link sentence, nothing else touched. **Phase M4 done.** |
-| M5.1 | Cross-scenario regression pass | todo | Depends on all above |
+| M5.1 | Cross-scenario regression pass | done | Full backend suite: 38 files / 323 tests passing, `tsc --noEmit` clean. Frontend: `npm run build`/`npm run lint` clean (same pre-existing warning baseline throughout this whole proposal, zero new). Docker smoke test **not run** — Docker Desktop isn't running in this environment. Risk assessed as low: nothing in this proposal touched `Dockerfile`/`docker-compose.yml`/`config.yaml`/any deployment file, and every change was additive (new endpoints/fields, `Capacitor.isNativePlatform()`-gated code paths) rather than a modification to an existing code path's default behavior. Worth a real Docker re-run before merge if the user wants extra confidence, but not treated as a hard blocker given the above. |
 | M5.2 | Real-hardware verification (needs the user) | todo | Needs actual bridge Pixel 7 Pro — stopping point for user |
 | M5.3 | Close out (backlog, PROGRESS.md, merge) | todo | Needs explicit user go-ahead to merge |
 
@@ -52,6 +52,20 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — Phases M0-M4 all completed this session, each task via a
+  narrowly-scoped subagent, independently verified (diff review, real test
+  suites, and — for the Android side — a real `gradlew assembleDebug`/
+  `npm run build:android` run, not just code review) and committed
+  separately. User installed JDK 21 (Eclipse Temurin) mid-session after the
+  M0.2 doc surfaced that gap, unblocking a real Android build for the rest
+  of the proposal. M5.1 (regression pass) done: full backend suite (323
+  tests) and frontend build/lint clean; a real Docker smoke test was **not**
+  run (Docker Desktop not running in this environment) but risk assessed as
+  low since nothing in this proposal touched deployment files and all
+  changes are additive/feature-gated. **Remaining: M5.2 (real bridge Pixel
+  7 Pro verification — needs the user directly, cannot be done
+  autonomously) and M5.3 (close-out: backlog, root PROGRESS.md, merge —
+  needs explicit user go-ahead for the merge step).**
 - **2026-08-29** — Picked up via `/continue-development`. `BACKLOG.md` item 8
   listed this as "in progress — design spec in review," but
   `DESIGN_SPEC.md`'s own header already said "Reviewed — ready for
