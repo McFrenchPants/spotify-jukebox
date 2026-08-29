@@ -54,20 +54,29 @@ function BackendSetupScreen({ onSaved }: { onSaved: () => void }) {
 
     setSubmitting(true)
     setError(null)
+    const base = trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed
     try {
-      const base = trimmed.endsWith('/') ? trimmed.slice(0, -1) : trimmed
       const res = await fetch(`${base}/api/health`)
       if (!res.ok) {
-        throw new Error(`Server responded with ${res.status}`)
+        throw new Error(`Server responded with HTTP ${res.status}`)
       }
       const body = (await res.json()) as { status?: string }
       if (body.status !== 'ok') {
-        throw new Error('Unexpected response from server')
+        throw new Error(`Unexpected response body: ${JSON.stringify(body)}`)
       }
       setBackendUrl(trimmed)
       onSaved()
-    } catch {
-      setError("Couldn't reach that address. Check the URL and that both devices are on the same network.")
+    } catch (err) {
+      // Surface the real error instead of a canned message — a bare
+      // "TypeError: Failed to fetch" still narrows things down a lot
+      // (network-level failure vs. a real HTTP/JSON response), and this
+      // avoids blind guess-and-retype cycles when it doesn't. Also logged to
+      // console so it's visible via `adb logcat` (Capacitor forwards WebView
+      // console output there under the "Capacitor/Console" tag) even if the
+      // on-screen text alone isn't enough to diagnose.
+      const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
+      console.error(`[NativeBackendGate] health check failed for ${base}/api/health —`, err)
+      setError(`Couldn't reach ${base}/api/health — ${detail}`)
     } finally {
       setSubmitting(false)
     }
