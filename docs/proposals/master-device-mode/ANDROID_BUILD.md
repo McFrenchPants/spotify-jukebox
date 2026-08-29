@@ -1,15 +1,17 @@
 # Android Build Prerequisites (Master Device Mode)
 
-Status: **partially verified**. This doc was written after actually attempting a
-debug build in a real dev environment (Windows 11, this repo, branch
-`feature/master-device-mode`). Sections marked "Verified" below were
-confirmed by running the commands. Sections marked "Per Capacitor/AGP
-convention" are documented from the generated Gradle config's own stated
-requirements and standard Capacitor/Android Gradle Plugin (AGP) behavior,
-but were **not** exercised end-to-end here because the local Android SDK
-platform used for the successful parts of this attempt was not fully set up
-for the final assemble step — see "What was actually tried" for the exact
-point where it stopped working, and why.
+Status: **fully verified end-to-end**. A debug build was successfully
+produced in this project's real dev environment (Windows 11, this repo,
+branch `feature/master-device-mode`) after installing a JDK 21 distribution
+(Eclipse Temurin 21) alongside the JDK 17 already present. `gradlew.bat
+assembleDebug` completed with `BUILD SUCCESSFUL`, producing
+`frontend/android/app/build/outputs/apk/debug/app-debug.apk` — confirming
+both the command sequence in §3 and the output path in §4 below, which were
+previously only inferred/documented-not-verified.
+
+The JDK-17 failure mode described below (§1) is kept as-written since it's
+still useful context for anyone who hits it fresh — just know the fix (JDK
+21) is now confirmed, not merely inferred.
 
 ## 1. What must be installed locally
 
@@ -175,13 +177,15 @@ distribution download, SDK license acceptance, SDK Platform 36
 auto-install, and 39 actionable Gradle tasks (manifest merging, resource
 processing, R-file generation, etc.) before failing at
 `:capacitor-android:compileDebugJavaWithJavac` for the JDK 21 reason
-documented in section 1. **No APK was produced in this environment** —
-the command sequence above is accurate as far as it went, but has not
-been confirmed to succeed to completion here. The next attempt should
-install JDK 21, set `JAVA_HOME` to it, and re-run
-`gradlew.bat assembleDebug` from this same checkout (the SDK and
-`local.properties`/`ANDROID_HOME` setup already in place should not need
-to change).
+documented in section 1. **No APK was produced in this pass.**
+
+**Update — confirmed fixed.** After installing Eclipse Temurin JDK 21 and
+pointing `JAVA_HOME` at it, `gradlew.bat assembleDebug` was re-run from this
+same checkout (SDK/`local.properties`/`ANDROID_HOME` setup unchanged) and
+completed with `BUILD SUCCESSFUL in 1m 21s` (93 actionable tasks, 66
+executed / 27 up-to-date). The JDK-17 failure above is exactly what a fresh
+environment will hit until JDK 21 is installed — the fix is now verified,
+not just inferred.
 
 ## 4. Where the APK lands
 
@@ -196,21 +200,20 @@ directory or APK filename override (only the standard `debug`/`release`
 frontend/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-This path was **not** confirmed by an actual successful build in this
-pass (the build failed before reaching the `:app:assembleDebug`/packaging
-task), so treat it as the expected default rather than a verified fact
-until someone runs this to completion with a JDK 21 toolchain.
+This path is now **confirmed** — after the JDK 21 install, `assembleDebug`
+completed and produced exactly `app-debug.apk` at this path.
 
 ## Summary of what's confirmed vs. not
 
 | Item | Status |
 |---|---|
 | JDK 17 alone is insufficient (`capacitor-android` requires source/target 21) | Verified by actual build failure |
+| Installing JDK 21 (Eclipse Temurin) resolves the compile failure | **Verified** — `BUILD SUCCESSFUL` after install |
 | Gradle 8.14.3 / AGP 8.13.0 accept JDK 17 for Gradle itself (project configures, fails later at Java compile) | Verified |
 | `npm run build` works from a clean-ish checkout | Verified |
 | `npx cap sync android` works | Verified |
 | Android SDK routes (Android Studio vs. `sdkmanager` command-line tools) | Documented from Capacitor/Android convention, not both tried here (only the pre-existing SDK-on-disk route was used) |
 | `compileSdk`/`targetSdk` 36, `minSdk` 24 requiring `platforms;android-36` | Verified indirectly — Gradle auto-installed it when missing |
 | `ANDROID_HOME` / `local.properties` mechanism | Verified working (build progressed past SDK resolution) |
-| Final APK output path | Not verified — inferred from default AGP convention and absence of custom output overrides in `app/build.gradle` |
-| A full, successful `assembleDebug` producing an installable APK | **Not achieved in this environment** — blocked on missing JDK 21 |
+| Final APK output path (`app/build/outputs/apk/debug/app-debug.apk`) | **Verified** — confirmed present after a successful build |
+| A full, successful `assembleDebug` producing an installable APK | **Achieved** — `BUILD SUCCESSFUL in 1m 21s`, 93 tasks (66 executed / 27 up-to-date), with JDK 21 installed |

@@ -12,7 +12,7 @@ branch before making any changes. The branch was fast-forwarded to current
 `master` (`b49e7e3`) on 2026-08-29 before implementation started, since it
 had sat untouched (0 unique commits) since being cut.
 
-## Status: Implementation started — Phase M0 in progress
+## Status: Phases M0, M1, M3 done; JDK 21 installed and a real Android build verified. M2 (native plugin) next.
 
 ## Task Table
 
@@ -39,18 +39,12 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 ## Open Questions / Blockers
 
-- **JDK 21 required, not installed.** This environment has JDK 17 and an
-  Android SDK already at `C:\Dev Android SDK` (platforms 34/35, Gradle
-  auto-installed 36 on demand) — but `@capacitor/android`'s Gradle module
-  pins `sourceCompatibility`/`targetCompatibility` to Java 21, so
-  `gradlew assembleDebug` fails at the Java compile step regardless of SDK
-  platform availability. No APK has been produced yet. M2.1 (native plugin)
-  and M4.1 (build script) will need a real JDK 21 install to actually run a
-  build and verify anything beyond code review — flag this explicitly each
-  time rather than assuming a build succeeds. Installing a JDK is a small,
-  reversible, one-time environment setup step (not a project/user decision)
-  — worth just doing before M2.1/M4.1 rather than treating as a blocker
-  needing the user.
+- **Resolved 2026-08-29 — JDK 21 installed.** User installed Eclipse
+  Temurin JDK 21 and confirmed a real `gradlew.bat assembleDebug` now
+  succeeds end-to-end (`BUILD SUCCESSFUL in 1m 21s`), producing
+  `frontend/android/app/build/outputs/apk/debug/app-debug.apk`. M2.1/M4.1
+  can now be verified by actually running a build, not just code review.
+  See [ANDROID_BUILD.md](ANDROID_BUILD.md), updated to reflect this.
 - M5.2 explicitly requires the user's real bridge hardware and cannot be
   done autonomously.
 
