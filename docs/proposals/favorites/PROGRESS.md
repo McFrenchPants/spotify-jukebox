@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved).
 All work happens on `feature/favorites` — confirm you're on that branch
 before making any changes.
 
-## Status: Phase F0+F1 (backend) done, starting F2 (frontend)
+## Status: Phase F0+F1+F2 done, starting F3 (heart control + integration)
 
 ## Task Table
 
@@ -21,9 +21,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | F0.2 | DB module (`favorites.ts` + `guestSessions.ts` updates) | done | `backend/src/db/favorites.ts` (add/remove/list/batch-status) + `updateGuestProfile()` in `guestSessions.ts`; 16 new tests, all passing (272 total backend tests green) |
 | F1.1 | Favorites routes | done | `backend/src/routes/favorites.ts`: `GET/POST /api/favorites`, `DELETE /api/favorites/:trackId`, `GET /api/favorites/status` (never 400s even with no session — always safe for heart-coloring) |
 | F1.2 | Guest profile route + queue attribution join | done | `PATCH /api/session/me` (nickname/avatar); `POST /api/session` now returns them too; `listQueueEntries()` left-joins `guest_sessions`, adding `adderNickname`/`adderAvatar` (null when unset/unattributed) — **these are the exact field names F3.3 must consume** |
-| F2.1 | API client + avatar palette | todo | Depends on F1.1/F1.2 (done) — calls `GET/POST/DELETE /api/favorites`, `GET /api/favorites/status`, `PATCH /api/session/me` |
-| F2.2 | "Me" page + nav entry | todo | Depends on F2.1 |
-| F3.1 | `FavoriteButton` + `useFavoritesStatus` hook | todo | Depends on F2.1 |
+| F2.1 | API client + avatar palette | done | `getFavorites`/`addFavorite`/`removeFavorite`/`getFavoritesStatus`/`updateGuestProfile` added to `frontend/src/lib/api.ts`; `frontend/src/lib/avatars.ts` exports `AVATAR_PALETTE` (20 emoji) |
+| F2.2 | "Me" page + nav entry | done | `frontend/src/pages/MePage.tsx` + `/me` route; `NAV_ITEMS` gained a 5th "Me" entry; `SessionContext` now carries `nickname`/`avatar`/`setProfile()`. Verified live (nickname/avatar round-trip survives reload); screenshot compositing unavailable this session, verification was DOM/network-inspection based |
+| F3.1 | `FavoriteButton` + `useFavoritesStatus` hook | todo | Depends on F2.1 (done) |
 | F3.2 | Now Playing integration | todo | Depends on F3.1 |
 | F3.3 | Queue + attribution integration | todo | Depends on F3.1, F1.2 |
 | F3.4 | History (Leaderboard + Recently Played) integration | todo | Depends on F3.1 |
@@ -42,6 +42,24 @@ plan was written)*
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — F2.1+F2.2 complete via one subagent (small, tightly
+  sequential tasks — F2.2 depends directly on F2.1's API functions, so
+  handled together rather than as two round-trips), verified (diff read +
+  `tsc -b` clean + live browser check: nickname/avatar set via the "Me" page
+  round-trip through `PATCH /api/session/me` and survive a reload via
+  `POST /api/session`'s response; "Me" nav item confirmed present in both
+  `BottomNav` and `SideNav`) and committed (`75be324`). Screenshot
+  compositing was unavailable in the subagent's Browser pane session (a
+  recurring environment limitation also seen on the landscape-layout
+  proposal), so verification was DOM/network-inspection based, not visual —
+  flagged explicitly, not overstated. Two transient 502s appeared in console
+  logs during verification with no matching failed request in the network
+  log and didn't reproduce on reload; judged unrelated to the change
+  (likely a brief hiccup from the subagent's own accidental concurrent dev
+  server start), not a regression, but worth a second look if it recurs.
+  Avatar palette landed as 20 fixed emoji (🐱🐶🦊🐼🐸🐵🦁🐨🐯🐙🎸🎧🎹⚡🌟🍕🌵🚀🎲👑).
+  F3 (heart control + integration across Now Playing/Queue/History) is
+  next — F3.1 (the shared `FavoriteButton` + status hook) has no blockers.
 - **2026-08-29** — F1.1+F1.2 complete via two parallel subagents (independent
   files — favorites.ts/app.ts vs. session.ts/queueEntries.ts/queue.ts — no
   merge conflict), verified together (diff read + `tsc --noEmit` clean +
