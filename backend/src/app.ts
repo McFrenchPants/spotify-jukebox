@@ -21,6 +21,27 @@ export function createApp(): Express {
 
   app.use(express.json());
 
+  // CORS — permissive by design. The native Android app (Master Device Mode,
+  // Capacitor-wrapped) loads its bundled frontend from its own local WebView
+  // origin (e.g. capacitor://localhost) and calls this backend's LAN URL
+  // directly, which makes every request genuinely cross-origin. Every route
+  // in this app is either a public unauthenticated read, or protected by a
+  // bearer-style header token (x-admin-token / x-guest-token) — never
+  // cookies — so there is no CORS-credentials concern that would require
+  // echoing a specific origin: a wildcard is safe and simplest. Hand-rolled
+  // rather than pulling in the `cors` package, matching this project's
+  // existing preference for small hand-rolled auth over new dependencies.
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-admin-token, x-guest-token");
+    if (req.method === "OPTIONS") {
+      res.status(204).end();
+      return;
+    }
+    next();
+  });
+
   app.get("/api/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
   });
