@@ -141,3 +141,128 @@ additional build target from the same repo, not a replacement.
 Design spec: [docs/proposals/master-device-mode/DESIGN_SPEC.md](docs/proposals/master-device-mode/DESIGN_SPEC.md)
 (branch `feature/master-device-mode`). Implementation plan to follow after
 design review.
+
+## 9. Spotify 429 "Too Many Requests" — stale/stuck Now Playing after idle, device list fails in Settings
+**Status:** needs research
+
+Recurring issue (reported several times before, keeps coming back): after the
+bridge device/app has been idle a while, the app shows a track playing that
+isn't actually the current track, and when that (stale) track's timer runs
+out the UI just sits there acting like something is still playing — refresh
+doesn't fix it — even though the bridge device itself is actually still
+playing music correctly. Separately, the Settings page's playback-device
+picker shows "device list failed, too many requests." Suspect these are the
+same root cause: Spotify API rate limiting (HTTP 429).
+
+Starting points for the investigation:
+- Now Playing poller runs every 4s
+  ([nowPlaying.ts:14](backend/src/spotify/nowPlaying.ts:14),
+  [nowPlaying.ts:328-333](backend/src/spotify/nowPlaying.ts:328-333)); poll
+  logic at [nowPlaying.ts:209-318](backend/src/spotify/nowPlaying.ts:209-318).
+- Device list is fetched from two places:
+  [device.ts:38-87](backend/src/spotify/device.ts:38-87) `listDevices()`, via
+  a throttled fallback inside the poller
+  ([nowPlaying.ts:159-191](backend/src/spotify/nowPlaying.ts:159-191), gated
+  to once per 5 minutes), and on-demand from `resolveDevice()`
+  ([device.ts:108](backend/src/spotify/device.ts:108)) — the latter is what
+  Settings' device picker calls directly, which is the likely source of the
+  "too many requests" message.
+- A shared 429 backoff already exists
+  ([rateLimitBackoff.ts](backend/src/spotify/rateLimitBackoff.ts)): any 429
+  arms a 30s (or `Retry-After`-driven) cooldown that background pollers
+  check and skip. A code comment there
+  ([rateLimitBackoff.ts:13-18](backend/src/spotify/rateLimitBackoff.ts:13-18))
+  documents a past real incident: two backend instances (local dev + Home
+  Assistant add-on) polling the same Spotify account simultaneously doubled
+  request volume and triggered 429s. The backoff is shared within one
+  process but **not** across separate deployments/instances — if the user is
+  running more than one backend against the same Spotify account (e.g. a dev
+  instance left running alongside the HA add-on), that would reproduce this.
+- On-demand calls — search, a manual "retry" in Settings, adding to the
+  queue — are explicitly **not** gated by the backoff
+  ([rateLimitBackoff.ts:7-11](backend/src/spotify/rateLimitBackoff.ts:7-11)),
+  so a user clicking around in Settings while the account is already
+  rate-limited can trigger a raw, unhandled 429 (hence the error message
+  surfacing directly instead of retrying/backing off gracefully).
+- Also worth checking: what the frontend does when a poll fails/returns
+  stale data — the "stuck on a track that already ended" symptom suggests
+  the UI isn't distinguishing "poll failed, keep last known state
+  indefinitely" from "poll succeeded, nothing changed," and there's no
+  visible reconnect/error state or automatic recovery once rate limiting
+  clears.
+- Next steps: confirm whether multiple backend instances are actually
+  running against production; add a visible "connection lost / stale data"
+  UI state instead of silently freezing; consider gating on-demand device
+  calls behind the same backoff (with a clear "try again in Ns" message
+  instead of a raw error); consider whether the 4s poll interval is more
+  aggressive than needed.
+
+## 10. Desktop: playback controls/volume slider centered but labels aren't
+**Status:** ready
+
+In [PlaybackControls.tsx](frontend/src/components/playback/PlaybackControls.tsx),
+on wide screens the volume slider is centered (`lg:mx-auto lg:max-w-sm` on
+the slider input, [PlaybackControls.tsx:263](frontend/src/components/playback/PlaybackControls.tsx:263))
+but the "Volume" label above it ([PlaybackControls.tsx:254](frontend/src/components/playback/PlaybackControls.tsx:254))
+and the "volume can't be controlled remotely" message (always shown,
+[PlaybackControls.tsx:66-67](frontend/src/components/playback/PlaybackControls.tsx:66-67)/[279-280](frontend/src/components/playback/PlaybackControls.tsx:279-280))
+stay left-aligned, so on desktop the text visibly sits to the left of the
+centered slider/controls instead of lining up with them.
+
+## 11. Find Music page: Favorites should sit alongside search, not in a separate tab, on wide screens
+**Status:** idea
+
+On tablet/desktop widths, Favorites shouldn't be a separate tab a guest has
+to switch to — it should display side-by-side with search in a two-column
+layout (search/queue on one side, favorites on the other). Currently both
+live in one component with tab switching, no wide-screen split:
+[SearchAndQueue.tsx](frontend/src/components/search/SearchAndQueue.tsx) —
+tab state at [SearchAndQueue.tsx:26](frontend/src/components/search/SearchAndQueue.tsx:26),
+tab buttons at [SearchAndQueue.tsx:184-197](frontend/src/components/search/SearchAndQueue.tsx:184-197),
+Favorites section at [SearchAndQueue.tsx:274-431](frontend/src/components/search/SearchAndQueue.tsx:274-431)
+(rendered conditionally, not laid out side-by-side). Should follow the same
+`lg` (1024px) breakpoint convention used elsewhere for reflowing to
+side-by-side layouts (see item 2).
+
+## 12. Favorites list: rename "Add" button to "Add to Queue"
+**Status:** ready
+
+The button that queues a favorited track currently just says "Add":
+[FavoriteRow.tsx:75](frontend/src/components/favorites/FavoriteRow.tsx:75)
+(`status === 'adding' ? 'Adding…' : status === 'added' ? 'Added' : 'Add'`).
+Change the default label to "Add to Queue" (and consider whether "Adding…"
+should become "Adding to Queue…" for consistency).
+
+## 13. Nav order: move "Me" to the end, after "Settings"
+**Status:** ready
+
+Swap the order of the last two nav items. Currently `NAV_ITEMS` in
+[navItems.tsx:58-64](frontend/src/components/nav/navItems.tsx:58-64) lists
+Now Playing, Find Music, History, Me, Settings — Settings should move before
+Me so Me is last. Single array reorder, consumed by both
+[BottomNav.tsx:21](frontend/src/components/nav/BottomNav.tsx:21) and
+[SideNav.tsx:21](frontend/src/components/nav/SideNav.tsx:21).
+
+## 14. Now Playing expanded card: add more track stats (favorite count, etc.)
+**Status:** needs research
+
+When a guest expands the Now Playing card, it currently shows play count and
+artist/genre details ([NowPlaying.tsx](frontend/src/components/nowplaying/NowPlaying.tsx),
+expand toggle at [NowPlaying.tsx:60](frontend/src/components/nowplaying/NowPlaying.tsx:60)/[212](frontend/src/components/nowplaying/NowPlaying.tsx:212),
+play count at [NowPlaying.tsx:280-284](frontend/src/components/nowplaying/NowPlaying.tsx:280-284),
+artist/genre block at [NowPlaying.tsx:288-329](frontend/src/components/nowplaying/NowPlaying.tsx:288-329)).
+Requested: show how many guests have favorited the current track (data we
+already have via the favorites feature, item 3), plus whatever other
+interesting stats are feasible.
+
+Spotify API research (as of 2026): Spotify deprecated `audio-features`,
+`audio-analysis`, `recommendations`, and `related-artists` for apps without
+an existing extended-quota grant (November 2024) — so per-track attributes
+like danceability/energy/tempo/key/valence are **not** available to this app
+and shouldn't be planned around. Still available from the standard
+`GET /tracks/{id}`, `GET /artists/{id}`, and `GET /albums/{id}` endpoints:
+track popularity score (0-100), explicit flag, duration, release date,
+album art/type, and artist-level popularity, follower count, and genres.
+Realistic stat additions: track popularity score, artist follower count,
+artist genres (if not already shown), and album release date — alongside
+the in-app favorite count.
