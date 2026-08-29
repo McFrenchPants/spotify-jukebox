@@ -141,7 +141,7 @@ export function SearchAndQueue() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search for a song or artist…"
-          className="glass-inset h-12 w-full max-w-2xl rounded-md px-4 text-body text-text-primary placeholder:text-text-muted transition-fast focus:border-accent focus:outline-none"
+          className="glass-inset mx-auto block h-12 w-full max-w-2xl rounded-md px-4 text-body text-text-primary placeholder:text-text-muted transition-fast focus:border-accent focus:outline-none"
         />
       </label>
 

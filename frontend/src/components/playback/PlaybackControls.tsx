@@ -247,7 +247,7 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
           value={volumeValue}
           disabled={!volumeAllowed || pending.volume}
           onChange={(e) => handleVolumeChange(Number(e.target.value))}
-          className="h-11 w-full accent-accent disabled:opacity-40 lg:max-w-sm"
+          className="h-11 w-full accent-accent disabled:opacity-40 lg:mx-auto lg:max-w-sm"
         />
       </label>
 
