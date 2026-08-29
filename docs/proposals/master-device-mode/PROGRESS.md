@@ -21,7 +21,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | ID | Task | Status | Notes |
 |---|---|---|---|
 | M0.1 | Add Capacitor to `frontend` | done | `frontend/capacitor.config.ts` (app id `com.mcfrench.guestjukebox`, `webDir: 'dist'`), `frontend/android/` native project. `npx cap sync android` verified clean — no Android SDK/Gradle invocation needed for a plain sync with no native plugins yet, so no environment-limitation caveat here (that will likely surface at M4.1 when `gradlew assembleDebug` is actually run). `npm run build` output unchanged (same file names/hashes). |
-| M0.2 | Document Android build prerequisites | todo | |
+| M0.2 | Document Android build prerequisites | done | [ANDROID_BUILD.md](ANDROID_BUILD.md). Real build attempted in this environment: JDK 17 + an existing local Android SDK got through project config/resource processing, but failed at `:capacitor-android:compileDebugJavaWithJavac` — `@capacitor/android` requires JDK 21 source/target compatibility. No APK produced yet; JDK 21 install needed before M4.1 can complete a real build. See Open Questions. |
 | M1.1 | Jukebox device registration endpoints | done | `backend/src/db/jukeboxDevice.ts` (new `app_settings` key, no new table) + `GET`/`POST /api/admin/jukebox-device*` in `admin.ts`, both `requireAdminAuth`-gated. 303 backend tests passing (11 new), `tsc --noEmit` clean. |
 | M1.2 | Jukebox-device online/offline tracking | todo | Depends on M1.1 |
 | M1.3 | Volume command routing endpoint | todo | Depends on M1.1, M1.2 |
@@ -39,11 +39,18 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 ## Open Questions / Blockers
 
-- This dev/agent environment's Android SDK/emulator availability is unknown
-  going in — M0.1/M0.2/M2.1 may need to flag "code-reviewed only, not
-  runnable in this environment" the same way this project's Docker work
-  once did before Docker Desktop was installed. Not a blocker to starting,
-  just an expected verification-confidence caveat to watch for.
+- **JDK 21 required, not installed.** This environment has JDK 17 and an
+  Android SDK already at `C:\Dev Android SDK` (platforms 34/35, Gradle
+  auto-installed 36 on demand) — but `@capacitor/android`'s Gradle module
+  pins `sourceCompatibility`/`targetCompatibility` to Java 21, so
+  `gradlew assembleDebug` fails at the Java compile step regardless of SDK
+  platform availability. No APK has been produced yet. M2.1 (native plugin)
+  and M4.1 (build script) will need a real JDK 21 install to actually run a
+  build and verify anything beyond code review — flag this explicitly each
+  time rather than assuming a build succeeds. Installing a JDK is a small,
+  reversible, one-time environment setup step (not a project/user decision)
+  — worth just doing before M2.1/M4.1 rather than treating as a blocker
+  needing the user.
 - M5.2 explicitly requires the user's real bridge hardware and cannot be
   done autonomously.
 
