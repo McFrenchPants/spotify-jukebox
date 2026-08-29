@@ -12,7 +12,7 @@ branch before making any changes. The branch was fast-forwarded to current
 `master` (`b49e7e3`) on 2026-08-29 before implementation started, since it
 had sat untouched (0 unique commits) since being cut.
 
-## Status: Phases M0-M4 done. Only M5.2 (real-hardware verification, needs the user) and M5.3 (close-out/merge) remain.
+## Status: Phases M0-M4 done. M5.2 in progress — first real-hardware attempt found a real bug (missing backend-URL config + no CORS), now fixed and rebuilt; awaiting user retest. M5.3 (close-out/merge) remains after that.
 
 ## Task Table
 
@@ -52,6 +52,31 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-29** — **Real-hardware testing (M5.2) found and fixed a genuine
+  gap in the original plan**: the user installed the APK and hit an
+  immediate crash — `Unexpected token '<', "<!doctype " is not valid JSON`.
+  Root cause: the native app's WebView loads the bundled static build from
+  its own local origin with no backend co-located there at all, so every
+  relative `/api/...` fetch (all of `api.ts`, `useEventStream.ts`'s SSE URL,
+  and — found during review, missed by the first pass — `session.ts`'s
+  `bootstrapSession()`) resolved against the WebView's own local server and
+  got served `index.html` back. Nothing in the original DESIGN_SPEC/
+  IMPLEMENTATION_PLAN anticipated this — an oversight, not a task that was
+  skipped. Also found and fixed a second, related gap: the backend had no
+  CORS headers on any route except `/api/events`, which would have blocked
+  the fix below even once the URL was right. Two fixes, delegated in
+  parallel then verified: (1) backend — global permissive CORS middleware
+  (`backend/src/app.ts`; wildcard origin is safe since every route uses
+  bearer-style header tokens, never cookies), 326 tests passing; (2)
+  frontend — `lib/backendUrl.ts` (`getApiBaseUrl()`: `''` on web, the
+  user-configured LAN URL on native) threaded through every API/SSE call,
+  plus a native-only first-run `NativeBackendGate` setup screen that
+  validates reachability via `GET /api/health` before saving. Web path
+  live-verified unchanged via dev server (every call still relative,
+  byte-identical); real `gradlew assembleDebug`/`build:android` succeeds
+  with the fix included. Rebuilt APK ready for the user to reinstall and
+  retest — native first-run screen itself could only be code-reviewed (no
+  device/emulator in this environment).
 - **2026-08-29** — Phases M0-M4 all completed this session, each task via a
   narrowly-scoped subagent, independently verified (diff review, real test
   suites, and — for the Android side — a real `gradlew assembleDebug`/
