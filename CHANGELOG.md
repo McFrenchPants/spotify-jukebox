@@ -4,7 +4,8 @@ All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers 
 
 ## 1.0.14
 
-- In-progress backend changes for Master Device Mode (`feature/master-device-mode`, not yet merged to `master`): global CORS support so the optional native Android build can reach this backend across origins. No behavior change for the standard web/guest experience.
+- Added Master Device Mode: an optional native Android build (built separately, see `docs/MASTER_DEVICE_MODE.md`) that can register itself as "the Jukebox device" from Settings, giving guests real working volume control on a phone-based Bluetooth-speaker bridge — something Spotify's own API can't do remotely for that setup. No effect on the standard web/guest experience if you don't build/use the Android app.
+- Added global CORS support so the native app (and anything else) can reach this backend across origins.
 
 ## 1.0.13
 

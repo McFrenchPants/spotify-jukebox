@@ -168,7 +168,7 @@ Findings so far:
   comes up.
 
 ## 8. Master Device Mode — Android app build + local volume control on the bridge device
-**Status:** in progress — design spec in review
+**Status:** done
 **Type:** enhancement
 **Analysis:** N/A — see design spec below
 
@@ -181,16 +181,35 @@ enclosure's audio path may run entirely through that Android phone (Bluetooth
 speaker with no native Spotify Connect support of its own), guest-facing
 in-app volume control doesn't work for that setup today.
 
-Proposed direction: wrap the existing web app with Capacitor to produce an
-installable native Android build with direct `AudioManager` access, add a
-"this is the Jukebox device" designation in Settings, and have the backend
-push volume commands to that specific client over the existing SSE event bus.
-The regular web deployment (Docker / HA Add-on) is unaffected — this is an
-additional build target from the same repo, not a replacement.
+Shipped: the existing web app is now also buildable (`npm run build:android`)
+as an installable native Android app via Capacitor, with a custom plugin
+giving it direct `AudioManager` access. A "this is the Jukebox device"
+designation in Settings registers a specific installed client; the backend
+routes volume commands to it over the existing SSE event bus instead of
+Spotify's Volume API when it's registered and online. The regular web
+deployment (Docker / HA Add-on) is unaffected — this is an additional build
+target from the same repo, not a replacement. **Confirmed working against
+real hardware** (the actual bridge Pixel 7 Pro + Bluetooth speaker) — the
+guest volume slider genuinely changes real audio output.
 
-Design spec: [docs/proposals/master-device-mode/DESIGN_SPEC.md](docs/proposals/master-device-mode/DESIGN_SPEC.md)
-(branch `feature/master-device-mode`). Implementation plan to follow after
-design review.
+Getting a real build working also surfaced and fixed several real gaps the
+original design didn't anticipate: no way for the native app to know the
+backend's LAN address (added a first-run setup screen), no CORS support on
+the backend for the native app's cross-origin requests, Android's default
+cleartext-HTTP block, and Capacitor's default HTTPS-origin causing a
+mixed-content block — all fixed on the branch. Also found (and fixed) that
+the guest volume slider was seeded from a hardcoded default instead of the
+device's real current volume. Two related rough edges were deliberately
+**not** fixed here and are tracked separately: item 19 (the Jukebox device's
+volume can still drift out of sync if changed on the phone directly — no
+live read-back exists yet) and item 9 (a sharper root-cause understanding of
+the pre-existing stale-Now-Playing/queue issue, found during this testing).
+
+Design spec: [docs/proposals/master-device-mode/DESIGN_SPEC.md](docs/proposals/master-device-mode/DESIGN_SPEC.md).
+Self-hoster docs: [docs/MASTER_DEVICE_MODE.md](docs/MASTER_DEVICE_MODE.md).
+Full implementation/session history:
+[docs/proposals/master-device-mode/PROGRESS.md](docs/proposals/master-device-mode/PROGRESS.md).
+Implemented on `feature/master-device-mode`, merged to `master`.
 
 ## 9. Spotify 429 "Too Many Requests" — stale/stuck Now Playing after idle, device list fails in Settings
 **Status:** needs research
