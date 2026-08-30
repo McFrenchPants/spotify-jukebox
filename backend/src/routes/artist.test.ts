@@ -48,6 +48,32 @@ describe("GET /api/artist/:id", () => {
     expect(getArtist).toHaveBeenCalledWith("artist-1");
   });
 
+  it("returns 200 when the shaped artist has default followers/imageUrl (BACKLOG item 15 regression)", async () => {
+    // getArtist now defaults followers to 0 and imageUrl to null instead of
+    // throwing when Spotify omits those fields for a given artist ID, so the
+    // route should see a normal resolved value here, not an error — this
+    // guards against the fix regressing back to a 502.
+    vi.mocked(getArtist).mockResolvedValue({
+      id: "artist-3",
+      name: "Artist Three",
+      genres: [],
+      imageUrl: null,
+      followers: 0,
+    });
+
+    const res = await fetch(`${baseUrl}/api/artist/artist-3`);
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({
+      id: "artist-3",
+      name: "Artist Three",
+      genres: [],
+      imageUrl: null,
+      followers: 0,
+    });
+  });
+
   it("returns 404 with artist_not_found when Spotify reports the artist as not found", async () => {
     vi.mocked(getArtist).mockRejectedValue(
       new Error("Spotify artist lookup failed: 404 Not found")

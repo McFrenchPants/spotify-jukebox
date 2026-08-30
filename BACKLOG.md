@@ -389,22 +389,26 @@ artist genres (if not already shown), and album release date — alongside
 the in-app favorite count.
 
 ## 15. Artist lookup 502: "Cannot read properties of undefined (reading 'total')"
-**Status:** ready
+**Status:** done
 **Type:** bug
 **Analysis:** N/A — root cause and fix are already fully scoped below
 
-`GET /api/artist/:id` throws for at least one artist ID
+`GET /api/artist/:id` threw for at least one artist ID
 (`3QFXxlWMDSRABMc79TKS5U`), surfacing as a generic 502
-`spotify_artist_lookup_failed`. Root cause found:
-[client.ts:251](backend/src/spotify/client.ts:251) in `getArtist()` reads
-`artist.followers.total` unguarded off the raw Spotify `GET /artists/{id}`
-response. If Spotify omits or partially returns `followers` for a given
-artist, `artist.followers` is `undefined` and `.total` throws a `TypeError`,
-which isn't a shape the route's error handler
-([artist.ts:27-30](backend/src/routes/artist.ts:27-30)) recognizes as a 404,
-so it falls through to the generic 502. Fix: guard the same way `imageUrl`
-already is on the line above (`artist.images?.[0]?.url ?? null`) — e.g.
-`artist.followers?.total ?? 0`.
+`spotify_artist_lookup_failed`. Root cause: `getArtist()` in
+[client.ts](backend/src/spotify/client.ts) read `artist.followers.total` and
+`artist.images[0]` unguarded off the raw Spotify `GET /artists/{id}`
+response. When Spotify omits or partially returns `followers`/`images` for a
+given artist, that throws a `TypeError`, which isn't a shape the route's
+error handler ([artist.ts](backend/src/routes/artist.ts)) recognizes as a
+404, so it fell through to the generic 502.
+
+**Fixed**: both fields guarded (`artist.followers?.total ?? 0`,
+`artist.images?.[0]?.url ?? null`); `SpotifyArtistResponse`'s `images`/
+`followers` typed optional to match observed reality. Added a `getArtist()`
+unit test (missing-fields case) and a route-level regression test
+confirming `GET /api/artist/:id` now returns 200 instead of 502. Implemented
+on `fix/artist-followers-guard`.
 
 ## 16. Album art background flashes to black when navigating to Now Playing
 **Status:** ready

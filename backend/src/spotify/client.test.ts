@@ -232,6 +232,33 @@ describe("getArtist", () => {
     expect(result.imageUrl).toBeNull();
   });
 
+  it("defaults followers to 0 and imageUrl to null when Spotify omits those fields", async () => {
+    // Regression test for BACKLOG item 15: Spotify's response shape for a
+    // given artist ID isn't fully reliable — `followers` and `images` have
+    // been observed missing/undefined entirely (not just empty), which used
+    // to throw a raw TypeError (`Cannot read properties of undefined`) that
+    // fell through the route's error handler as a generic 502.
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        id: "artist-3",
+        name: "Artist Three",
+        genres: [],
+        // `images` and `followers` intentionally omitted.
+      })
+    );
+    const getTokenFn = vi.fn().mockResolvedValue("test-access-token");
+
+    const result = await getArtist("artist-3", fetchMock, getTokenFn);
+
+    expect(result).toEqual({
+      id: "artist-3",
+      name: "Artist Three",
+      genres: [],
+      imageUrl: null,
+      followers: 0,
+    });
+  });
+
   it("calls the Spotify artist endpoint with the id and bearer token", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({ id: "artist-1", name: "A", genres: [], images: [], followers: { total: 0 } })
