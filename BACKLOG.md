@@ -249,6 +249,44 @@ Starting points for the investigation:
   instead of a raw error); consider whether the 4s poll interval is more
   aggressive than needed.
 
+**Update 2026-08-30 — sharper root cause found, reframes this item.** While
+testing Master Device Mode (item 8) on real hardware, the same
+stuck-Now-Playing symptom reappeared, self-corrected once a genuinely new
+track started playing, and was accompanied by a related discovery: the
+bridge/Jukebox device's own long-running app instance was showing 3
+already-played tracks as still "up next," while a PC client open at the
+same time correctly showed an empty queue — confirmed by the user as the
+bridge device's client rendering being wrong, not the backend's actual
+`queue_entries` state (the PC's view, which matches what the backend
+actually holds, was the correct one).
+
+This points at a more precise mechanism than "Spotify 429s" alone:
+`useEventStream.ts`'s `EventSource` auto-reconnects after a connection
+drop, but **no consumer treats a reconnect as a signal to refetch** — every
+component (`QueueList`, `NowPlaying`, etc.) only reacts to specific named
+SSE events arriving *after* reconnection completes. Anything that happened
+*during* the gap (a track finishing and being dequeued, a track change) is
+silently missed, and the stale view persists indefinitely — there's no
+"resync everything, we might have missed something" path, only "wait for
+the next live event." A guest's browser tab rarely surfaces this (short
+session, frequent fresh loads); a bridge device's app running for hours at
+a stretch is exactly the case where a connection gap (backgrounding, Doze
+mode, a network handoff, screen-off) becomes visible as stale, wrong-seeming
+state. This may fully explain the original stuck-Now-Playing report too,
+independent of whether 429 rate-limiting is also a contributing factor —
+worth re-investigating with this more specific hypothesis before assuming
+429s are the primary cause.
+
+Next steps (updated): add reconnect-triggered refetch to `useEventStream.ts`
+consumers (e.g. a `connectionState` transition from non-open back to
+`'open'` should trigger each subscriber's own refetch, not just wait for a
+future named event) — likely the real fix, more foundational than anything
+429-specific. Worth scoping as its own small proposal given it's a
+frontend-architecture-level gap affecting multiple components, not a
+one-line fix. Deliberately NOT bundled into Master Device Mode (item 8) —
+that proposal is otherwise complete and verified; this deserves its own
+scoped pass rather than scope-creeping onto an already-done branch.
+
 ## 10. Desktop: playback controls/volume slider centered but labels aren't
 **Status:** ready
 **Type:** bug
