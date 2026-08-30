@@ -6,6 +6,8 @@ import { BottomNav } from './nav/BottomNav'
 import { SideNav } from './nav/SideNav'
 import { useEventStream, type EventStream } from '../hooks/useEventStream'
 import { VolumeControl } from '../lib/volumeControlPlugin'
+import { reportJukeboxVolume } from '../lib/api'
+import { getOrCreateClientId } from '../lib/clientId'
 
 /** Shared state/handlers threaded to every routed page via <Outlet context>. */
 export interface RootLayoutContext {
@@ -81,6 +83,31 @@ export function RootLayout() {
       })
     })
   }, [subscribe])
+
+  // Master Device Mode: the native Jukebox device reports its own system
+  // volume back to the backend so guest volume sliders can be seeded
+  // accurately and kept in sync when the phone's volume changes out-of-band
+  // (hardware buttons, Android's own volume UI). Only the native build does
+  // this; everyone else must stay a no-op.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+
+    const reportVolume = () => {
+      VolumeControl.getVolume()
+        .then(({ percent }) => reportJukeboxVolume(getOrCreateClientId(), percent))
+        .catch((error) => {
+          console.error('Failed to report jukebox volume', error)
+        })
+    }
+
+    reportVolume()
+
+    // 5s: a middle ground between this app's 4s now-playing poll and its
+    // ~12s device-status poll. The backend dedupes SSE emission when the
+    // reported value hasn't changed, so no change-detection is needed here.
+    const intervalId = setInterval(reportVolume, 5000)
+    return () => clearInterval(intervalId)
+  }, [])
 
   const showStaleBanner = isStale && !bannerDismissed
 

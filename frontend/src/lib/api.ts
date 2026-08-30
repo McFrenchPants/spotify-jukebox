@@ -612,6 +612,45 @@ export async function getJukeboxDeviceMine(clientId: string): Promise<{ isRegist
   return (await res.json()) as { isRegistered: boolean }
 }
 
+/**
+ * POST /api/playback/jukebox-volume-report — public, no auth headers needed.
+ * Lets the native Jukebox device itself (Master Device Mode) report its own
+ * system volume back to the backend, so it can seed/sync guest volume
+ * sliders. Backend rejects with 403 if this clientId isn't the currently-
+ * registered Jukebox device; callers should treat failures as non-fatal.
+ */
+export async function reportJukeboxVolume(clientId: string, volumePercent: number): Promise<void> {
+  const res = await fetch(apiUrl('/api/playback/jukebox-volume-report'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ clientId, volumePercent }),
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to report Jukebox volume: ${res.status}`)
+  }
+}
+
+/**
+ * GET /api/playback/jukebox-volume — public, no auth headers needed. Returns
+ * the last system-volume value the native Jukebox device reported via
+ * POST /api/playback/jukebox-volume-report above, or null if none has been
+ * reported yet. Used to seed the guest-facing volume slider on load for the
+ * Jukebox-device path, which (unlike a plain Spotify device) has no
+ * volume_percent on GET /api/device to seed from — see PlaybackControls.tsx.
+ */
+export async function getJukeboxVolume(): Promise<{ volumePercent: number | null }> {
+  const res = await fetch(apiUrl('/api/playback/jukebox-volume'))
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load Jukebox volume: ${res.status}`)
+  }
+
+  return (await res.json()) as { volumePercent: number | null }
+}
+
 /* -------------------------------------------------------------------- */
 /* F2 — Favorites + guest profile.                                      */
 /* -------------------------------------------------------------------- */

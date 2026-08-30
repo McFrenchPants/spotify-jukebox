@@ -4,6 +4,7 @@ import { getSetting } from "../db";
 import { getRegisteredJukeboxDeviceId } from "../db/jukeboxDevice";
 import { emitEvent } from "../events/bus";
 import { isJukeboxDeviceOnline } from "../events/jukeboxDeviceOnline";
+import { getLastKnownJukeboxVolumePercent, reportJukeboxVolumePercent } from "../events/jukeboxVolumeStatus";
 import { PlaybackCapability, resolveEffectivePermission } from "../guardrails/playbackPermissions";
 import { ADMIN_TOKEN_HEADER } from "../middleware/adminAuth";
 import { pausePlayback, resumePlayback, setVolume, skipToNext, skipToPrevious } from "../spotify/playback";
@@ -174,4 +175,51 @@ playbackRouter.post("/volume", async (req, res) => {
   }
 
   res.status(200).json({ status: "ok" });
+});
+
+/**
+ * Backlog item 19 — Public (no-auth), clientId-gated endpoint the native
+ * Jukebox device (Master Device Mode) uses to report its actual current
+ * volume, since Master Device Mode volume control is otherwise one-way
+ * (backend -> phone via jukebox-volume-command above). Mirrors the
+ * clientId-gating pattern of GET /api/jukebox-device/mine.
+ */
+playbackRouter.post("/jukebox-volume-report", (req, res) => {
+  // Validated before the clientId check, same "validate shape before
+  // checking who's asking" ordering as POST /volume above.
+  const { clientId, volumePercent } = req.body ?? {};
+  if (
+    typeof volumePercent !== "number" ||
+    !Number.isInteger(volumePercent) ||
+    volumePercent < 0 ||
+    volumePercent > 100
+  ) {
+    res.status(400).json({
+      error: "invalid_volume",
+      message: "Body field 'volumePercent' is required and must be an integer between 0 and 100.",
+    });
+    return;
+  }
+
+  if (typeof clientId !== "string" || clientId.trim() === "") {
+    res.status(400).json({ error: "clientId is required" });
+    return;
+  }
+
+  if (clientId !== getRegisteredJukeboxDeviceId()) {
+    res.status(403).json({ error: "not_registered_device" });
+    return;
+  }
+
+  reportJukeboxVolumePercent(volumePercent);
+  res.status(200).json({ status: "ok" });
+});
+
+/**
+ * Backlog item 19 — Public (no-auth) read of the last-known volume reported
+ * by the Jukebox device, so any client (guest browser) can seed/resync its
+ * volume slider without an admin token.
+ */
+playbackRouter.get("/jukebox-volume", (req, res) => {
+  res.status(200).json({ volumePercent: getLastKnownJukeboxVolumePercent() });
 });

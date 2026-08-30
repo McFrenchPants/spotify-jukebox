@@ -50,4 +50,21 @@ public class VolumeControlPlugin extends Plugin {
         ret.put("maxIndex", maxVolume);
         call.resolve(ret);
     }
+
+    @PluginMethod
+    public void getVolume(PluginCall call) {
+        AudioManager audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        if (audioManager == null) {
+            call.reject("AudioManager unavailable");
+            return;
+        }
+
+        int currentIndex = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC);
+        int maxIndex = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        int percent = Math.round(currentIndex * 100.0f / maxIndex);
+
+        JSObject ret = new JSObject();
+        ret.put("percent", percent);
+        call.resolve(ret);
+    }
 }

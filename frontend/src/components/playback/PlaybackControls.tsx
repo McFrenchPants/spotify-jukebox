@@ -4,6 +4,7 @@ import { Button } from '../ui/Button'
 import {
   ApiError,
   getDevice,
+  getJukeboxVolume,
   getTrustMode,
   pausePlayback,
   previousPlayback,
@@ -14,12 +15,15 @@ import {
   type TrustModeState,
 } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
+import type { EventStream } from '../../hooks/useEventStream'
 
 const VOLUME_DEBOUNCE_MS = 300
 
 export interface PlaybackControlsProps {
   /** Current play state, lifted up from NowPlaying via RootLayout.tsx — mirrors the albumArt precedent. */
   isPlaying: boolean
+  /** SSE subscribe fn from useEventStream, lifted via RootLayout.tsx — used for live jukebox-volume-status sync. */
+  subscribe: EventStream['subscribe']
 }
 
 type ActionKey = 'previous' | 'pauseResume' | 'skip' | 'volume'
@@ -115,7 +119,7 @@ function describePlaybackError(err: unknown): string {
  * false, since that communicates more to a curious guest than silent
  * absence, while still satisfying "hidden/disabled" either way.
  */
-export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
+export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps) {
   const [permissions, setPermissions] = useState<TrustModeState | null>(null)
   const [device, setDevice] = useState<Device | null | undefined>(undefined)
   const [pending, setPending] = useState<Record<ActionKey, boolean>>({
@@ -127,6 +131,13 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
   const [volumeValue, setVolumeValue] = useState(50)
   const { showToast } = useToast()
   const volumeDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Drag-awareness for live jukebox-volume-status sync (BACKLOG.md item 19):
+  // while a guest is actively dragging the slider, an incoming live update
+  // must not fight their in-progress drag. isDraggingRef tracks whether a
+  // drag/keyboard-interaction is in progress; pendingIncomingRef holds the
+  // latest value that arrived mid-drag, applied once the guest releases.
+  const isDraggingRef = useRef(false)
+  const pendingIncomingRef = useRef<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -159,9 +170,9 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
         // volume to whatever the guessed default was, an abrupt/surprising
         // jump reported from real use. Only meaningful for a device Spotify
         // itself tracks volume for; the Jukebox-device native-volume path
-        // (see jukeboxOnline below) has no equivalent read-back in this
-        // first version — see DESIGN_SPEC.md §4.3 — so this can't seed an
-        // accurate value there and is left at its prior default in that case.
+        // (see jukeboxOnline below) has its own separate seed effect further
+        // down (BACKLOG.md item 19), since Spotify has no visibility into
+        // that device's real volume at all.
         if (data.resolved?.volume_percent != null) {
           setVolumeValue(data.resolved.volume_percent)
         }
@@ -180,6 +191,51 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
       if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
     }
   }, [])
+
+  // Seed the slider from the Jukebox device's last-reported system volume
+  // (BACKLOG.md item 19) — closes the gap called out in the getDevice effect
+  // above, which can only seed a real value for a plain Spotify device. In
+  // practice only a Jukebox-device deployment will ever have a non-null
+  // value here (nothing else calls the report endpoint this reads), so
+  // there's no meaningful conflict with the getDevice seed effect above —
+  // whichever of the two async fetches resolves and finds a real value last
+  // simply wins.
+  useEffect(() => {
+    let cancelled = false
+    getJukeboxVolume()
+      .then((data) => {
+        if (cancelled) return
+        if (data.volumePercent != null) {
+          setVolumeValue(data.volumePercent)
+        }
+      })
+      .catch(() => {
+        // Non-fatal — the slider just keeps whatever value it already has.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // Live-sync the slider while mounted (BACKLOG.md item 19): the native
+  // Jukebox device's system volume can change out-of-band (hardware
+  // buttons, Android's own volume UI), and every connected guest should see
+  // that reflected without touching the slider themselves. Drag-aware: an
+  // update that arrives while this guest is actively dragging must not
+  // fight their in-progress drag, so it's parked in pendingIncomingRef and
+  // applied once they release (see the input's onPointerUp/onBlur below).
+  useEffect(() => {
+    return subscribe('jukebox-volume-status', (data) => {
+      const payload = data as { volumePercent?: unknown } | undefined
+      if (typeof payload?.volumePercent !== 'number') return
+
+      if (isDraggingRef.current) {
+        pendingIncomingRef.current = payload.volumePercent
+      } else {
+        setVolumeValue(payload.volumePercent)
+      }
+    })
+  }, [subscribe])
 
   async function runAction(key: ActionKey, action: () => Promise<void>) {
     setPending((prev) => ({ ...prev, [key]: true }))
@@ -210,6 +266,23 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
     volumeDebounceRef.current = setTimeout(() => {
       void runAction('volume', () => setVolume(next))
     }, VOLUME_DEBOUNCE_MS)
+  }
+
+  function handleVolumeDragStart() {
+    isDraggingRef.current = true
+  }
+
+  // Also wired to onBlur as a safety net for a keyboard-driven change (arrow
+  // keys move the slider without a pointerup) or a pointerup that fires
+  // outside the element (e.g. the pointer is dragged off the slider before
+  // release) — either way, this is what applies a value that arrived
+  // mid-drag instead of silently dropping it.
+  function handleVolumeDragEnd() {
+    isDraggingRef.current = false
+    if (pendingIncomingRef.current !== null) {
+      setVolumeValue(pendingIncomingRef.current)
+      pendingIncomingRef.current = null
+    }
   }
 
   // Volume needs both the trust-mode permission AND a way to actually reach a
@@ -272,6 +345,9 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
           value={volumeValue}
           disabled={!volumeAllowed || pending.volume}
           onChange={(e) => handleVolumeChange(Number(e.target.value))}
+          onPointerDown={handleVolumeDragStart}
+          onPointerUp={handleVolumeDragEnd}
+          onBlur={handleVolumeDragEnd}
           className="h-11 w-full accent-accent disabled:opacity-40 lg:mx-auto lg:max-w-sm"
         />
       </label>
