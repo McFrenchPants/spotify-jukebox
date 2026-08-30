@@ -25,7 +25,7 @@ export function NowPlayingPage() {
         onIsPlayingChange={onIsPlayingChange}
         onArtistIdChange={onArtistIdChange}
       />
-      <PlaybackControls isPlaying={isPlaying} />
+      <PlaybackControls isPlaying={isPlaying} subscribe={subscribe} />
       <QueueList subscribe={subscribe} refreshKey={refreshKey} />
       <ArtistInfoPanel artistId={artistId} />
     </div>

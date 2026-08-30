@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.20
+
+- Fixed the guest volume slider not staying in sync with the Jukebox device's real volume: it now seeds accurately on load (instead of a hardcoded default) and stays live-updated if the phone's volume is changed directly (its hardware buttons or Android's own volume UI), without interrupting a guest who's actively dragging the slider themselves.
+
 ## 1.0.19
 
 - Every song list (Search, Leaderboard, Recently Played, Favorites) now supports both favoriting and adding to queue consistently — previously Search had no favorite button, and Leaderboard/Recently Played had no "Add to Queue".
