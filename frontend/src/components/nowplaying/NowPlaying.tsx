@@ -89,7 +89,17 @@ export function NowPlaying({
   )
 
   useEffect(() => {
-    onAlbumArtChange?.(snapshot?.albumArt ?? null)
+    // Skip while `snapshot` is still the initial not-yet-loaded `null` (every
+    // fresh mount of this routed page starts here, including a same-track
+    // revisit) — pushing `null` up now would prematurely clear RootLayout's
+    // already-correct background art and flash it to black before the real
+    // snapshot (initial fetch or next SSE `now-playing` event) arrives. Once
+    // loaded, `snapshot` is always a real NowPlayingState (never reset back to
+    // null), so this only ever suppresses that one spurious pre-load call —
+    // a genuine "nothing playing" snapshot still has `albumArt` forwarded as
+    // null via the `?? null` below, same as before.
+    if (!snapshot) return
+    onAlbumArtChange?.(snapshot.albumArt ?? null)
   }, [snapshot, onAlbumArtChange])
 
   useEffect(() => {

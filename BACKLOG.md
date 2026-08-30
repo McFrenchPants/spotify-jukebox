@@ -411,27 +411,31 @@ confirming `GET /api/artist/:id` now returns 200 instead of 502. Implemented
 on `fix/artist-followers-guard`.
 
 ## 16. Album art background flashes to black when navigating to Now Playing
-**Status:** ready
+**Status:** done
 **Type:** bug
 **Analysis:** N/A — root cause and fix direction are already fully scoped below
 
-Reported: switching from any page to Now Playing briefly loses the blurred
-background album art (goes black) while the song-info card's own art stays
-visible. Root cause: `NowPlaying` remounts on route change and initializes
-its `snapshot` state to `null`
-([NowPlaying.tsx:56](frontend/src/components/nowplaying/NowPlaying.tsx:56)).
-An effect fires immediately on mount pushing that `null` art up to
-`RootLayout` ([NowPlaying.tsx:91-93](frontend/src/components/nowplaying/NowPlaying.tsx:91-93)
-→ [RootLayout.tsx:32,79](frontend/src/components/RootLayout.tsx:32)), which
-sets `AppShell`'s background art state to `null`, triggering its fade-out
-transition ([AppShell.tsx:60-68](frontend/src/components/AppShell.tsx:60-68),
-`app-shell__bg-art` layer at [AppShell.tsx:102-113](frontend/src/components/AppShell.tsx:102-113)) —
-all before the real snapshot arrives from the async `getNowPlaying()` fetch
-or the next SSE `now-playing` event. Fix direction: don't clear the shared
-background art on mount before the first real snapshot resolves — e.g. skip
-the `onAlbumArtChange(null)` push while `snapshot` is still the initial
-unloaded state, or keep the previously-displayed art until new art (or an
-explicit "nothing playing") is confirmed.
+Switching from any page to Now Playing briefly lost the blurred background
+album art (went black) while the song-info card's own art stayed visible.
+Root cause: `NowPlaying` remounts on route change and initializes its
+`snapshot` state to `null`, and an effect fired immediately on mount pushing
+that `null` art up to `RootLayout` → `AppShell`, triggering `AppShell`'s
+fade-out transition before the real snapshot arrived from the initial fetch
+or the next SSE `now-playing` event.
+
+**Fixed**: the `onAlbumArtChange` effect in
+[NowPlaying.tsx](frontend/src/components/nowplaying/NowPlaying.tsx) now
+returns early while `snapshot` is still the initial unloaded `null`, so a
+fresh mount no longer clobbers `RootLayout`'s already-correct background art
+— since `snapshot` is only ever set from real data and never reset back to
+`null` afterward, this only suppresses the one spurious pre-load call; the
+legitimate "nothing playing" case still forwards `null` once actually
+loaded. Verified via a mocked-fetch-delay + real-callback-logging approach
+(screenshot compositing and computed-style opacity inspection were both
+unreliable in that session — the tab was backgrounded, which blocks
+`requestAnimationFrame` and makes `AppShell`'s rAF-gated fade-in opacity a
+false baseline regardless of the fix). `npm run build`/`npm run lint` clean.
+Implemented on `fix/album-art-flash`.
 
 ## 17. Make song cards consistent across Leaderboard, Recently Played, Search, and Favorites
 **Status:** idea
