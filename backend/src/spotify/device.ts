@@ -1,5 +1,6 @@
 import { getSetting, setSetting } from "../db";
 import { getValidAccessToken } from "./client";
+import { SpotifyRateLimitedError } from "./errors";
 import { recordRateLimitFromResponse } from "./rateLimitBackoff";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
@@ -53,7 +54,7 @@ export async function listDevices(
     // caller (an admin's manual retry, or the poller itself) still gets a
     // real, honest error; this just stops the *automatic* pollers from
     // continuing to hammer Spotify while the window is active.
-    recordRateLimitFromResponse(response);
+    const wasRateLimited = recordRateLimitFromResponse(response);
 
     let message = `${response.status}`;
     try {
@@ -65,6 +66,14 @@ export async function listDevices(
       }
     } catch {
       // Ignore JSON parse failures on the error body; fall back to status.
+    }
+
+    if (wasRateLimited) {
+      // A dedicated error type so classifySpotifyAuthError() (errors.ts) can
+      // surface this as a friendly 503 spotify_rate_limited response instead
+      // of routes/device.ts's generic 502 spotify_device_lookup_failed with
+      // the raw Spotify error text (see BACKLOG.md item 9, Bug B).
+      throw new SpotifyRateLimitedError(`Spotify device list failed: ${message}`);
     }
     throw new Error(`Spotify device list failed: ${message}`);
   }

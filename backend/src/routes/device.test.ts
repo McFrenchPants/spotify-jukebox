@@ -113,6 +113,20 @@ describe("GET /api/device", () => {
     expect(body.error).toBe("spotify_reauth_required");
     expect(body.message).toMatch(/GET \/api\/auth\/login/);
   });
+
+  it("returns 503 spotify_rate_limited with a friendly message when Spotify 429s the device list, instead of a raw 502", async () => {
+    const { SpotifyRateLimitedError } = await import("../spotify/errors");
+    vi.mocked(resolveDevice).mockRejectedValue(
+      new SpotifyRateLimitedError("Spotify device list failed: 429 Too many requests")
+    );
+
+    const res = await fetch(`${baseUrl}/api/device`);
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(503);
+    expect(body.error).toBe("spotify_rate_limited");
+    expect(body.message).not.toMatch(/429/);
+  });
 });
 
 describe("POST /api/device/select", () => {

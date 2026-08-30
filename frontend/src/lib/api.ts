@@ -79,6 +79,19 @@ export interface NowPlayingState {
   progressMs?: number
   /** Primary/first artist's Spotify id — empty/absent when nothing is playing (P4.8). */
   artistId?: string
+  /**
+   * Epoch ms of the last poll attempt that actually completed (backend
+   * BACKLOG.md item 9 "Bug A"). Only present on the REST GET /api/now-playing
+   * response, not the `now-playing` SSE event payload — optional here so
+   * both shapes still satisfy this interface without another type change.
+   */
+  polledAt?: number
+  /**
+   * Whether the backend's Spotify poller is currently in an active
+   * rate-limit backoff window (i.e. this snapshot may be stale). Same
+   * REST-only caveat as polledAt above.
+   */
+  rateLimited?: boolean
 }
 
 /** One entry in the pending-queue mirror returned by GET /api/queue. */

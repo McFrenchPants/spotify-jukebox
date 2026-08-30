@@ -14,6 +14,7 @@ import { listQueueEntries } from "../db/queueEntries";
 import { listDevices } from "./device";
 import {
   DEFAULT_POLL_INTERVAL_MS,
+  getLastPolledAt,
   pollNowPlaying,
   resetNowPlayingState,
   startNowPlayingPoller,
@@ -494,6 +495,99 @@ describe("pollNowPlaying", () => {
       expect(fetchFn).toHaveBeenCalled();
 
       vi.useRealTimers();
+    });
+  });
+
+  describe("lastPolledAt staleness tracking (BACKLOG item 9, Bug A)", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("starts at 0 (no poll has completed yet)", () => {
+      expect(getLastPolledAt()).toBe(0);
+    });
+
+    it("is set on a normal successful poll", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+
+      expect(getLastPolledAt()).toBe(1_000_000);
+    });
+
+    it("is updated again on a subsequent unchanged poll (still a completed attempt)", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+      expect(getLastPolledAt()).toBe(1_000_000);
+
+      vi.setSystemTime(1_004_000);
+      await pollNowPlaying(
+        vi.fn().mockResolvedValue(jsonResponse(TRACK_A_PROGRESSED)),
+        getTokenFn
+      );
+      expect(getLastPolledAt()).toBe(1_004_000);
+    });
+
+    it("is NOT updated by the 429 poll that arms the backoff window, nor by the skipped tick that follows", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+      const fetchFn = vi.fn().mockResolvedValue(rateLimitedResponse(45));
+
+      // The 429 itself short-circuits (arms the backoff window and returns)
+      // before ever reaching the lastState/lastPolledAt assignment — so this
+      // poll attempt does not count as "completed" either.
+      await pollNowPlaying(fetchFn, getTokenFn);
+      expect(getLastPolledAt()).toBe(0);
+      expect(isRateLimited()).toBe(true);
+
+      // Next tick is skipped outright while backed off — lastPolledAt must
+      // not advance, since nothing was actually polled (that's the whole
+      // point: the route needs to see this snapshot as stale).
+      vi.setSystemTime(1_010_000);
+      await pollNowPlaying(fetchFn, getTokenFn);
+      expect(getLastPolledAt()).toBe(0);
+    });
+
+    it("is NOT updated while isRateLimited() causes a tick to be skipped, but resumes updating once the window passes", async () => {
+      vi.useFakeTimers();
+      vi.setSystemTime(1_000_000);
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      // Establish a baseline successful poll.
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+      expect(getLastPolledAt()).toBe(1_000_000);
+
+      // Arm the backoff window directly (independent of the poll that arms
+      // it in real usage) so this test isolates just the isRateLimited()
+      // early-return guard at the top of pollNowPlaying.
+      vi.setSystemTime(1_005_000);
+      await pollNowPlaying(vi.fn().mockResolvedValue(rateLimitedResponse(30)), getTokenFn);
+      expect(getLastPolledAt()).toBe(1_000_000); // unchanged — the 429 poll itself doesn't update it
+
+      vi.setSystemTime(1_010_000);
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_B)), getTokenFn);
+      expect(getLastPolledAt()).toBe(1_000_000); // still frozen — this tick was skipped outright
+
+      // Once the backoff window passes (armed for 30s at 1_005_000, so it
+      // expires at 1_035_000), polling resumes and updates again.
+      vi.setSystemTime(1_036_000);
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_B)), getTokenFn);
+      expect(getLastPolledAt()).toBe(1_036_000);
+    });
+
+    it("resets to 0 via resetNowPlayingState (test helper)", async () => {
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+      expect(getLastPolledAt()).not.toBe(0);
+
+      resetNowPlayingState();
+      expect(getLastPolledAt()).toBe(0);
     });
   });
 });
