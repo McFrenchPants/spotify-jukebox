@@ -5,7 +5,7 @@ import { SettingsForm } from '../components/admin/SettingsForm'
 import { QueueModeration } from '../components/admin/QueueModeration'
 import { DeviceSelector } from '../components/admin/DeviceSelector'
 import { JukeboxDeviceCard } from '../components/admin/JukeboxDeviceCard'
-import { GuestUrlCard } from '../components/admin/GuestUrlCard'
+import { GuestUrlCard } from '../components/GuestUrlCard'
 import { AdminAuthProvider, useAdminAuth } from '../context/AdminAuthContext'
 import type { RootLayoutContext } from '../components/RootLayout'
 

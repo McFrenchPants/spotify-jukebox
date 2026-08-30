@@ -7,6 +7,7 @@ import { NowPlayingPage } from './pages/NowPlayingPage.tsx'
 import { SearchPage } from './pages/SearchPage.tsx'
 import { HistoryPage } from './pages/HistoryPage.tsx'
 import { MePage } from './pages/MePage.tsx'
+import { ConnectPage } from './pages/ConnectPage.tsx'
 import { SettingsPage } from './pages/SettingsPage.tsx'
 import StyleGuide from './pages/StyleGuide.tsx'
 import { SessionProvider } from './context/SessionContext.tsx'
@@ -31,6 +32,7 @@ createRoot(document.getElementById('root')!).render(
             <Route path="/search" element={<SearchPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/me" element={<MePage />} />
+            <Route path="/connect" element={<ConnectPage />} />
             <Route path="/settings" element={<SettingsPage />} />
           </Route>
           <Route path="/style-guide" element={<StyleGuide />} />

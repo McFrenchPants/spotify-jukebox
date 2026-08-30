@@ -55,6 +55,18 @@ function MeIcon({ className }: { className?: string }) {
   )
 }
 
+/** QR-code glyph, used for the "Connect" nav tab (C2). */
+function ConnectIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="2" className={className}>
+      <rect x="3.5" y="3.5" width="6" height="6" rx="1" />
+      <rect x="14.5" y="3.5" width="6" height="6" rx="1" />
+      <rect x="3.5" y="14.5" width="6" height="6" rx="1" />
+      <path d="M14.5 14.5h3v3M20.5 17.5v3h-3M14.5 20.5h2M18 14.5h2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Now Playing', icon: HomeIcon },
   { to: '/search', label: 'Find Music', icon: SearchIcon },
@@ -62,3 +74,11 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
   { to: '/me', label: 'Me', icon: MeIcon },
 ]
+
+/**
+ * Replaces the "Me" item when this browser is the registered Jukebox
+ * (master/bridge) device — see useIsJukeboxDevice (C2). That device isn't a
+ * guest browsing to add songs, so it gets a QR/link-sharing destination in
+ * the same nav slot instead.
+ */
+export const CONNECT_NAV_ITEM: NavItem = { to: '/connect', label: 'Connect', icon: ConnectIcon }

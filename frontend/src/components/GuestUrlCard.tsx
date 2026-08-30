@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { Button } from '../ui/Button'
-import { Card } from '../ui/Card'
+import { Button } from './ui/Button'
+import { Card } from './ui/Card'
 
 /**
  * QR code + plain-text guest URL, for showing/printing so guests can scan

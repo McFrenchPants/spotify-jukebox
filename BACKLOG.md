@@ -112,20 +112,21 @@ sorts, filters, unfavorites, and re-queues. Implemented on
 `feature/favorites`; pushed for PR review, not yet merged to `master`.
 
 ## 4. "Connect" nav item on the master device (was: QR code on Now Playing)
-**Status:** needs research
+**Status:** done
 **Type:** enhancement
 **Analysis:** [analysis/04-qr-code-now-playing.md](analysis/04-qr-code-now-playing.md)
 
 Reframed during analysis/user check-in (2026-08-30): rather than an
 icon/modal on the Now Playing screen shown identically to every device,
-the master/bridge device's nav should swap its "Me" tab (a personal
+the master/bridge device's nav swaps its "Me" tab (a personal
 favorites/nickname tab that doesn't apply to a shared bridge device) for a
 "Connect" tab, leading to a page with the QR code, guest URL, and brief
 instructions — visible only on the one device where it's actually useful.
-Needs a new public (unauthenticated) way for a client to learn whether its
-own `clientId` is the registered Jukebox device (see analysis for the
-proposed shape), plus scoping around Master Device Mode being optional —
-see the analysis file's open questions before this moves to `ready`.
+Scoped to Master Device Mode (item 8) specifically: the swap fires only
+when this client's `clientId` matches the registered Jukebox device, via a
+new public (unauthenticated) `GET /api/jukebox-device/mine` endpoint.
+Implemented on `feature/master-device-connect-nav`, live-verified
+end-to-end, not yet merged to `master`.
 
 ## 5. Move "Playback Device" above "Queue Moderation" in Settings
 **Status:** done

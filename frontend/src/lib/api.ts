@@ -594,6 +594,24 @@ export async function registerJukeboxDevice(token: string, clientId: string): Pr
   return (await res.json()) as { clientId: string }
 }
 
+/**
+ * GET /api/jukebox-device/mine?clientId= — public, no auth headers needed.
+ * Lets any client (guest browser) check whether ITS OWN clientId is the
+ * currently-registered "Jukebox device" (Master Device Mode), distinct from
+ * the admin-gated getJukeboxDevice()/registerJukeboxDevice() pair above.
+ * Backed by GET backend/src/routes/jukeboxDeviceStatus.ts (C1).
+ */
+export async function getJukeboxDeviceMine(clientId: string): Promise<{ isRegistered: boolean }> {
+  const res = await fetch(apiUrl(`/api/jukebox-device/mine?clientId=${encodeURIComponent(clientId)}`))
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load Jukebox device status: ${res.status}`)
+  }
+
+  return (await res.json()) as { isRegistered: boolean }
+}
+
 /* -------------------------------------------------------------------- */
 /* F2 — Favorites + guest profile.                                      */
 /* -------------------------------------------------------------------- */
