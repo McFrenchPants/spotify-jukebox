@@ -438,29 +438,41 @@ details, favorite, add to queue. Likely needs a shared card component
 already-duplicated `FavoriteRow`) rather than bolting the missing actions
 onto each row individually.
 
-## 19. Volume slider doesn't read the actual current volume before first touch
-**Status:** ready (Spotify-device case) / needs research (Jukebox-device case)
+## 19. Volume slider doesn't stay in sync with the Jukebox device's actual volume
+**Status:** ready (Spotify-device case, initial-load half already shipped) / needs research (Jukebox-device case)
 **Type:** bug
-**Analysis:** N/A — root cause and fix already scoped below
+**Analysis:** N/A — root cause and fix direction already scoped below
 
-Reported during Master Device Mode's real-hardware testing: the guest
-volume slider starts at a hardcoded default
-([PlaybackControls.tsx:127](frontend/src/components/playback/PlaybackControls.tsx:127),
-`useState(50)`) rather than the device's actual current volume — so the
-first touch snaps real playback volume to wherever the guessed default
-was, an abrupt/surprising jump. **Fixed for the standard Spotify-device
-path**: `GET /api/device` already returns `volume_percent`
-([api.ts:510](frontend/src/lib/api.ts:510)), now used to seed the slider
-once the device resolves. **Still an open gap for the Jukebox-device
-(native volume) path** specifically (item 8) — there's no mechanism to
-read the phone's actual current `AudioManager` volume back into the app at
-all; the design spec explicitly scoped this out for v1 (one-way app→phone
-control only, see
-[DESIGN_SPEC.md §4.3](docs/proposals/master-device-mode/DESIGN_SPEC.md)).
-Would need a `getVolume()` counterpart to the existing native plugin's
-`setVolume()`, plus a way to fetch it into the slider on load — worth
-scoping as a proper follow-up now that real use has confirmed it's a
-genuine (not just theoretical) rough edge.
+Reported during Master Device Mode's real-hardware testing, in two parts:
+
+1. **Initial load**: the guest volume slider started at a hardcoded default
+   ([PlaybackControls.tsx:127](frontend/src/components/playback/PlaybackControls.tsx:127),
+   `useState(50)`) rather than the device's actual current volume — so the
+   first touch snapped real playback volume to wherever the guessed default
+   was, an abrupt/surprising jump. **Fixed for the standard Spotify-device
+   path**: `GET /api/device` already returns `volume_percent`
+   ([api.ts:510](frontend/src/lib/api.ts:510)), now used to seed the slider
+   once the device resolves.
+2. **Ongoing drift, Jukebox-device path specifically**: even after the fix
+   above, adjusting the phone's volume out-of-band (its hardware buttons, or
+   Android's own volume UI) leaves every guest's slider stale until they
+   themselves touch it — at which point it silently overwrites whatever the
+   phone was actually at, rather than reflecting reality first.
+
+Both are really the same underlying gap: **there is no mechanism at all to
+read the phone's actual current `AudioManager` volume back into the app** —
+neither once on load nor live while the slider is open. The design spec
+explicitly scoped this out for v1 (one-way app→phone control only, see
+[DESIGN_SPEC.md §4.3](docs/proposals/master-device-mode/DESIGN_SPEC.md)),
+accepting it as a known limitation — now confirmed as a real, not just
+theoretical, rough edge from actual use. Would need: a `getVolume()`
+counterpart to the existing native plugin's `setVolume()`, a way to fetch it
+on load (closing gap 1 for this path too), and probably a periodic poll or a
+native-side volume-change listener pushed back over SSE to close gap 2 (live
+drift) — worth scoping as a proper follow-up rather than a quick patch,
+since the live-sync half in particular has real design questions (how often
+to poll, whether a guest's own in-flight drag should be interrupted by an
+incoming update, etc.).
 
 ## 18. Clarify/hide playback-permission settings when a master device is active
 **Status:** needs research
