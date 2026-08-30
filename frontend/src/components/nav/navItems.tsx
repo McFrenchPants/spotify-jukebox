@@ -59,6 +59,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Now Playing', icon: HomeIcon },
   { to: '/search', label: 'Find Music', icon: SearchIcon },
   { to: '/history', label: 'History', icon: HistoryIcon },
-  { to: '/me', label: 'Me', icon: MeIcon },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
+  { to: '/me', label: 'Me', icon: MeIcon },
 ]
