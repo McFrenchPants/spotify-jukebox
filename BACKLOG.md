@@ -292,16 +292,16 @@ Change the default label to "Add to Queue" (and consider whether "Adding…"
 should become "Adding to Queue…" for consistency).
 
 ## 13. Nav order: move "Me" to the end, after "Settings"
-**Status:** ready
+**Status:** done
 **Type:** enhancement
-**Analysis:** N/A — single array reorder, trivial enough to skip an analysis file
+**Analysis:** N/A — shipped
 
-Swap the order of the last two nav items. Currently `NAV_ITEMS` in
-[navItems.tsx:58-64](frontend/src/components/nav/navItems.tsx:58-64) lists
-Now Playing, Find Music, History, Me, Settings — Settings should move before
-Me so Me is last. Single array reorder, consumed by both
-[BottomNav.tsx:21](frontend/src/components/nav/BottomNav.tsx:21) and
-[SideNav.tsx:21](frontend/src/components/nav/SideNav.tsx:21).
+Swapped the order of the last two entries in `NAV_ITEMS`
+([navItems.tsx](frontend/src/components/nav/navItems.tsx)) — order is now
+Now Playing, Find Music, History, Settings, Me. Consumed as-is by both
+`BottomNav.tsx` and `SideNav.tsx`, no other changes needed. Verified live
+via the Browser pane's `read_page`. Implemented on
+`fix/nav-me-after-settings`.
 
 ## 14. Now Playing expanded card: add more track stats (favorite count, etc.)
 **Status:** needs research
