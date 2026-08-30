@@ -421,32 +421,29 @@ false baseline regardless of the fix). `npm run build`/`npm run lint` clean.
 Implemented on `fix/album-art-flash`.
 
 ## 17. Make song cards consistent across Leaderboard, Recently Played, Search, and Favorites
-**Status:** idea
+**Status:** ready
 **Type:** enhancement
-**Analysis:** analysis/17-song-card-consistency.md (not yet written)
+**Analysis:** [analysis/17-song-card-consistency.md](analysis/17-song-card-consistency.md)
 
-Every list currently has its own bespoke row component with a different
-subset of behavior — no shared `TrackCard`/`SongCard` exists, so the same
-song looks and behaves differently depending on which list it's found in:
-- [Leaderboard.tsx:30-84](frontend/src/components/leaderboard/Leaderboard.tsx:30-84)
-  (`LeaderboardRow`) — favorite toggle only.
-- [RecentlyPlayed.tsx:31-77](frontend/src/components/recent/RecentlyPlayed.tsx:31-77)
-  (`RecentlyPlayedRow`) — favorite toggle only.
+Narrowed during analysis/user check-in (2026-08-30): scoped to **favorite
++ add-to-queue consistency only** across all four lists, via one shared
+`SongCard` component. "Expand for details" (the third action in the
+original ask) is deliberately deferred, not built now — Now Playing's
+expand makes sense for the one track a guest is actively engaged with,
+but whether it's wanted in a scanning list context is unproven; revisit
+as its own item later if real demand shows up.
+
+Confirmed gaps this closes:
 - [TrackRow.tsx:21-74](frontend/src/components/search/TrackRow.tsx:21-74)
-  (search results) — add-to-queue only.
-- [FavoriteRow.tsx:29-79](frontend/src/components/favorites/FavoriteRow.tsx:29-79) —
-  favorite toggle + add-to-queue; its own comment
+  (search results) has no favorite button at all — add-to-queue only.
+- [Leaderboard.tsx:30-84](frontend/src/components/leaderboard/Leaderboard.tsx:30-84)
+  and [RecentlyPlayed.tsx:31-77](frontend/src/components/recent/RecentlyPlayed.tsx:31-77)
+  have a favorite toggle but no add-to-queue.
+- [FavoriteRow.tsx:29-79](frontend/src/components/favorites/FavoriteRow.tsx:29-79)
+  has both already; its own comment
   ([FavoriteRow.tsx:21-28](frontend/src/components/favorites/FavoriteRow.tsx:21-28))
-  admits it's a deliberate copy of `TrackRow` rather than a shared component.
-- Click-to-expand-for-more-info exists nowhere in these four lists today —
-  it's only implemented on the Now Playing hero card
-  ([NowPlaying.tsx:202-223](frontend/src/components/nowplaying/NowPlaying.tsx:202-223)).
-
-Requested: every list should support the same three actions — expand for
-details, favorite, add to queue. Likely needs a shared card component
-(consolidating the existing bespoke rows, particularly `TrackRow` and the
-already-duplicated `FavoriteRow`) rather than bolting the missing actions
-onto each row individually.
+  admits it's a deliberate copy of `TrackRow` rather than a shared
+  component — this item replaces that duplication with the real thing.
 
 ## 19. Volume slider doesn't stay in sync with the Jukebox device's actual volume
 **Status:** ready (Spotify-device case, initial-load half already shipped) / needs research (Jukebox-device case)
