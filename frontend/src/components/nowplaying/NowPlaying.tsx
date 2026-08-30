@@ -197,6 +197,23 @@ export function NowPlaying({
   const { status: favoritesStatus, toggle: toggleFavorite } = useFavoritesStatus(favoritesTrackIds, subscribe)
 
   if (!displaySnapshot || !displaySnapshot.isPlaying || !displaySnapshot.trackId) {
+    // A rate-limited snapshot means the backend has stopped being able to ask
+    // Spotify anything right now — "Nothing playing" would misreport that as
+    // a confirmed, current fact rather than a connectivity problem. Only the
+    // initial REST fetch carries `rateLimited` (SSE deltas never fire during
+    // an active backoff window, so this can't be stale-masked by a later
+    // SSE update while still actually rate-limited).
+    if (displaySnapshot?.rateLimited) {
+      return (
+        <Card className="flex flex-col items-center gap-1 py-8 text-center">
+          <p className="text-body text-text-secondary">Could not connect to Spotify</p>
+          <p className="text-caption text-text-muted">
+            Spotify is rate-limiting requests from this app right now — try again in a bit.
+          </p>
+        </Card>
+      )
+    }
+
     return (
       <Card className="flex flex-col items-center gap-1 py-8 text-center">
         <p className="text-body text-text-secondary">Nothing playing</p>
