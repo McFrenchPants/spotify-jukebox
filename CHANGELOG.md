@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.14
+
+- In-progress backend changes for Master Device Mode (`feature/master-device-mode`, not yet merged to `master`): global CORS support so the optional native Android build can reach this backend across origins. No behavior change for the standard web/guest experience.
+
 ## 1.0.13
 
 - Fixed the bottom nav bar reading as transparent in some embedded views (e.g. a Home Assistant dashboard's "Website" card), letting page content behind it overlap and clash with the bar's own icons/labels. The bar is now solid enough to stay legible even where the intended frosted-glass blur effect doesn't render, and page content now fades out completely before it ever reaches the bar instead of relying on the blur alone to obscure it.
