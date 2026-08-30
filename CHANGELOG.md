@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.17
+
+- Fixed Now Playing getting stuck on an old track (and Settings' device picker sometimes showing "too many requests") after the app sat idle for a while — a background connection could silently drop and reconnect without ever refreshing what's shown, and a Spotify rate-limit could leave the display frozen with no way to tell it was stale. Both are now handled: the app automatically resyncs after a reconnect, and a rate limit now shows a clear, friendly message instead of a raw error.
+
 ## 1.0.16
 
 - Fixed the Now Playing screen's blurred background art briefly flashing to black every time you navigated to it, even while a song was already playing.
