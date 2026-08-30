@@ -11,6 +11,7 @@ vi.mock("../db", () => ({
 
 import { getSetting, setSetting } from "../db";
 import { listDevices, resolveDevice } from "./device";
+import { SpotifyRateLimitedError } from "./errors";
 import { isRateLimited, resetRateLimitForTests } from "./rateLimitBackoff";
 
 function jsonResponse(body: unknown, ok = true, status = 200, retryAfterSeconds?: number): Response {
@@ -111,6 +112,15 @@ describe("listDevices", () => {
 
     await expect(listDevices(fetchMock, getTokenFn)).rejects.toThrow(/429/);
     expect(isRateLimited()).toBe(true);
+  });
+
+  it("throws SpotifyRateLimitedError (not a plain Error) on a 429, so callers can classify it as a friendly error", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({ error: { status: 429, message: "Too many requests" } }, false, 429, 30)
+    );
+    const getTokenFn = vi.fn().mockResolvedValue("test-token");
+
+    await expect(listDevices(fetchMock, getTokenFn)).rejects.toBeInstanceOf(SpotifyRateLimitedError);
   });
 });
 

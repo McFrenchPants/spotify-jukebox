@@ -212,113 +212,40 @@ Full implementation/session history:
 Implemented on `feature/master-device-mode`, merged to `master`.
 
 ## 9. Spotify 429 "Too Many Requests" — stale/stuck Now Playing after idle, device list fails in Settings
-**Status:** ready
+**Status:** done
 **Type:** bug
-**Analysis:** [analysis/09-spotify-429-rate-limiting.md](analysis/09-spotify-429-rate-limiting.md) — three
-distinct root causes identified, each with a concrete, independent fix:
-(A) `GET /api/now-playing` silently serves a frozen cache during an active
-rate-limit backoff, with no staleness signal, so even a page refresh can't
-recover — fix by exposing `polledAt`/`rateLimited` on the response;
-(B) `listDevices()`'s Web API 429 throws a plain `Error` instead of the
-`SpotifyRateLimitedError` type `classifySpotifyAuthError()` already handles
-cleanly (used elsewhere for the token-endpoint 429 case) — fix by throwing
-the right type, no new classification logic needed;
-(C) an SSE reconnect never triggers any consumer to refetch — `RootLayout`'s
-shared `refreshKey` (read by both `NowPlaying` and `QueueList`) only bumps
-on a manual banner click, not automatically on reconnect-after-a-real-drop
-— fix by auto-bumping it on that transition, which resyncs every consumer
-for free. All three are independent and can be implemented/verified
-separately.
+**Analysis:** [analysis/09-spotify-429-rate-limiting.md](analysis/09-spotify-429-rate-limiting.md)
 
-Recurring issue (reported several times before, keeps coming back): after the
-bridge device/app has been idle a while, the app shows a track playing that
-isn't actually the current track, and when that (stale) track's timer runs
-out the UI just sits there acting like something is still playing — refresh
-doesn't fix it — even though the bridge device itself is actually still
-playing music correctly. Separately, the Settings page's playback-device
-picker shows "device list failed, too many requests." Suspect these are the
-same root cause: Spotify API rate limiting (HTTP 429).
+Recurring issue: after the bridge device/app had been idle a while, the app
+showed a track playing that wasn't actually current, stuck once its timer
+ran out — refresh didn't fix it — even though the bridge device itself kept
+playing correctly. Separately, Settings' device picker sometimes showed
+"device list failed, too many requests." Turned out to be three independent
+bugs, not one:
 
-Starting points for the investigation:
-- Now Playing poller runs every 4s
-  ([nowPlaying.ts:14](backend/src/spotify/nowPlaying.ts:14),
-  [nowPlaying.ts:328-333](backend/src/spotify/nowPlaying.ts:328-333)); poll
-  logic at [nowPlaying.ts:209-318](backend/src/spotify/nowPlaying.ts:209-318).
-- Device list is fetched from two places:
-  [device.ts:38-87](backend/src/spotify/device.ts:38-87) `listDevices()`, via
-  a throttled fallback inside the poller
-  ([nowPlaying.ts:159-191](backend/src/spotify/nowPlaying.ts:159-191), gated
-  to once per 5 minutes), and on-demand from `resolveDevice()`
-  ([device.ts:108](backend/src/spotify/device.ts:108)) — the latter is what
-  Settings' device picker calls directly, which is the likely source of the
-  "too many requests" message.
-- A shared 429 backoff already exists
-  ([rateLimitBackoff.ts](backend/src/spotify/rateLimitBackoff.ts)): any 429
-  arms a 30s (or `Retry-After`-driven) cooldown that background pollers
-  check and skip. A code comment there
-  ([rateLimitBackoff.ts:13-18](backend/src/spotify/rateLimitBackoff.ts:13-18))
-  documents a past real incident: two backend instances (local dev + Home
-  Assistant add-on) polling the same Spotify account simultaneously doubled
-  request volume and triggered 429s. The backoff is shared within one
-  process but **not** across separate deployments/instances — if the user is
-  running more than one backend against the same Spotify account (e.g. a dev
-  instance left running alongside the HA add-on), that would reproduce this.
-- On-demand calls — search, a manual "retry" in Settings, adding to the
-  queue — are explicitly **not** gated by the backoff
-  ([rateLimitBackoff.ts:7-11](backend/src/spotify/rateLimitBackoff.ts:7-11)),
-  so a user clicking around in Settings while the account is already
-  rate-limited can trigger a raw, unhandled 429 (hence the error message
-  surfacing directly instead of retrying/backing off gracefully).
-- Also worth checking: what the frontend does when a poll fails/returns
-  stale data — the "stuck on a track that already ended" symptom suggests
-  the UI isn't distinguishing "poll failed, keep last known state
-  indefinitely" from "poll succeeded, nothing changed," and there's no
-  visible reconnect/error state or automatic recovery once rate limiting
-  clears.
-- Next steps: confirm whether multiple backend instances are actually
-  running against production; add a visible "connection lost / stale data"
-  UI state instead of silently freezing; consider gating on-demand device
-  calls behind the same backoff (with a clear "try again in Ns" message
-  instead of a raw error); consider whether the 4s poll interval is more
-  aggressive than needed.
+1. **`GET /api/now-playing` silently served a frozen cache** during an
+   active rate-limit backoff, with no staleness signal — even a full page
+   reload got the same frozen snapshot. Fixed: the route now also returns
+   `polledAt`/`rateLimited` so a stale snapshot is at least detectable.
+2. **`listDevices()`'s Web API 429 threw a plain `Error`** instead of the
+   `SpotifyRateLimitedError` type `classifySpotifyAuthError()` already
+   handled cleanly elsewhere (the token-endpoint 429 case) — it fell through
+   to a generic 502 with the raw Spotify error text. Fixed: throws the right
+   type, reuses existing classification, no new logic needed.
+3. **An SSE reconnect never triggered any consumer to refetch** —
+   `RootLayout`'s shared `refreshKey` (read by both `NowPlaying` and
+   `QueueList`) only bumped on a manual "tap to refresh" banner click, which
+   auto-hides the instant the connection reopens — so a quick silent
+   drop-and-recover (very plausible for a long-running bridge-device tab:
+   WiFi power-saving, Android Doze mode, a brief network blip) left stale
+   state with no visible recovery path. Fixed: `useEventStream` now exposes
+   a `reconnectedAt` signal that only fires on a genuine drop-then-reopen
+   (never on the initial mount), and `RootLayout` auto-bumps `refreshKey` on
+   it — resyncing every `refreshKey` consumer automatically.
 
-**Update 2026-08-30 — sharper root cause found, reframes this item.** While
-testing Master Device Mode (item 8) on real hardware, the same
-stuck-Now-Playing symptom reappeared, self-corrected once a genuinely new
-track started playing, and was accompanied by a related discovery: the
-bridge/Jukebox device's own long-running app instance was showing 3
-already-played tracks as still "up next," while a PC client open at the
-same time correctly showed an empty queue — confirmed by the user as the
-bridge device's client rendering being wrong, not the backend's actual
-`queue_entries` state (the PC's view, which matches what the backend
-actually holds, was the correct one).
-
-This points at a more precise mechanism than "Spotify 429s" alone:
-`useEventStream.ts`'s `EventSource` auto-reconnects after a connection
-drop, but **no consumer treats a reconnect as a signal to refetch** — every
-component (`QueueList`, `NowPlaying`, etc.) only reacts to specific named
-SSE events arriving *after* reconnection completes. Anything that happened
-*during* the gap (a track finishing and being dequeued, a track change) is
-silently missed, and the stale view persists indefinitely — there's no
-"resync everything, we might have missed something" path, only "wait for
-the next live event." A guest's browser tab rarely surfaces this (short
-session, frequent fresh loads); a bridge device's app running for hours at
-a stretch is exactly the case where a connection gap (backgrounding, Doze
-mode, a network handoff, screen-off) becomes visible as stale, wrong-seeming
-state. This may fully explain the original stuck-Now-Playing report too,
-independent of whether 429 rate-limiting is also a contributing factor —
-worth re-investigating with this more specific hypothesis before assuming
-429s are the primary cause.
-
-Next steps (updated): add reconnect-triggered refetch to `useEventStream.ts`
-consumers (e.g. a `connectionState` transition from non-open back to
-`'open'` should trigger each subscriber's own refetch, not just wait for a
-future named event) — likely the real fix, more foundational than anything
-429-specific. Worth scoping as its own small proposal given it's a
-frontend-architecture-level gap affecting multiple components, not a
-one-line fix. Deliberately NOT bundled into Master Device Mode (item 8) —
-that proposal is otherwise complete and verified; this deserves its own
-scoped pass rather than scope-creeping onto an already-done branch.
+All three implemented independently in parallel, verified together
+(338/338 backend tests, clean typecheck both sides, clean frontend
+build/lint). Implemented on `fix/stale-now-playing-429`.
 
 ## 10. Desktop: playback controls/volume slider centered but labels aren't
 **Status:** ready

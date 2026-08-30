@@ -49,6 +49,15 @@ const NOTHING_PLAYING_STATE: NowPlayingState = {
 /** Last-seen state, module-level so repeated polls can diff against it. */
 let lastState: NowPlayingState = NOTHING_PLAYING_STATE;
 
+/**
+ * Timestamp (epoch ms) of the last poll attempt that actually completed
+ * (i.e. wasn't skipped early due to isRateLimited()). 0 means no poll has
+ * completed yet. Lets consumers of getNowPlayingState() tell a live snapshot
+ * apart from one frozen by an active rate-limit backoff window — see
+ * getNowPlayingSnapshot() below.
+ */
+let lastPolledAt = 0;
+
 export interface DeviceStatus {
   online: boolean;
   deviceId?: string;
@@ -75,11 +84,17 @@ export function resetNowPlayingState(): void {
   lastState = NOTHING_PLAYING_STATE;
   lastDeviceOnline = null;
   lastDeviceCheckAt = 0;
+  lastPolledAt = 0;
 }
 
 /** Returns the last-seen now-playing state (same data the SSE now-playing event carries). */
 export function getNowPlayingState(): NowPlayingState {
   return lastState;
+}
+
+/** Timestamp (epoch ms) of the last poll that actually completed; 0 if none yet. */
+export function getLastPolledAt(): number {
+  return lastPolledAt;
 }
 
 function shapeResponse(data: SpotifyCurrentlyPlayingResponse | null): NowPlayingState {
@@ -280,6 +295,7 @@ export async function pollNowPlaying(
 
   if (hasChanged(lastState, nextState)) {
     lastState = nextState;
+    lastPolledAt = Date.now();
     if (nextState.trackId) {
       // The track that just started playing is no longer "pending," so drop
       // it from the local queue mirror — and use the matched row's
@@ -314,6 +330,7 @@ export async function pollNowPlaying(
     emitEvent("now-playing", nextState);
   } else {
     lastState = nextState;
+    lastPolledAt = Date.now();
   }
 }
 

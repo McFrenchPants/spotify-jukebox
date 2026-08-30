@@ -28,7 +28,7 @@ export interface RootLayoutContext {
  * mirroring today's prop-drilling but across routes instead of components.
  */
 export function RootLayout() {
-  const { subscribe, isStale } = useEventStream()
+  const { subscribe, isStale, reconnectedAt } = useEventStream()
   const [albumArt, setAlbumArt] = useState<string | null>(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [artistId, setArtistId] = useState<string | null>(null)
@@ -50,6 +50,19 @@ export function RootLayout() {
     setRefreshKey((k) => k + 1)
     setBannerDismissed(true)
   }, [])
+
+  // Auto-refetch on a real SSE reconnect (connection genuinely dropped and
+  // came back), even if it recovered too quickly to ever show the manual
+  // "tap to refresh" banner below. reconnectedAt starts at 0 and only
+  // changes on an actual reconnect (see useEventStream), so this never fires
+  // on mount. Uses the same track-across-renders pattern as prevIsStale
+  // above rather than a useEffect, so it's a no-op during the render caused
+  // by its own setRefreshKey call.
+  const [prevReconnectedAt, setPrevReconnectedAt] = useState(reconnectedAt)
+  if (reconnectedAt !== prevReconnectedAt) {
+    setPrevReconnectedAt(reconnectedAt)
+    if (reconnectedAt !== 0) setRefreshKey((k) => k + 1)
+  }
 
   // Master Device Mode: the backend broadcasts jukebox-volume-command to
   // every connected SSE client (no per-client filtering server-side — see

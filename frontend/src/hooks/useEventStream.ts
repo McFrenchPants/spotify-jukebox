@@ -73,6 +73,15 @@ export interface EventStream {
   connectionState: ConnectionState
   /** True once the connection has been non-open for more than a few seconds. */
   isStale: boolean
+  /**
+   * Epoch ms timestamp of the most recent *real* reconnect — i.e. the
+   * connection was open, actually dropped, and has now reopened. Starts at 0
+   * and stays 0 until the first real reconnect; never fires for the initial
+   * connect on mount (there's nothing to recover from then). Consumers can
+   * watch this value to auto-refetch state that may have changed during a
+   * drop too brief to trip `isStale`'s manual-refresh banner.
+   */
+  reconnectedAt: number
   /** Registers `handler` for `eventName`; returns an unsubscribe function. */
   subscribe: (eventName: string, handler: EventHandler) => () => void
 }
@@ -87,12 +96,19 @@ export interface EventStream {
 export function useEventStream(url = buildEventsUrl()): EventStream {
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting')
   const [isStale, setIsStale] = useState(false)
+  const [reconnectedAt, setReconnectedAt] = useState(0)
   const listenersRef = useRef(new Map<string, Set<EventHandler>>())
   // Timestamp the connection most recently *left* the open state, or null
   // while currently open. Set to "now" when the connect effect starts,
   // since we start disconnected — done there rather than as this ref's
   // initializer so Date.now() isn't called during render.
   const disconnectedSinceRef = useRef<number | null>(null)
+  // Whether this connection has ever actually reached the 'open' state.
+  // Distinguishes "hasn't connected yet" (disconnectedSinceRef is non-null
+  // simply because the effect just started) from "was open, then dropped"
+  // (a real disconnect) — only the latter counts as a reconnect once we're
+  // back open, so reconnectedAt never fires on the initial connect.
+  const wasEverOpenRef = useRef(false)
 
   const subscribe = useCallback((eventName: string, handler: EventHandler) => {
     let handlers = listenersRef.current.get(eventName)
@@ -108,12 +124,21 @@ export function useEventStream(url = buildEventsUrl()): EventStream {
 
   useEffect(() => {
     disconnectedSinceRef.current = Date.now()
+    wasEverOpenRef.current = false
     const source = new EventSource(url)
 
     source.onopen = () => {
+      // Only a *real* reconnect (was open, then genuinely dropped) should
+      // trigger reconnectedAt — not the very first connect on mount, which
+      // has nothing to recover from.
+      const isRealReconnect = wasEverOpenRef.current && disconnectedSinceRef.current !== null
       disconnectedSinceRef.current = null
+      wasEverOpenRef.current = true
       setConnectionState('open')
       setIsStale(false)
+      if (isRealReconnect) {
+        setReconnectedAt(Date.now())
+      }
     }
 
     source.onerror = () => {
@@ -149,5 +174,5 @@ export function useEventStream(url = buildEventsUrl()): EventStream {
     }
   }, [url])
 
-  return { connectionState, isStale, subscribe }
+  return { connectionState, isStale, reconnectedAt, subscribe }
 }
