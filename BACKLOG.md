@@ -99,7 +99,7 @@ Pixel 7 Pro hardware is still worth doing but isn't blocking.
 ## 3. Favorites / like a song
 **Status:** done
 **Type:** enhancement
-**Analysis:** N/A — shipped (pending merge)
+**Analysis:** N/A — shipped
 
 Design spec: [docs/proposals/favorites/DESIGN_SPEC.md](docs/proposals/favorites/DESIGN_SPEC.md).
 Guests can heart any track (Now Playing, Queue, History, search results) —
@@ -109,7 +109,7 @@ identity (`guest_sessions` + `x-guest-token`), extended with an optional
 nickname/avatar settable on a new "Me" tab. Queued tracks show the adder's
 nickname/avatar when set. A dedicated Favorites tab on Find Music lists,
 sorts, filters, unfavorites, and re-queues. Implemented on
-`feature/favorites`; pushed for PR review, not yet merged to `master`.
+`feature/favorites`, merged to `master` via PR #1.
 
 ## 4. "Connect" nav item on the master device (was: QR code on Now Playing)
 **Status:** done
