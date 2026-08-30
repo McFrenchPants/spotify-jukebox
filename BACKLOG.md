@@ -29,6 +29,35 @@ where ambiguity gets surfaced and questioned, not resolved by assumption.
   clarifying questions where the item is genuinely underspecified — is
   itself a legitimate first unit of work, done *before* jumping to a design
   spec or code.
+- **Backlog entries are raw, not vetted.** They're often a one-line
+  reaction someone had in the moment — not a scoped, pre-approved plan.
+  Don't treat an entry's existence as proof the work is worth doing.
+  Writing the analysis means genuinely scrutinizing the item first:
+  - What problem is it actually solving, and for whom (guest, admin,
+    self-hoster)? If that's unclear, say so rather than inventing a
+    plausible-sounding justification.
+  - What value does it bring relative to its cost/complexity? An idea can
+    be legitimate and still not worth building right now.
+  - Are there simpler or more elegant ways to reach the same underlying
+    goal than the literal thing the entry describes (including "don't
+    build this, do X instead" or "this is actually already covered by
+    Y")?
+  - Is this even a good idea? A skeptical first pass belongs in the
+    analysis file, not just agreement plus scoping.
+  - Read the item's `**Type:**` line for the amount of latitude to
+    expect: `enhancement` entries are explicitly not firm requirements
+    (per the Type legend above) and should be scrutinized hardest;
+    `bug` entries still deserve a sanity check on whether the described
+    behavior is really wrong, but less license to second-guess the goal
+    itself.
+  - **Before the analysis file is considered complete, check in with the
+    user at least once**: share the initial assessment (the problem
+    reading, the value judgment, any alternatives found) and ask for
+    their reaction — confirmation, correction, or a steer — before
+    finalizing the document. This is a real checkpoint, not a formality;
+    don't write it as a rhetorical question you then answer yourself in
+    the same pass. Only skip it if the user explicitly says to proceed
+    without checking in on a given item or for a stretch of work.
 - Items that already shipped, or that already have a full
   `docs/proposals/<name>/DESIGN_SPEC.md`, don't need a separate analysis
   file — the design spec (or the shipped result) supersedes it. Marked

@@ -113,6 +113,23 @@ normal step, not a subagent-delegated one — this needs your own judgment
 and probably some web/codebase investigation) and update the backlog entry
 with findings before scaffolding implementation.
 
+Whenever the chosen item's analysis file is missing or still says "not yet
+written" (see `BACKLOG.md`'s "Analysis files" section), writing it is the
+first unit of work — before research-only follow-up, before a design spec,
+before any code. That means genuinely scrutinizing the entry rather than
+transcribing it: what problem it actually solves, whether it's worth the
+cost, whether a simpler/different approach reaches the same goal, and
+whether it's a good idea at all — a backlog entry is someone's raw idea,
+not a pre-approved plan (see the Type legend: `enhancement` entries in
+particular are explicitly not firm requirements). Once you have an initial
+read on those questions, **stop and check in with the user via
+`AskUserQuestion` (or a direct question, if free-form reaction fits
+better) before writing the analysis file's final version** — share your
+assessment and any alternatives you found, and let them confirm, correct,
+or redirect. Only then finalize `analysis/NN-slug.md`. Don't skip this
+checkpoint just because the item seems obviously fine — that's exactly the
+case where a rubber-stamped analysis is least useful.
+
 ### If the backlog is empty or has nothing actionable
 
 Do a lightweight analysis of the project to surface real candidates —
