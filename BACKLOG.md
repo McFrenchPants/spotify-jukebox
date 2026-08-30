@@ -248,20 +248,28 @@ All three implemented independently in parallel, verified together
 build/lint). Implemented on `fix/stale-now-playing-429`.
 
 ## 10. Desktop: playback controls/volume slider centered but labels aren't
-**Status:** ready
+**Status:** done
 **Type:** bug
-**Analysis:** analysis/10-desktop-volume-slider-alignment.md (not yet
-written — but this one's small enough it could reasonably skip straight to
-a fix; write the analysis first only if scope creeps)
+**Analysis:** N/A — root cause and fix are already fully scoped below
 
 In [PlaybackControls.tsx](frontend/src/components/playback/PlaybackControls.tsx),
-on wide screens the volume slider is centered (`lg:mx-auto lg:max-w-sm` on
-the slider input, [PlaybackControls.tsx:263](frontend/src/components/playback/PlaybackControls.tsx:263))
-but the "Volume" label above it ([PlaybackControls.tsx:254](frontend/src/components/playback/PlaybackControls.tsx:254))
-and the "volume can't be controlled remotely" message (always shown,
-[PlaybackControls.tsx:66-67](frontend/src/components/playback/PlaybackControls.tsx:66-67)/[279-280](frontend/src/components/playback/PlaybackControls.tsx:279-280))
-stay left-aligned, so on desktop the text visibly sits to the left of the
-centered slider/controls instead of lining up with them.
+on wide screens the volume slider was centered (`lg:mx-auto lg:max-w-sm` on
+the slider input) but the "Volume" label above it and the "volume can't be
+controlled remotely" message stayed left-aligned, so on desktop the text
+visibly sat to the left of the centered slider/controls instead of lining
+up with them.
+
+**Fixed**: applied `block lg:mx-auto lg:max-w-sm` to the "Volume" `<span>`
+and `lg:mx-auto lg:max-w-sm` to the unsupported-volume message paragraph,
+matching the input's existing centering. (First attempt put `lg:mx-auto
+lg:max-w-sm` on the wrapping `<label>` itself instead — that broke, since
+auto margins on a flex item's cross axis disable flex "stretch," collapsing
+the label — and its `w-full` input inside it — down to the range input's
+tiny ~129px browser-default width. Caught via live DOM/computed-style
+inspection before committing, not just a build check.) Verified live via
+`getBoundingClientRect()` at a 1280px viewport: label span, input, and
+message now share the same centered 384px column. Implemented on
+`fix/desktop-volume-slider-alignment`.
 
 ## 11. Find Music page: Favorites should sit alongside search, not in a separate tab, on wide screens
 **Status:** idea

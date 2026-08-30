@@ -61,6 +61,7 @@ MVP is done — this section replaces the phased task table for tracking new wor
 
 | Item | Status | Notes |
 |---|---|---|
+| Desktop volume slider label/message alignment (BACKLOG.md item 10) | done | `PlaybackControls.tsx`'s "Volume" label and volume-unsupported message stayed left-aligned while the slider itself was centered at `lg`. Fixed by centering the label `<span>` and message paragraph the same way (`lg:mx-auto lg:max-w-sm`). Implemented on `fix/desktop-volume-slider-alignment`, not yet merged. |
 | Spotify 429 rate-limit resilience | done | Root cause: local dev + the HA Add-on were both polling the same Spotify account simultaneously. Fixed with `rateLimitBackoff.ts` — automatic pollers now back off on a 429 instead of continuing to hammer Spotify every tick. User stopped the local dev backend (confirmed via `netstat`, port 8085 no longer listening). |
 | Reduce background Spotify polling volume | done | User asked for further reduction beyond the backoff fix. Device-status detection now reuses the `device` field already present in every currently-playing response instead of a separate `/v1/me/player/devices` call every ~12s (that call is now only a rarely-needed fallback, throttled to once per 5 min). Also closed a related gap: the token-refresh endpoint had no 429 handling at all, so a rate limit there could bypass the poller's backoff entirely — added `SpotifyRateLimitedError`. |
 | Add-on changelog missing | done | HA add-on page showed "No changelog found" — Supervisor reads `CHANGELOG.md` at the repo root, which didn't exist. Added it (reconstructed from git history: 1.0.0 initial, 1.0.2 EACCES/root-user fix, 1.0.3 429 backoff, 1.0.4 polling reduction), and added process reminders (a comment in `config.yaml` + a PROGRESS.md process note) so future version bumps update it too. |
@@ -73,6 +74,17 @@ MVP is done — this section replaces the phased task table for tracking new wor
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-08-30 — Post-launch: fixed desktop volume slider alignment (BACKLOG.md item 10)
+- `/continue-development 10` — user picked this alongside item 13 from a shortlist of small `ready` items. Small, fully-scoped bug fix, implemented directly (no subagent delegation).
+- **First fix attempt was wrong and caught before committing**: initially moved `lg:mx-auto lg:max-w-sm` onto the wrapping `<label>` element to constrain/center the whole label+input block together. Live DOM inspection (`getBoundingClientRect()`/`getComputedStyle()` via the Browser pane's `javascript_tool`, screenshot compositing unavailable again — same recurring gap noted in earlier sessions) showed this actually broke things: putting auto margins on a flex item's cross axis disables flexbox's default "stretch" sizing, so the label (and its `w-full` input inside it) collapsed down to the range input's ~129px browser-default width instead of the intended 384px.
+- **Correct fix**: left the `<label>` alone, added `block lg:mx-auto lg:max-w-sm` directly to the "Volume" `<span>` and `lg:mx-auto lg:max-w-sm` to the volume-unsupported message `<p>` — matching the centering already present (and already working) on the slider `<input>` itself, rather than trying to constrain the shared parent. Re-verified live: at 1280px viewport, input and message both span the same 536–920px centered column; the (short) label text centers within that same column.
+- Verified: `npm run build` clean, `npm run lint` clean (no new warnings beyond pre-existing ones). Implemented on `fix/desktop-volume-slider-alignment`, not yet merged — merging needs explicit user go-ahead per process.
+
+### 2026-08-30 — Post-launch: moved "Me" nav item after "Settings" (BACKLOG.md item 13)
+- `/continue-development 13` — user picked this alongside item 10. Trivial single-line array reorder in `navItems.tsx` (`NAV_ITEMS`), consumed as-is by both `BottomNav.tsx` and `SideNav.tsx` — no other changes needed.
+- Verified: `npm run build` clean; live-checked via the Browser pane (`read_page`) that the rendered nav links are now in order `/`, `/search`, `/history`, `/settings`, `/me`.
+- Implemented on `fix/nav-me-after-settings`, not yet merged — merging needs explicit user go-ahead per process.
 
 ### 2026-08-30 — Post-launch: fixed stale Now Playing + device-list 429 (BACKLOG.md item 9)
 - `/continue-development 9` — item was `needs research`, so per the skill's own rules I did the research myself first (not delegated) before scaffolding anything. Read `nowPlaying.ts`, `device.ts`, `rateLimitBackoff.ts`, `errors.ts`, `useEventStream.ts`, and `RootLayout.tsx` directly rather than trusting the backlog's prior (already partially-superseded) investigation notes. Findings written up in `analysis/09-spotify-429-rate-limiting.md`, committed and pushed separately before implementation started.
