@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Card } from '../ui/Card'
 import { Skeleton } from '../ui/Skeleton'
-import { ApiError, getRecentlyPlayed, type RecentlyPlayedEntry } from '../../lib/api'
+import { ApiError, getRecentlyPlayed, queueTrack, type RecentlyPlayedEntry } from '../../lib/api'
 import { formatRelativeTime } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
-import { FavoriteButton } from '../favorites/FavoriteButton'
-import { useFavoritesStatus, type FavoriteStatusEntry } from '../../hooks/useFavoritesStatus'
+import { useFavoritesStatus } from '../../hooks/useFavoritesStatus'
+import { SongCard, type QueueRowStatus } from '../songs/SongCard'
+import { useSession } from '../../context/SessionContext'
+import { useToast } from '../../context/ToastContext'
+import { describeQueueError } from '../../lib/queueErrors'
 
 const SKELETON_ROWS = 3
 
@@ -27,55 +30,6 @@ function RecentlyPlayedSkeletonRow() {
   )
 }
 
-/** Row: art, name/artist, relative "played X ago" timestamp, favorite toggle. */
-function RecentlyPlayedRow({
-  entry,
-  favoriteStatus,
-  onToggleFavorite,
-}: {
-  entry: RecentlyPlayedEntry
-  favoriteStatus: FavoriteStatusEntry
-  onToggleFavorite: () => void
-}) {
-  return (
-    <Card noPadding className="flex items-center gap-3 p-3">
-      {entry.albumArtUrl ? (
-        <img
-          src={entry.albumArtUrl}
-          alt=""
-          className="h-12 w-12 shrink-0 rounded-sm bg-surface-overlay object-cover"
-        />
-      ) : (
-        <div
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm bg-surface-overlay text-text-muted"
-          aria-hidden="true"
-        >
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-            <path d="M9 18V5l12-2v13" />
-            <circle cx="6" cy="18" r="3" />
-            <circle cx="18" cy="16" r="3" />
-          </svg>
-        </div>
-      )}
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-body font-semibold text-text-primary">{entry.trackName}</p>
-        <p className="truncate text-caption text-text-secondary">{entry.artistName}</p>
-      </div>
-
-      <div className="flex shrink-0 items-center gap-2">
-        <span className="text-caption text-text-muted">{formatRelativeTime(entry.playedAt)}</span>
-        <FavoriteButton
-          size="sm"
-          favoritedByMe={favoriteStatus.favoritedByMe}
-          favoritedByAnyone={favoriteStatus.favoritedByAnyone}
-          onToggle={onToggleFavorite}
-        />
-      </div>
-    </Card>
-  )
-}
-
 /**
  * Recently-played history list. Fetches GET /api/recent on mount. Also
  * re-fetches on `leaderboard-update` SSE events — there's no dedicated live
@@ -85,8 +39,11 @@ function RecentlyPlayedRow({
  * nice-to-have, not required by the acceptance criteria).
  */
 export function RecentlyPlayed({ subscribe, refreshKey }: RecentlyPlayedProps) {
+  const { token } = useSession()
+  const { showToast } = useToast()
   const [entries, setEntries] = useState<RecentlyPlayedEntry[] | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [rowStatus, setRowStatus] = useState<Record<string, QueueRowStatus>>({})
 
   const load = useCallback(() => {
     getRecentlyPlayed()
@@ -109,6 +66,25 @@ export function RecentlyPlayed({ subscribe, refreshKey }: RecentlyPlayedProps) {
     entries?.map((e) => e.spotifyTrackId) ?? [],
     subscribe
   )
+
+  async function handleAdd(entry: RecentlyPlayedEntry) {
+    if (!token) return // session not ready — shouldn't happen, App only renders once loaded
+
+    const id = entry.spotifyTrackId
+    setRowStatus((prev) => ({ ...prev, [id]: 'adding' }))
+
+    try {
+      await queueTrack(id, token)
+      setRowStatus((prev) => ({ ...prev, [id]: 'added' }))
+      showToast('success', `Added "${entry.trackName}" to the queue`, entry.artistName)
+      setTimeout(() => {
+        setRowStatus((prev) => (prev[id] === 'added' ? { ...prev, [id]: 'idle' } : prev))
+      }, 2000)
+    } catch (err) {
+      setRowStatus((prev) => ({ ...prev, [id]: 'idle' }))
+      showToast('warning', 'Could not add to queue', describeQueueError(err))
+    }
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -139,22 +115,31 @@ export function RecentlyPlayed({ subscribe, refreshKey }: RecentlyPlayedProps) {
       {entries !== null && entries.length > 0 && (
         <div className="flex flex-col gap-2">
           {entries.map((entry, i) => (
-            <RecentlyPlayedRow
+            <SongCard
               key={`${entry.spotifyTrackId}-${entry.playedAt}-${i}`}
-              entry={entry}
-              favoriteStatus={
-                favoritesStatus[entry.spotifyTrackId] ?? { favoritedByMe: false, favoritedByAnyone: false }
-              }
-              onToggleFavorite={() =>
-                toggleFavorite({
-                  id: entry.spotifyTrackId,
-                  name: entry.trackName,
-                  artist: entry.artistName,
-                  albumArt: entry.albumArtUrl,
-                  durationMs: entry.durationMs,
-                  explicit: false,
-                })
-              }
+              albumArtUrl={entry.albumArtUrl}
+              name={entry.trackName}
+              artist={entry.artistName}
+              timestamp={formatRelativeTime(entry.playedAt)}
+              favorite={{
+                favoritedByMe:
+                  favoritesStatus[entry.spotifyTrackId]?.favoritedByMe ?? false,
+                favoritedByAnyone:
+                  favoritesStatus[entry.spotifyTrackId]?.favoritedByAnyone ?? false,
+                onToggle: () =>
+                  toggleFavorite({
+                    id: entry.spotifyTrackId,
+                    name: entry.trackName,
+                    artist: entry.artistName,
+                    albumArt: entry.albumArtUrl,
+                    durationMs: entry.durationMs,
+                    explicit: false,
+                  }),
+              }}
+              addToQueue={{
+                status: rowStatus[entry.spotifyTrackId] ?? 'idle',
+                onAdd: () => handleAdd(entry),
+              }}
             />
           ))}
         </div>
