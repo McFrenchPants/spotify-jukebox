@@ -72,7 +72,7 @@ export function FavoriteRow({ favorite, status, onAdd, onToggleFavorite }: Favor
         disabled={disabled}
         onClick={() => onAdd(favorite)}
       >
-        {status === 'adding' ? 'Adding…' : status === 'added' ? 'Added' : 'Add'}
+        {status === 'adding' ? 'Adding to Queue…' : status === 'added' ? 'Added' : 'Add to Queue'}
       </Button>
     </Card>
   )

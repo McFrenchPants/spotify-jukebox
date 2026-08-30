@@ -318,15 +318,14 @@ Favorites section at [SearchAndQueue.tsx:274-431](frontend/src/components/search
 side-by-side layouts (see item 2).
 
 ## 12. Favorites list: rename "Add" button to "Add to Queue"
-**Status:** ready
+**Status:** done
 **Type:** enhancement
-**Analysis:** N/A — copy change, trivial enough to skip an analysis file
+**Analysis:** N/A — shipped
 
-The button that queues a favorited track currently just says "Add":
-[FavoriteRow.tsx:75](frontend/src/components/favorites/FavoriteRow.tsx:75)
-(`status === 'adding' ? 'Adding…' : status === 'added' ? 'Added' : 'Add'`).
-Change the default label to "Add to Queue" (and consider whether "Adding…"
-should become "Adding to Queue…" for consistency).
+Button label in [FavoriteRow.tsx](frontend/src/components/favorites/FavoriteRow.tsx)
+changed from `'Add'`/`'Adding…'` to `'Add to Queue'`/`'Adding to Queue…'`
+(the `'Added'` state was left as-is). Implemented on
+`fix/favorites-add-to-queue-copy`.
 
 ## 13. Nav order: move "Me" to the end, after "Settings"
 **Status:** ready
