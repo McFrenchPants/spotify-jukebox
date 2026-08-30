@@ -4,8 +4,7 @@ import { Card } from '../ui/Card'
 import { Skeleton } from '../ui/Skeleton'
 import { Button } from '../ui/Button'
 import { Select } from '../ui/Select'
-import { TrackRow, type QueueRowStatus } from './TrackRow'
-import { FavoriteRow } from '../favorites/FavoriteRow'
+import { SongCard, type QueueRowStatus } from '../songs/SongCard'
 import {
   ApiError,
   getFavorites,
@@ -19,6 +18,7 @@ import { useToast } from '../../context/ToastContext'
 import { useSession } from '../../context/SessionContext'
 import { useFavoritesStatus } from '../../hooks/useFavoritesStatus'
 import type { EventStream } from '../../hooks/useEventStream'
+import { describeQueueError } from '../../lib/queueErrors'
 
 const DEBOUNCE_MS = 380
 const SKELETON_ROWS = 4
@@ -55,43 +55,6 @@ function SearchSkeletonRow() {
       </div>
     </Card>
   )
-}
-
-/** Human-readable "Xs" / "Xm Ys" from a millisecond duration, rounded up. */
-function formatRetryAfter(retryAfterMs: number): string {
-  const totalSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000))
-  if (totalSeconds < 60) return `${totalSeconds}s`
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}m ${seconds}s`
-}
-
-/**
- * Maps a queue-add failure to distinct, guest-facing copy. The 422
- * guardrail rejections already carry a complete human-readable sentence
- * from the backend (see backend/src/guardrails/queueGuardrails.ts) — that's
- * reused as-is since each `reason` produces its own distinct message there.
- * Rate limiting (429) has no message from the backend, so it's composed
- * here from `retryAfterMs`. Everything else falls back to a generic message.
- */
-function describeQueueError(err: unknown): string {
-  if (err instanceof ApiError) {
-    if (err.status === 429) {
-      const wait = err.retryAfterMs !== undefined ? formatRetryAfter(err.retryAfterMs) : 'a moment'
-      return `You're queueing too fast — try again in ${wait}.`
-    }
-    if (err.status === 422) {
-      return err.message
-    }
-    if (err.status === 503) {
-      return "Playback isn't ready yet — an admin needs to finish setup. Try again shortly."
-    }
-    if (err.status === 404) {
-      return "That track couldn't be found on Spotify."
-    }
-    return err.message || 'Could not add that track to the queue.'
-  }
-  return 'Could not add that track to the queue — check your connection and try again.'
 }
 
 /** Converts a FavoriteTrack (favorites API shape) into the Track shape queueTrack/toggle expect. */
@@ -157,6 +120,11 @@ export function SearchAndQueue({ subscribe }: SearchAndQueueProps) {
   }, [debouncedQuery])
 
   const isLoading = debouncedQuery !== '' && outcome?.query !== debouncedQuery
+
+  const { status: favoritesStatus, toggle: toggleFavorite } = useFavoritesStatus(
+    outcome?.tracks?.map((t) => t.id) ?? [],
+    subscribe
+  )
 
   async function handleAdd(track: Track) {
     if (!token) return // session not ready — shouldn't happen, App only renders once loaded
@@ -252,11 +220,22 @@ export function SearchAndQueue({ subscribe }: SearchAndQueueProps) {
             outcome.tracks.length > 0 && (
               <div className="flex flex-col gap-2">
                 {outcome.tracks.map((track) => (
-                  <TrackRow
+                  <SongCard
                     key={track.id}
-                    track={track}
-                    status={rowStatus[track.id] ?? 'idle'}
-                    onAdd={handleAdd}
+                    albumArtUrl={track.albumArt}
+                    name={track.name}
+                    artist={track.artist}
+                    explicit={track.explicit}
+                    durationMs={track.durationMs}
+                    favorite={{
+                      favoritedByMe: favoritesStatus[track.id]?.favoritedByMe ?? false,
+                      favoritedByAnyone: favoritesStatus[track.id]?.favoritedByAnyone ?? false,
+                      onToggle: () => toggleFavorite(track),
+                    }}
+                    addToQueue={{
+                      status: rowStatus[track.id] ?? 'idle',
+                      onAdd: () => handleAdd(track),
+                    }}
                   />
                 ))}
               </div>
@@ -424,12 +403,21 @@ function FavoritesSection({ subscribe, onAdd, rowStatus }: FavoritesSectionProps
       {!isLoading && !outcome?.errorMessage && filteredFavorites.length > 0 && (
         <div className="flex flex-col gap-2">
           {filteredFavorites.map((favorite) => (
-            <FavoriteRow
+            <SongCard
               key={favorite.spotifyTrackId}
-              favorite={favorite}
-              status={rowStatus[favorite.spotifyTrackId] ?? 'idle'}
-              onAdd={(f) => onAdd(favoriteToTrack(f))}
-              onToggleFavorite={handleUnfavorite}
+              albumArtUrl={favorite.albumArtUrl}
+              name={favorite.trackName}
+              artist={favorite.artistName}
+              durationMs={favorite.durationMs}
+              favorite={{
+                favoritedByMe: true,
+                favoritedByAnyone: true,
+                onToggle: () => handleUnfavorite(favorite),
+              }}
+              addToQueue={{
+                status: rowStatus[favorite.spotifyTrackId] ?? 'idle',
+                onAdd: () => onAdd(favoriteToTrack(favorite)),
+              }}
             />
           ))}
         </div>
