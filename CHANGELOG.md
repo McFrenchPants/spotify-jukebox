@@ -2,6 +2,11 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.21
+
+- Now Playing shows a clear "Could not connect to Spotify" message when Spotify is rate-limiting requests, instead of the misleading "Nothing playing."
+- Reduced Spotify API calls when several guests are searching or queueing at the same time, by briefly reusing recent search/track/artist lookups instead of repeating them — helps avoid tripping Spotify's rate limit with multiple concurrent guests.
+
 ## 1.0.20
 
 - Fixed the guest volume slider not staying in sync with the Jukebox device's real volume: it now seeds accurately on load (instead of a hardcoded default) and stays live-updated if the phone's volume is changed directly (its hardware buttons or Android's own volume UI), without interrupting a guest who's actively dragging the slider themselves.
