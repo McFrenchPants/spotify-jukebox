@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.16
+
+- Fixed the Now Playing screen's blurred background art briefly flashing to black every time you navigated to it, even while a song was already playing.
+
 ## 1.0.15
 
 - Fixed a bug where looking up certain artists (e.g. from a track's artist link) could fail with an error instead of showing the artist's info — some artists don't have follower or image data available, and the app now handles that gracefully instead of crashing.
