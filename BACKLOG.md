@@ -5,10 +5,44 @@ bottom of the list with a status; move to "Done" (or delete) once shipped.
 
 Status legend: `idea` (not scoped), `needs research`, `ready`, `in progress`, `done`
 
+Type legend:
+- `bug` — something is broken relative to how the app is already supposed to
+  behave (a crash, a visual defect, incorrect data, a regression).
+- `enhancement` — a new capability, a design/UX change, or a preference —
+  even when the fix would be trivial to implement, this is not "wrong,"
+  it's a choice. Nothing here should be treated as a firm requirement just
+  because it's written down — several of these are half-formed and need
+  brainstorming or a design pass before they're worth building.
+
+## Analysis files
+
+Every item below should eventually have a corresponding
+`analysis/NN-slug.md` (NN = the item number, zero-padded to 2 digits) that
+goes deeper than this single-paragraph backlog entry: what problem it's
+actually solving, what's been learned so far, open questions, and (once
+known) acceptance criteria. This is the step *before* a design doc — it's
+where ambiguity gets surfaced and questioned, not resolved by assumption.
+
+- If an item's `**Analysis:**` line below says "not yet written," that's a
+  gap. When `/continue-development` (or anyone) picks up an item with no
+  analysis file, writing that analysis — including asking the user
+  clarifying questions where the item is genuinely underspecified — is
+  itself a legitimate first unit of work, done *before* jumping to a design
+  spec or code.
+- Items that already shipped, or that already have a full
+  `docs/proposals/<name>/DESIGN_SPEC.md`, don't need a separate analysis
+  file — the design spec (or the shipped result) supersedes it. Marked
+  `N/A` below.
+- Analysis files are working documents, not backlog items themselves — they
+  don't get a status, and they're expected to end in open questions for
+  items still at `idea`/`needs research`.
+
 ---
 
 ## 1. Lyrics integration
 **Status:** needs research
+**Type:** enhancement
+**Analysis:** analysis/01-lyrics-integration.md (not yet written)
 
 Show lyrics for the currently playing track. Needs research into providers —
 whether there's a usable free API (e.g. lrclib, Musixmatch's unofficial API)
@@ -17,6 +51,8 @@ Licensing/ToS should be checked before committing to a provider.
 
 ## 2. Landscape layout for the bridge device
 **Status:** done
+**Type:** enhancement
+**Analysis:** N/A — shipped
 
 Reframed during scoping: phone stays the primary target for both the bridge
 device and guests, but the app should respond well to tablets and desktop
@@ -33,6 +69,8 @@ Pixel 7 Pro hardware is still worth doing but isn't blocking.
 
 ## 3. Favorites / like a song
 **Status:** done
+**Type:** enhancement
+**Analysis:** N/A — shipped (pending merge)
 
 Design spec: [docs/proposals/favorites/DESIGN_SPEC.md](docs/proposals/favorites/DESIGN_SPEC.md).
 Guests can heart any track (Now Playing, Queue, History, search results) —
@@ -46,6 +84,8 @@ sorts, filters, unfavorites, and re-queues. Implemented on
 
 ## 4. On-demand QR code on the Now Playing screen
 **Status:** idea
+**Type:** enhancement
+**Analysis:** analysis/04-qr-code-now-playing.md (not yet written)
 
 Add a small icon/affordance on the main (now playing) screen that reveals the
 QR code for controlling the jukebox from a guest's own phone. Intent: when the
@@ -55,12 +95,16 @@ clutter the primary layout.
 
 ## 5. Move "Playback Device" above "Queue Moderation" in Settings
 **Status:** done
+**Type:** enhancement
+**Analysis:** N/A — shipped
 
 Reordered in [SettingsPage.tsx](frontend/src/pages/SettingsPage.tsx) —
 `DeviceSelector` now renders directly above `QueueModeration`.
 
 ## 6. Trust mode toggle: "Restricted" label overlaps the switch
 **Status:** done
+**Type:** bug
+**Analysis:** N/A — shipped
 
 Widened the `Switch` component ([Switch.tsx](frontend/src/components/ui/Switch.tsx))
 from 7.5rem to 11rem (each half-label area from 60px to ~88px) and its pill
@@ -72,6 +116,10 @@ safety net in case a future label is even longer.
 
 ## 7. Play count display seems to undercount plays
 **Status:** display bug fixed — watch for recurrence
+**Type:** bug
+**Analysis:** analysis/07-play-count-undercount.md (not yet written — worth
+writing if this recurs, to capture the track-ID-fragmentation theory below
+as a real open question rather than a footnote)
 
 Reported: a track that's "definitely" been played several times shows
 "Played 1 time" when expanding the Now Playing card.
@@ -121,6 +169,8 @@ Findings so far:
 
 ## 8. Master Device Mode — Android app build + local volume control on the bridge device
 **Status:** in progress — design spec in review
+**Type:** enhancement
+**Analysis:** N/A — see design spec below
 
 Spotify's API reports `supports_volume: false` for phones acting as a Spotify
 Connect receiver (confirmed live against the real deployment: the bridge
@@ -144,6 +194,8 @@ design review.
 
 ## 9. Spotify 429 "Too Many Requests" — stale/stuck Now Playing after idle, device list fails in Settings
 **Status:** needs research
+**Type:** bug
+**Analysis:** analysis/09-spotify-429-rate-limiting.md (not yet written)
 
 Recurring issue (reported several times before, keeps coming back): after the
 bridge device/app has been idle a while, the app shows a track playing that
@@ -199,6 +251,10 @@ Starting points for the investigation:
 
 ## 10. Desktop: playback controls/volume slider centered but labels aren't
 **Status:** ready
+**Type:** bug
+**Analysis:** analysis/10-desktop-volume-slider-alignment.md (not yet
+written — but this one's small enough it could reasonably skip straight to
+a fix; write the analysis first only if scope creeps)
 
 In [PlaybackControls.tsx](frontend/src/components/playback/PlaybackControls.tsx),
 on wide screens the volume slider is centered (`lg:mx-auto lg:max-w-sm` on
@@ -211,6 +267,8 @@ centered slider/controls instead of lining up with them.
 
 ## 11. Find Music page: Favorites should sit alongside search, not in a separate tab, on wide screens
 **Status:** idea
+**Type:** enhancement
+**Analysis:** analysis/11-favorites-two-column-layout.md (not yet written)
 
 On tablet/desktop widths, Favorites shouldn't be a separate tab a guest has
 to switch to — it should display side-by-side with search in a two-column
@@ -226,6 +284,8 @@ side-by-side layouts (see item 2).
 
 ## 12. Favorites list: rename "Add" button to "Add to Queue"
 **Status:** ready
+**Type:** enhancement
+**Analysis:** N/A — copy change, trivial enough to skip an analysis file
 
 The button that queues a favorited track currently just says "Add":
 [FavoriteRow.tsx:75](frontend/src/components/favorites/FavoriteRow.tsx:75)
@@ -235,6 +295,8 @@ should become "Adding to Queue…" for consistency).
 
 ## 13. Nav order: move "Me" to the end, after "Settings"
 **Status:** ready
+**Type:** enhancement
+**Analysis:** N/A — single array reorder, trivial enough to skip an analysis file
 
 Swap the order of the last two nav items. Currently `NAV_ITEMS` in
 [navItems.tsx:58-64](frontend/src/components/nav/navItems.tsx:58-64) lists
@@ -245,6 +307,8 @@ Me so Me is last. Single array reorder, consumed by both
 
 ## 14. Now Playing expanded card: add more track stats (favorite count, etc.)
 **Status:** needs research
+**Type:** enhancement
+**Analysis:** analysis/14-now-playing-more-stats.md (not yet written)
 
 When a guest expands the Now Playing card, it currently shows play count and
 artist/genre details ([NowPlaying.tsx](frontend/src/components/nowplaying/NowPlaying.tsx),
@@ -266,3 +330,106 @@ album art/type, and artist-level popularity, follower count, and genres.
 Realistic stat additions: track popularity score, artist follower count,
 artist genres (if not already shown), and album release date — alongside
 the in-app favorite count.
+
+## 15. Artist lookup 502: "Cannot read properties of undefined (reading 'total')"
+**Status:** ready
+**Type:** bug
+**Analysis:** N/A — root cause and fix are already fully scoped below
+
+`GET /api/artist/:id` throws for at least one artist ID
+(`3QFXxlWMDSRABMc79TKS5U`), surfacing as a generic 502
+`spotify_artist_lookup_failed`. Root cause found:
+[client.ts:251](backend/src/spotify/client.ts:251) in `getArtist()` reads
+`artist.followers.total` unguarded off the raw Spotify `GET /artists/{id}`
+response. If Spotify omits or partially returns `followers` for a given
+artist, `artist.followers` is `undefined` and `.total` throws a `TypeError`,
+which isn't a shape the route's error handler
+([artist.ts:27-30](backend/src/routes/artist.ts:27-30)) recognizes as a 404,
+so it falls through to the generic 502. Fix: guard the same way `imageUrl`
+already is on the line above (`artist.images?.[0]?.url ?? null`) — e.g.
+`artist.followers?.total ?? 0`.
+
+## 16. Album art background flashes to black when navigating to Now Playing
+**Status:** ready
+**Type:** bug
+**Analysis:** N/A — root cause and fix direction are already fully scoped below
+
+Reported: switching from any page to Now Playing briefly loses the blurred
+background album art (goes black) while the song-info card's own art stays
+visible. Root cause: `NowPlaying` remounts on route change and initializes
+its `snapshot` state to `null`
+([NowPlaying.tsx:56](frontend/src/components/nowplaying/NowPlaying.tsx:56)).
+An effect fires immediately on mount pushing that `null` art up to
+`RootLayout` ([NowPlaying.tsx:91-93](frontend/src/components/nowplaying/NowPlaying.tsx:91-93)
+→ [RootLayout.tsx:32,79](frontend/src/components/RootLayout.tsx:32)), which
+sets `AppShell`'s background art state to `null`, triggering its fade-out
+transition ([AppShell.tsx:60-68](frontend/src/components/AppShell.tsx:60-68),
+`app-shell__bg-art` layer at [AppShell.tsx:102-113](frontend/src/components/AppShell.tsx:102-113)) —
+all before the real snapshot arrives from the async `getNowPlaying()` fetch
+or the next SSE `now-playing` event. Fix direction: don't clear the shared
+background art on mount before the first real snapshot resolves — e.g. skip
+the `onAlbumArtChange(null)` push while `snapshot` is still the initial
+unloaded state, or keep the previously-displayed art until new art (or an
+explicit "nothing playing") is confirmed.
+
+## 17. Make song cards consistent across Leaderboard, Recently Played, Search, and Favorites
+**Status:** idea
+**Type:** enhancement
+**Analysis:** analysis/17-song-card-consistency.md (not yet written)
+
+Every list currently has its own bespoke row component with a different
+subset of behavior — no shared `TrackCard`/`SongCard` exists, so the same
+song looks and behaves differently depending on which list it's found in:
+- [Leaderboard.tsx:30-84](frontend/src/components/leaderboard/Leaderboard.tsx:30-84)
+  (`LeaderboardRow`) — favorite toggle only.
+- [RecentlyPlayed.tsx:31-77](frontend/src/components/recent/RecentlyPlayed.tsx:31-77)
+  (`RecentlyPlayedRow`) — favorite toggle only.
+- [TrackRow.tsx:21-74](frontend/src/components/search/TrackRow.tsx:21-74)
+  (search results) — add-to-queue only.
+- [FavoriteRow.tsx:29-79](frontend/src/components/favorites/FavoriteRow.tsx:29-79) —
+  favorite toggle + add-to-queue; its own comment
+  ([FavoriteRow.tsx:21-28](frontend/src/components/favorites/FavoriteRow.tsx:21-28))
+  admits it's a deliberate copy of `TrackRow` rather than a shared component.
+- Click-to-expand-for-more-info exists nowhere in these four lists today —
+  it's only implemented on the Now Playing hero card
+  ([NowPlaying.tsx:202-223](frontend/src/components/nowplaying/NowPlaying.tsx:202-223)).
+
+Requested: every list should support the same three actions — expand for
+details, favorite, add to queue. Likely needs a shared card component
+(consolidating the existing bespoke rows, particularly `TrackRow` and the
+already-duplicated `FavoriteRow`) rather than bolting the missing actions
+onto each row individually.
+
+## 18. Clarify/hide playback-permission settings when a master device is active
+**Status:** needs research
+**Type:** enhancement
+**Analysis:** analysis/18-master-device-permission-clarity.md (not yet
+written)
+
+Question raised: when a guest is connected while a Jukebox master device is
+designated (item 8), do the admin's global playback-permission toggles
+(pause/resume, skip, volume, reorder) still do anything, or does the master
+device silently take priority — leaving a setting visible in Settings that
+has no real effect?
+
+What was found: the permission gate itself is *not* bypassed by master-device
+routing — every playback action (including volume) still passes through
+`checkTrustModeGate()` / `resolveEffectivePermission()` before the
+master-device branch runs
+([playback.ts:39-53](backend/src/routes/playback.ts:39-53), volume path at
+[playback.ts:150-161](backend/src/routes/playback.ts:150-161)), so the
+toggles in [SettingsForm.tsx:51-56](frontend/src/components/admin/SettingsForm.tsx:51-56)
+aren't dead. However, a related staleness issue was found while checking
+this: `PlaybackControls` fetches jukebox-device online status
+(`GET /api/trust-mode`) once on mount with no live SSE update
+([PlaybackControls.tsx:104-113,131-144](frontend/src/components/playback/PlaybackControls.tsx:104-113)),
+and `volumeAllowed` is computed from that snapshot
+([PlaybackControls.tsx:219](frontend/src/components/playback/PlaybackControls.tsx:219)) —
+so if the Jukebox bridge device goes offline mid-session, the volume slider
+can keep rendering as enabled until the guest refreshes, even though a
+submitted change would now silently no-op or fall back to the
+"can't control volume remotely" copy. Worth deciding: (a) should this stale
+state be fixed by pushing device-online changes over SSE, and (b) is there a
+genuinely dead/no-op setting in this scenario that the original report had
+in mind — worth re-confirming the specific setting/scenario with the
+reporter before scoping further.
