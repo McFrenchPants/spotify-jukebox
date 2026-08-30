@@ -212,9 +212,23 @@ Full implementation/session history:
 Implemented on `feature/master-device-mode`, merged to `master`.
 
 ## 9. Spotify 429 "Too Many Requests" — stale/stuck Now Playing after idle, device list fails in Settings
-**Status:** needs research
+**Status:** ready
 **Type:** bug
-**Analysis:** analysis/09-spotify-429-rate-limiting.md (not yet written)
+**Analysis:** [analysis/09-spotify-429-rate-limiting.md](analysis/09-spotify-429-rate-limiting.md) — three
+distinct root causes identified, each with a concrete, independent fix:
+(A) `GET /api/now-playing` silently serves a frozen cache during an active
+rate-limit backoff, with no staleness signal, so even a page refresh can't
+recover — fix by exposing `polledAt`/`rateLimited` on the response;
+(B) `listDevices()`'s Web API 429 throws a plain `Error` instead of the
+`SpotifyRateLimitedError` type `classifySpotifyAuthError()` already handles
+cleanly (used elsewhere for the token-endpoint 429 case) — fix by throwing
+the right type, no new classification logic needed;
+(C) an SSE reconnect never triggers any consumer to refetch — `RootLayout`'s
+shared `refreshKey` (read by both `NowPlaying` and `QueueList`) only bumps
+on a manual banner click, not automatically on reconnect-after-a-real-drop
+— fix by auto-bumping it on that transition, which resyncs every consumer
+for free. All three are independent and can be implemented/verified
+separately.
 
 Recurring issue (reported several times before, keeps coming back): after the
 bridge device/app has been idle a while, the app shows a track playing that
