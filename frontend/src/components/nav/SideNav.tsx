@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { NAV_ITEMS } from './navItems'
+import { NAV_ITEMS, CONNECT_NAV_ITEM } from './navItems'
+import { useIsJukeboxDevice } from '../../hooks/useIsJukeboxDevice'
 
 /**
  * Fixed left side rail (L1.1) — the `sm`-and-up counterpart to `BottomNav`'s
@@ -11,6 +12,9 @@ import { NAV_ITEMS } from './navItems'
  * regardless of which one is visually shown.
  */
 export function SideNav() {
+  const isJukeboxDevice = useIsJukeboxDevice()
+  const navItems = NAV_ITEMS.map((item) => (item.to === '/me' && isJukeboxDevice ? CONNECT_NAV_ITEM : item))
+
   return (
     <nav
       className="glass-chrome fixed inset-y-0 left-0 z-20 hidden w-48 flex-col border-y-0 border-l-0 sm:flex"
@@ -18,7 +22,7 @@ export function SideNav() {
       aria-label="Primary"
     >
       <div className="flex w-full flex-col gap-1 px-3 py-4">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

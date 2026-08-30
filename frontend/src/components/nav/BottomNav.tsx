@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
-import { NAV_ITEMS } from './navItems'
+import { NAV_ITEMS, CONNECT_NAV_ITEM } from './navItems'
+import { useIsJukeboxDevice } from '../../hooks/useIsJukeboxDevice'
 
 /**
  * Fixed bottom tab bar (P4.8) — the app's 4-tab primary navigation. Rendered
@@ -11,6 +12,9 @@ import { NAV_ITEMS } from './navItems'
  * visually shown, and CSS breakpoints (not JS) decide which one renders.
  */
 export function BottomNav() {
+  const isJukeboxDevice = useIsJukeboxDevice()
+  const navItems = NAV_ITEMS.map((item) => (item.to === '/me' && isJukeboxDevice ? CONNECT_NAV_ITEM : item))
+
   return (
     <nav
       className="glass-chrome fixed inset-x-0 bottom-0 z-20 border-x-0 border-b-0 sm:hidden"
@@ -18,7 +22,7 @@ export function BottomNav() {
       aria-label="Primary"
     >
       <div className="mx-auto flex w-full max-w-lg items-stretch justify-around px-2 py-1.5">
-        {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
+        {navItems.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

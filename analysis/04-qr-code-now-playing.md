@@ -103,19 +103,19 @@ scoped directly without one.
   bridge device with no personal identity of its own, so swapping (not
   adding) is both more correct and avoids nav clutter.
 
-## Open questions (still idea/needs-research tier — not yet answered)
+## Open questions
 
-- Exact copy/instructions for the "Connect" page — not scoped yet.
-- Whether "master device" here should mean specifically the registered
-  Jukebox device from Master Device Mode (item 8, native Android build),
-  or more generally "whatever device the admin is running the app from" —
-  needs clarifying, since Master Device Mode is optional/self-hoster-only
-  and plenty of deployments won't have a registered Jukebox device at
-  all. If there's no registered device, does the regular "Me" tab stay as
-  the default everywhere? (Likely yes — the conditional only fires when a
-  Jukebox device *is* registered and this client's id matches it.)
+- **Resolved (user check-in, 2026-08-30):** the Connect nav swap is
+  scoped to the existing Master Device Mode registration (item 8) only —
+  it fires exactly when this client's `clientId` matches the registered
+  Jukebox device's `clientId`. Not a general-purpose "flag any browser as
+  the display device" mechanism; deployments without a registered Jukebox
+  device (Master Device Mode is optional/self-hoster-only) always see the
+  regular "Me" tab, same as today.
+- Exact copy/instructions for the "Connect" page — not scoped yet, small
+  enough to decide during implementation.
 - Whether the public `isRegistered` check should be a one-shot fetch on
   mount or also live-updated over SSE (e.g. if the admin re-registers a
   different device mid-session, should nav in an already-open tab of the
-  old device flip back to "Me" without a reload?). Likely low-priority
-  edge case, not a launch blocker.
+  old device flip back to "Me" without a reload?). Low-priority edge
+  case, not a launch blocker — one-shot fetch on mount is enough for v1.
