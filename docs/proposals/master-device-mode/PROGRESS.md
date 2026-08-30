@@ -12,7 +12,7 @@ branch before making any changes. The branch was fast-forwarded to current
 `master` (`b49e7e3`) on 2026-08-29 before implementation started, since it
 had sat untouched (0 unique commits) since being cut.
 
-## Status: Phases M0-M4 done. M5.2 real-hardware testing found and fixed four real bugs the original plan missed (see session log); user confirms the app now works end-to-end on the real bridge Pixel 7 Pro. Still need explicit confirmation the volume slider itself audibly changes the Bluetooth speaker's volume (the actual §7 success criterion) before M5.2 is marked fully done. M5.3 (close-out/merge) remains after that, pending user go-ahead.
+## Status: Phases M0-M5.2 all done. User confirmed the volume slider genuinely changes the real Bluetooth speaker's output on the actual bridge Pixel 7 Pro — the design spec's §7 success criterion is met. Only M5.3 (close-out/merge) remains, pending explicit user go-ahead to merge.
 
 ## Task Table
 
@@ -34,7 +34,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | M4.1 | One-command Android build script | done | `npm run build:android` (`frontend/scripts/build-android.js`) chains web build → `cap sync android` → Gradle `assembleDebug`, cross-platform gradlew selection, and auto-locates/injects a JDK 21 for just the Gradle step if the shell's default `java`/`JAVA_HOME` is older (exactly the wrinkle this environment hit). Re-verified independently — real `BUILD SUCCEEDED`, APK produced. |
 | M4.2 | Self-hoster documentation | done | [docs/MASTER_DEVICE_MODE.md](../MASTER_DEVICE_MODE.md): what/why, `npm run build:android`, sideload/install-unknown-sources caveat, registering via Settings, verifying it worked. `README.md` gained exactly one added link sentence, nothing else touched. **Phase M4 done.** |
 | M5.1 | Cross-scenario regression pass | done | Full backend suite: 38 files / 323 tests passing, `tsc --noEmit` clean. Frontend: `npm run build`/`npm run lint` clean (same pre-existing warning baseline throughout this whole proposal, zero new). Docker smoke test **not run** — Docker Desktop isn't running in this environment. Risk assessed as low: nothing in this proposal touched `Dockerfile`/`docker-compose.yml`/`config.yaml`/any deployment file, and every change was additive (new endpoints/fields, `Capacitor.isNativePlatform()`-gated code paths) rather than a modification to an existing code path's default behavior. Worth a real Docker re-run before merge if the user wants extra confidence, but not treated as a hard blocker given the above. |
-| M5.2 | Real-hardware verification (needs the user) | todo | Needs actual bridge Pixel 7 Pro — stopping point for user |
+| M5.2 | Real-hardware verification (needs the user) | done | User confirmed on the real bridge Pixel 7 Pro: volume slider genuinely changes the Bluetooth speaker's real output volume. Along the way, found and fixed 5 real bugs the original plan missed (see session log) — the last one, a hardcoded slider seed value causing a jump on first touch, fixed same-session. Offline-disables-all-controls behavior not separately confirmed by the user, but its logic is unchanged from M3.3's earlier live-verified behavior. |
 | M5.3 | Close out (backlog, PROGRESS.md, merge) | todo | Needs explicit user go-ahead to merge |
 
 ## Open Questions / Blockers
@@ -52,6 +52,20 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-30** — **M5.2 complete — volume control confirmed working on real
+  hardware.** User confirmed the guest volume slider genuinely changes the
+  bridge Pixel 7 Pro's real Bluetooth-speaker output (§7 success criterion
+  met). Noted the slider snapped real playback volume abruptly on first
+  touch — root cause: `PlaybackControls.tsx`'s `volumeValue` was seeded from
+  a hardcoded `50` instead of the device's actual current volume, even
+  though `GET /api/device` already returns `volume_percent`. Fixed directly
+  for the standard Spotify-device path (seeds from `volume_percent` once
+  resolved). The Jukebox-device (native-volume) path still has no way to
+  read the phone's actual current volume at all — the design spec
+  explicitly scoped this out of v1 (one-way app→phone control only) — filed
+  as `BACKLOG.md` item 19 rather than silently accepted, since real use
+  confirmed it's a genuine rough edge worth a future pass. Build/lint clean.
+  Only M5.3 (close-out/merge) remains.
 - **2026-08-30** — **User confirms the app works end-to-end on the real bridge
   Pixel 7 Pro.** Full chain of what it took to get there, for the record:
   (1) no backend-URL config + no CORS (fixed), (2) Android's default
