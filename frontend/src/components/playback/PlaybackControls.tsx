@@ -152,7 +152,19 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
     // guest hit a confusing raw Spotify error after already using the slider.
     getDevice()
       .then((data) => {
-        if (!cancelled) setDevice(data.resolved)
+        if (cancelled) return
+        setDevice(data.resolved)
+        // Seed the slider from the device's actual current volume instead of
+        // a hardcoded guess — otherwise the first touch snaps real playback
+        // volume to whatever the guessed default was, an abrupt/surprising
+        // jump reported from real use. Only meaningful for a device Spotify
+        // itself tracks volume for; the Jukebox-device native-volume path
+        // (see jukeboxOnline below) has no equivalent read-back in this
+        // first version — see DESIGN_SPEC.md §4.3 — so this can't seed an
+        // accurate value there and is left at its prior default in that case.
+        if (data.resolved?.volume_percent != null) {
+          setVolumeValue(data.resolved.volume_percent)
+        }
       })
       .catch(() => {
         // Leave device undefined/unresolved — the volume slider stays
