@@ -1,4 +1,5 @@
 import fs from "fs";
+import { logWarn } from "../logger";
 
 // Home Assistant OS add-on mode: the Supervisor has no `.env` file for this
 // container. Instead it mounts the user's options (entered through the
@@ -52,10 +53,7 @@ export function loadHomeAssistantOptions(): void {
   try {
     raw = fs.readFileSync(OPTIONS_PATH, "utf-8");
   } catch (err) {
-    console.warn(
-      `[homeAssistantOptions] Found ${OPTIONS_PATH} but could not read it, ignoring:`,
-      err
-    );
+    logWarn("homeAssistantOptions", `Found ${OPTIONS_PATH} but could not read it, ignoring`, err);
     return;
   }
 
@@ -63,16 +61,14 @@ export function loadHomeAssistantOptions(): void {
   try {
     parsed = JSON.parse(raw);
   } catch (err) {
-    console.warn(
-      `[homeAssistantOptions] Found ${OPTIONS_PATH} but it is not valid JSON, ignoring:`,
-      err
-    );
+    logWarn("homeAssistantOptions", `Found ${OPTIONS_PATH} but it is not valid JSON, ignoring`, err);
     return;
   }
 
   if (typeof parsed !== "object" || parsed === null) {
-    console.warn(
-      `[homeAssistantOptions] Found ${OPTIONS_PATH} but its contents are not a JSON object, ignoring.`
+    logWarn(
+      "homeAssistantOptions",
+      `Found ${OPTIONS_PATH} but its contents are not a JSON object, ignoring`
     );
     return;
   }

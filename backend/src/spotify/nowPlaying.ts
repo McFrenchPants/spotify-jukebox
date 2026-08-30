@@ -7,6 +7,7 @@ import { listDevices } from "./device";
 import { getSetting } from "../db";
 import { SpotifyRateLimitedError, SpotifyReauthRequiredError } from "./errors";
 import { isRateLimited, recordRateLimitFromResponse } from "./rateLimitBackoff";
+import { logError, logInfo } from "../logger";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
@@ -347,13 +348,41 @@ export function startNowPlayingPoller(
   fetchFn: typeof fetch = fetch,
   getTokenFn: () => Promise<string> = getValidAccessToken
 ): NodeJS.Timeout {
+  // Tracks a run of consecutive poll failures (e.g. the container losing
+  // outbound network access, not just an HTTP-level Spotify error — those
+  // are already handled/silenced inside pollNowPlaying itself) so a
+  // sustained outage logs one detailed entry plus periodic reminders,
+  // instead of one near-identical `fetch failed` line per tick for as long
+  // as the outage lasts (a real incident produced dozens of these with no
+  // timestamp and no indication of the underlying cause — see BACKLOG.md
+  // item 21).
+  let consecutiveFailures = 0;
+
   const timer = setInterval(() => {
-    pollNowPlaying(fetchFn, getTokenFn).catch((err) => {
-      console.error(
-        "[nowPlaying] Spotify currently-playing poll failed:",
-        err instanceof Error ? err.message : err
-      );
-    });
+    pollNowPlaying(fetchFn, getTokenFn)
+      .then(() => {
+        if (consecutiveFailures > 0) {
+          logInfo(
+            "nowPlaying",
+            `Poll recovered after ${consecutiveFailures} consecutive failure(s)`
+          );
+          consecutiveFailures = 0;
+        }
+      })
+      .catch((err) => {
+        consecutiveFailures += 1;
+        // Log the first failure in a streak in full, then only every 15th
+        // after that (~once/minute at the default 4s interval) — enough to
+        // confirm it's still failing and see the cause, without flooding
+        // the log with identical lines.
+        if (consecutiveFailures === 1 || consecutiveFailures % 15 === 0) {
+          logError(
+            "nowPlaying",
+            `Spotify currently-playing poll failed (${consecutiveFailures} consecutive failure(s) so far)`,
+            err
+          );
+        }
+      });
   }, intervalMs);
 
   // Don't let this interval keep the process alive on its own.

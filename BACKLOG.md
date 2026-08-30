@@ -441,6 +441,63 @@ a favorite toggle but no add-to-queue. The old bespoke
 gone — `TrackRow`/`FavoriteRow` were deleted files, the other two were
 inline functions removed from their parent components.
 
+## 21. Unusable add-on logs: no timestamps, "fetch failed" hides the real cause
+**Status:** done
+**Type:** bug
+
+While troubleshooting item 20's ongoing 503s directly against the live add-on
+(`192.168.50.179:8085/api/device` still returned `spotify_rate_limited`, and
+`GET /api/now-playing` still showed `polledAt: 0`, even after every stray
+local backend was confirmed killed), the user checked the add-on's actual
+Supervisor logs and found the real problem was unreadable: dozens of
+identical, timestamp-less lines —
+
+```
+[nowPlaying] Spotify currently-playing poll failed: fetch failed
+```
+
+— with no way to tell when the failures started, whether they were ongoing
+or historical, or what actually failed. Two real gaps caused this:
+
+1. Every backend log line was a bare `console.log`/`console.error` call with
+   no timestamp — findable in code at
+   [index.ts:32](backend/src/index.ts:32),
+   [tokenRefresh.ts:113](backend/src/spotify/tokenRefresh.ts:113), and
+   [homeAssistantOptions.ts](backend/src/config/homeAssistantOptions.ts), in
+   addition to the nowPlaying poller below.
+2. Node's `fetch failed` is a generic wrapper `TypeError` — the actual reason
+   (DNS resolution failure, connection refused, timeout, etc.) lives in
+   `err.cause`, which [nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s
+   poller error handler never read, and every poll failure was logged in
+   full every single tick (every 4s) for as long as the underlying problem
+   lasted, with zero throttling — the "dozens of identical lines" the user
+   saw.
+
+This also clarified item 20: a `fetch failed` TypeError is a **network-level**
+failure that never reaches Spotify at all (no HTTP response comes back), so
+it's a distinct problem from a real Spotify 429 (which *did* happen — item
+20's `/api/device` 503 came from an actual Spotify response). Both were
+occurring on the same add-on: at least one stretch of genuine outbound
+network flakiness from the Home Assistant container, separate from the
+account-level rate-limit/quota state from item 20's duplicate-poller
+incident. Root cause of the network flakiness itself (Home Assistant host
+networking / DNS) is not yet identified — the logging fix here is what makes
+that diagnosable next time instead of guessing from silence.
+
+**Fixed**: added [backend/src/logger.ts](backend/src/logger.ts) — a small
+timestamped `logInfo`/`logWarn`/`logError` helper that also unwraps
+`err.cause` — and switched every existing `console.*` call site to use it.
+[nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s poller now tracks a
+consecutive-failure streak: logs the first failure in full (with cause), one
+reminder every ~15 ticks (~1 min) while it continues, and a "recovered after
+N consecutive failures" line when it succeeds again — replacing what used to
+be either total silence (Spotify-side errors, already handled elsewhere) or
+unthrottled per-tick spam (network-level errors, this bug). Deliberately
+not a full logging framework (no levels config, no transports) — this is a
+single-process self-hosted app whose only log sink is the Supervisor's
+plain-text viewer, so timestamp + scope + real error detail is the whole
+requirement. 355 backend tests pass, `npx tsc --noEmit` clean on both sides.
+
 ## 20. Spotify rate-limiting recurrence: stray local dev backend + 2026 quota pooling
 **Status:** done
 **Type:** bug

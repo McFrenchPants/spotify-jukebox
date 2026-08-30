@@ -1,6 +1,7 @@
 import { getSetting, setSetting } from "../db";
 import { SpotifyRateLimitedError, SpotifyReauthRequiredError } from "./errors";
 import { recordRateLimitFromResponse } from "./rateLimitBackoff";
+import { logError } from "../logger";
 
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 
@@ -110,10 +111,7 @@ export function startTokenRefreshWorker(
 ): NodeJS.Timeout {
   const timer = setInterval(() => {
     refreshFn().catch((err) => {
-      console.error(
-        "[tokenRefresh] Spotify access token refresh failed:",
-        err instanceof Error ? err.message : err
-      );
+      logError("tokenRefresh", "Spotify access token refresh failed", err);
     });
   }, intervalMs);
 

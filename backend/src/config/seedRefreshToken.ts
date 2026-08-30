@@ -1,4 +1,5 @@
 import { getSetting, setSetting } from "../db";
+import { logInfo } from "../logger";
 
 /**
  * Optional convenience for any deployment mode (Home Assistant add-on,
@@ -30,7 +31,8 @@ export function seedRefreshTokenFromEnv(): void {
   }
 
   setSetting("spotify_refresh_token", provided);
-  console.log(
-    "[seedRefreshToken] Seeded spotify_refresh_token from the SPOTIFY_REFRESH_TOKEN environment variable — skipping the one-time browser consent flow."
+  logInfo(
+    "seedRefreshToken",
+    "Seeded spotify_refresh_token from the SPOTIFY_REFRESH_TOKEN environment variable — skipping the one-time browser consent flow."
   );
 }
