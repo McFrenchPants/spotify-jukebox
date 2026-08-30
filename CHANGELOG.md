@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.19
+
+- Every song list (Search, Leaderboard, Recently Played, Favorites) now supports both favoriting and adding to queue consistently — previously Search had no favorite button, and Leaderboard/Recently Played had no "Add to Queue".
+
 ## 1.0.18
 
 - Added a "Connect" tab on the master/bridge device (in place of "Me"), showing a QR code and guest link so nearby guests can discover and join from their own phone. Only appears on the device registered as "the Jukebox device" (Master Device Mode); every other device is unaffected.
