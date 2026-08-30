@@ -498,6 +498,35 @@ single-process self-hosted app whose only log sink is the Supervisor's
 plain-text viewer, so timestamp + scope + real error detail is the whole
 requirement. 355 backend tests pass, `npx tsc --noEmit` clean on both sides.
 
+**Follow-up (same day)**: after deploying the above, the user restarted the
+add-on, reloaded both the guest and Master Device pages, and immediately saw
+"Could not connect to Spotify" again — but the logs showed *only* the
+startup line, nothing else. That silence was itself a real remaining gap,
+not a mystery: a real Spotify 429 response (as opposed to a network-level
+`fetch failed`) was, by original design, handled entirely silently —
+[rateLimitBackoff.ts](backend/src/spotify/rateLimitBackoff.ts)'s
+`recordRateLimitFromResponse()` armed the backoff window with no log output
+at all, on the reasoning that "an expected 429 every tick isn't worth
+logging." That reasoning holds for a *repeated* 429 during an already-known
+backoff, but meant the very first 429 — the one that actually explains why
+the app is down — left zero trace. Combined with the restart (which resets
+`blockedUntil` to 0 in memory), this meant every restart's very first poll
+could silently re-arm the exact same backoff with nothing in the logs to
+show it happened, which is exactly what the user hit.
+
+**Fixed**: `recordRateLimitFromResponse()` now logs a warning every time it
+actually arms the window — the caller (now-playing poll, device list, or
+token refresh), the backoff duration, and the exact resume timestamp — via
+an added `source` parameter threaded through from
+[nowPlaying.ts](backend/src/spotify/nowPlaying.ts:278),
+[device.ts](backend/src/spotify/device.ts:57), and
+[tokenRefresh.ts](backend/src/spotify/tokenRefresh.ts:80). This doesn't
+change any behavior, only observability — but it's what will finally show
+whether what's being hit is a short-lived rate limit or a much longer quota
+block, instead of the app just going quiet. 355 backend tests still pass
+(rateLimitBackoff.test.ts's existing single-argument calls are unaffected —
+`source` defaults to `"spotify"`).
+
 ## 20. Spotify rate-limiting recurrence: stray local dev backend + 2026 quota pooling
 **Status:** done
 **Type:** bug
