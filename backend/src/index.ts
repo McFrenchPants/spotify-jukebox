@@ -17,6 +17,7 @@ import { runMigrations } from "./db";
 import { seedRefreshTokenFromEnv } from "./config/seedRefreshToken";
 import { startNowPlayingPoller } from "./spotify/nowPlaying";
 import { startTokenRefreshWorker } from "./spotify/tokenRefresh";
+import { logInfo } from "./logger";
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
 
@@ -29,5 +30,5 @@ startNowPlayingPoller();
 const app = createApp();
 
 app.listen(PORT, () => {
-  console.log(`Guest Jukebox backend listening on port ${PORT}`);
+  logInfo("index", `Guest Jukebox backend listening on port ${PORT}`);
 });
