@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.15
+
+- Fixed a bug where looking up certain artists (e.g. from a track's artist link) could fail with an error instead of showing the artist's info — some artists don't have follower or image data available, and the app now handles that gracefully instead of crashing.
+
 ## 1.0.14
 
 - Added Master Device Mode: an optional native Android build (built separately, see `docs/MASTER_DEVICE_MODE.md`) that can register itself as "the Jukebox device" from Settings, giving guests real working volume control on a phone-based Bluetooth-speaker bridge — something Spotify's own API can't do remotely for that setup. No effect on the standard web/guest experience if you don't build/use the Android app.
