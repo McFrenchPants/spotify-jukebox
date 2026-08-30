@@ -111,16 +111,21 @@ nickname/avatar when set. A dedicated Favorites tab on Find Music lists,
 sorts, filters, unfavorites, and re-queues. Implemented on
 `feature/favorites`; pushed for PR review, not yet merged to `master`.
 
-## 4. On-demand QR code on the Now Playing screen
-**Status:** idea
+## 4. "Connect" nav item on the master device (was: QR code on Now Playing)
+**Status:** needs research
 **Type:** enhancement
-**Analysis:** analysis/04-qr-code-now-playing.md (not yet written)
+**Analysis:** [analysis/04-qr-code-now-playing.md](analysis/04-qr-code-now-playing.md)
 
-Add a small icon/affordance on the main (now playing) screen that reveals the
-QR code for controlling the jukebox from a guest's own phone. Intent: when the
-bridge device is sitting on a table unattended, people nearby should be able
-to discover that they can control it remotely. Placement TBD — should not
-clutter the primary layout.
+Reframed during analysis/user check-in (2026-08-30): rather than an
+icon/modal on the Now Playing screen shown identically to every device,
+the master/bridge device's nav should swap its "Me" tab (a personal
+favorites/nickname tab that doesn't apply to a shared bridge device) for a
+"Connect" tab, leading to a page with the QR code, guest URL, and brief
+instructions — visible only on the one device where it's actually useful.
+Needs a new public (unauthenticated) way for a client to learn whether its
+own `clientId` is the registered Jukebox device (see analysis for the
+proposed shape), plus scoping around Master Device Mode being optional —
+see the analysis file's open questions before this moves to `ready`.
 
 ## 5. Move "Playback Device" above "Queue Moderation" in Settings
 **Status:** done
