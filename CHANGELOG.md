@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.23
+
+- A real Spotify rate-limit/quota 429 is now actually logged (which caller hit it, how long the backoff is, and exactly when it resumes) — previously this was silent by design, which made a restart's very first 429 look like nothing had happened at all.
+
 ## 1.0.22
 
 - Backend logs now include a timestamp and, for background poll failures, the actual underlying cause (e.g. a DNS/network error) instead of a bare "fetch failed" — and repeated identical failures during an outage are now logged once plus periodic reminders instead of one line per 4-second tick.
