@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.22
+
+- Backend logs now include a timestamp and, for background poll failures, the actual underlying cause (e.g. a DNS/network error) instead of a bare "fetch failed" — and repeated identical failures during an outage are now logged once plus periodic reminders instead of one line per 4-second tick.
+
 ## 1.0.21
 
 - Now Playing shows a clear "Could not connect to Spotify" message when Spotify is rate-limiting requests, instead of the misleading "Nothing playing."
