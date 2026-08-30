@@ -441,6 +441,70 @@ a favorite toggle but no add-to-queue. The old bespoke
 gone — `TrackRow`/`FavoriteRow` were deleted files, the other two were
 inline functions removed from their parent components.
 
+## 20. Spotify rate-limiting recurrence: stray local dev backend + 2026 quota pooling
+**Status:** done
+**Type:** bug
+
+Recurring "Spotify is rate-limiting requests from this app right now" 503s
+on `GET /api/device`/`GET /api/now-playing`, reported again after an
+Android/webapp rebuild-and-restart with the party actively in progress.
+
+**Root cause**: a leftover local `tsx watch` backend (`backend/src/index.ts`)
+was still running on the dev machine (Windows, port 8085) from an earlier
+agent testing session and never got shut down. It held its own Spotify
+authorization and was independently polling `/v1/me/player/currently-playing`
+every 4s — on top of the live Home Assistant add-on's identical poll — for
+the same account, exactly reproducing the incident already documented in
+[rateLimitBackoff.ts](backend/src/spotify/rateLimitBackoff.ts). Confirmed via
+`netstat`/`tasklist` (stray process found, PID matched a `tsx` process for
+this repo) and by hitting the stray instance's own `/api/device`, which
+returned the identical `spotify_rate_limited` 503.
+
+**Contributing factor, newly understood**: dev and the HA add-on already use
+*separate* Spotify Client ID/secret pairs, but (a) `seedRefreshTokenFromEnv()`
+is a convenience for copying one deployment's refresh token to bootstrap
+another, which had been used to give local dev a working Spotify connection
+via the *same* authorized account as the live add-on, and (b) as of Spotify's
+July 2026 Web API quota update, Development Mode quota is now pooled **per
+developer account**, not per Client ID — so even fully separate Client IDs
+registered under the same Spotify Developer account draw from one shared
+quota bucket. Development Mode is also capped at 5 allowlisted Spotify user
+accounts, but that only matters for who can *authorize* the app (the admin) —
+guests never authenticate with Spotify themselves (they get an app-issued
+session token, see P2.2), so guest count doesn't interact with that cap.
+Extended Quota Mode (higher, unpooled limits) was checked and ruled out for
+this project: as of May 2025 it's organization-only (registered business,
+250k+ MAU, six-week review) — not available to a self-hosted personal app.
+
+**Fixed**:
+1. Killed the stray local process; confirmed nothing else is listening on
+   8085 besides the HA add-on.
+2. Added [CLAUDE.md](CLAUDE.md): agents must track and stop any dev server
+   they start before ending a session, and must never seed local dev's
+   Spotify refresh token from (or into) the live add-on's authorization.
+3. `GET /api/now-playing`'s `rateLimited` flag (already added for item 9) is
+   now surfaced in the UI: [NowPlaying.tsx](frontend/src/components/nowplaying/NowPlaying.tsx)
+   shows "Could not connect to Spotify" instead of "Nothing playing" when the
+   snapshot is rate-limited, instead of silently looking like a confirmed
+   empty state.
+4. Added a short-lived in-memory cache
+   ([backend/src/spotify/cache.ts](backend/src/spotify/cache.ts)) for
+   `searchTracks` (30s TTL), `getTrack`, and `getArtist` (10min TTL each) in
+   [client.ts](backend/src/spotify/client.ts) — reduces redundant Web API
+   calls when multiple concurrent guests search for or queue the same
+   popular track, or expand the same currently-playing track's artist info,
+   without needing a new rate-limit mechanism. Doesn't change the
+   now-playing/device poll, which already scales independently of guest
+   count (single in-process poller fanned out over SSE — see
+   [events/bus.ts](backend/src/events/bus.ts)).
+
+**Not changed / considered and rejected**: registering a wholly separate
+Spotify Developer account (different login) for local dev would give dev
+testing its own unpooled quota bucket — worth doing if local dev against
+live Spotify becomes routine again, but out of scope for this fix since the
+immediate cause was a leftover process, not a legitimate concurrent dev
+session.
+
 ## 19. Volume slider doesn't stay in sync with the Jukebox device's actual volume
 **Status:** done
 **Type:** bug

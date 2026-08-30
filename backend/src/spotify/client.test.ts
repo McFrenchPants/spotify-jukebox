@@ -16,6 +16,7 @@ vi.mock("./tokenRefresh", () => ({
 import { getSetting } from "../db";
 import { refreshAccessToken } from "./tokenRefresh";
 import { getArtist, getValidAccessToken, searchTracks } from "./client";
+import { resetSpotifyCacheForTests } from "./cache";
 
 function jsonResponse(body: unknown, ok = true, status = 200): Response {
   return {
@@ -116,6 +117,7 @@ describe("searchTracks", () => {
   beforeEach(() => {
     settings.clear();
     vi.clearAllMocks();
+    resetSpotifyCacheForTests();
   });
 
   it("shapes Spotify search results into { id, name, artist, albumArt, durationMs, explicit }", async () => {
@@ -187,6 +189,7 @@ describe("getArtist", () => {
   beforeEach(() => {
     settings.clear();
     vi.clearAllMocks();
+    resetSpotifyCacheForTests();
   });
 
   it("shapes a Spotify artist response into { id, name, genres, imageUrl, followers }", async () => {

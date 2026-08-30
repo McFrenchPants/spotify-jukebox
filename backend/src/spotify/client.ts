@@ -1,10 +1,28 @@
 import { getSetting } from "../db";
 import { refreshAccessToken } from "./tokenRefresh";
+import { withCache } from "./cache";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
 /** Refresh proactively if the token expires within this many ms. */
 const EXPIRY_SAFETY_MARGIN_MS = 60 * 1000;
+
+/**
+ * How long search results stay cached (keyed by exact query+limit). Short
+ * enough that a guest still sees fresh-feeling results, long enough to
+ * absorb the common multi-guest case of several people searching the same
+ * popular track within a few seconds of each other — see cache.ts's docs.
+ */
+const SEARCH_CACHE_TTL_MS = 30 * 1000;
+
+/**
+ * How long a single track/artist lookup stays cached. Track/artist metadata
+ * (name, art, duration, explicit flag, genres, follower count) doesn't
+ * meaningfully change minute to minute, so this can be far longer-lived than
+ * search — the main value here is collapsing repeated lookups of the same
+ * currently-playing or frequently-queued track/artist across guests.
+ */
+const ENTITY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export interface ShapedTrack {
   id: string;
@@ -110,47 +128,51 @@ export async function searchTracks(
   fetchFn: typeof fetch = fetch,
   getTokenFn: () => Promise<string> = getValidAccessToken
 ): Promise<ShapedTrack[]> {
-  const accessToken = await getTokenFn();
+  const cappedLimit = Math.min(limit, MAX_SEARCH_LIMIT);
 
-  const params = new URLSearchParams({
-    q: query,
-    type: "track",
-    limit: String(Math.min(limit, MAX_SEARCH_LIMIT)),
-  });
+  return withCache(`search:${query}:${cappedLimit}`, SEARCH_CACHE_TTL_MS, async () => {
+    const accessToken = await getTokenFn();
 
-  const response = await fetchFn(`${SPOTIFY_API_BASE}/search?${params.toString()}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+    const params = new URLSearchParams({
+      q: query,
+      type: "track",
+      limit: String(cappedLimit),
+    });
 
-  if (!response.ok) {
-    let message = `${response.status}`;
-    try {
-      const errBody = (await response.json()) as {
-        error?: { message?: string };
-      };
-      if (errBody.error?.message) {
-        message = `${response.status} ${errBody.error.message}`;
+    const response = await fetchFn(`${SPOTIFY_API_BASE}/search?${params.toString()}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      let message = `${response.status}`;
+      try {
+        const errBody = (await response.json()) as {
+          error?: { message?: string };
+        };
+        if (errBody.error?.message) {
+          message = `${response.status} ${errBody.error.message}`;
+        }
+      } catch {
+        // Ignore JSON parse failures on the error body; fall back to status.
       }
-    } catch {
-      // Ignore JSON parse failures on the error body; fall back to status.
+      throw new Error(`Spotify search failed: ${message}`);
     }
-    throw new Error(`Spotify search failed: ${message}`);
-  }
 
-  const data = (await response.json()) as SpotifySearchResponse;
-  const items = data.tracks?.items ?? [];
+    const data = (await response.json()) as SpotifySearchResponse;
+    const items = data.tracks?.items ?? [];
 
-  return items.map((track) => ({
-    id: track.id,
-    name: track.name,
-    artist: track.artists.map((a) => a.name).join(", "),
-    // Spotify returns album images sorted largest-first; use the first one.
-    albumArt: track.album.images[0]?.url ?? null,
-    durationMs: track.duration_ms,
-    explicit: track.explicit,
-  }));
+    return items.map((track) => ({
+      id: track.id,
+      name: track.name,
+      artist: track.artists.map((a) => a.name).join(", "),
+      // Spotify returns album images sorted largest-first; use the first one.
+      albumArt: track.album.images[0]?.url ?? null,
+      durationMs: track.duration_ms,
+      explicit: track.explicit,
+    }));
+  });
 }
 
 /**
@@ -170,39 +192,41 @@ export async function getTrack(
   fetchFn: typeof fetch = fetch,
   getTokenFn: () => Promise<string> = getValidAccessToken
 ): Promise<ShapedTrack> {
-  const accessToken = await getTokenFn();
+  return withCache(`track:${trackId}`, ENTITY_CACHE_TTL_MS, async () => {
+    const accessToken = await getTokenFn();
 
-  const response = await fetchFn(`${SPOTIFY_API_BASE}/tracks/${encodeURIComponent(trackId)}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+    const response = await fetchFn(`${SPOTIFY_API_BASE}/tracks/${encodeURIComponent(trackId)}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-  if (!response.ok) {
-    let message = `${response.status}`;
-    try {
-      const errBody = (await response.json()) as {
-        error?: { message?: string };
-      };
-      if (errBody.error?.message) {
-        message = `${response.status} ${errBody.error.message}`;
+    if (!response.ok) {
+      let message = `${response.status}`;
+      try {
+        const errBody = (await response.json()) as {
+          error?: { message?: string };
+        };
+        if (errBody.error?.message) {
+          message = `${response.status} ${errBody.error.message}`;
+        }
+      } catch {
+        // Ignore JSON parse failures on the error body; fall back to status.
       }
-    } catch {
-      // Ignore JSON parse failures on the error body; fall back to status.
+      throw new Error(`Spotify track lookup failed: ${message}`);
     }
-    throw new Error(`Spotify track lookup failed: ${message}`);
-  }
 
-  const track = (await response.json()) as SpotifyTrackResponse;
+    const track = (await response.json()) as SpotifyTrackResponse;
 
-  return {
-    id: track.id,
-    name: track.name,
-    artist: track.artists.map((a) => a.name).join(", "),
-    albumArt: track.album.images[0]?.url ?? null,
-    durationMs: track.duration_ms,
-    explicit: track.explicit,
-  };
+    return {
+      id: track.id,
+      name: track.name,
+      artist: track.artists.map((a) => a.name).join(", "),
+      albumArt: track.album.images[0]?.url ?? null,
+      durationMs: track.duration_ms,
+      explicit: track.explicit,
+    };
+  });
 }
 
 /**
@@ -220,40 +244,42 @@ export async function getArtist(
   fetchFn: typeof fetch = fetch,
   getTokenFn: () => Promise<string> = getValidAccessToken
 ): Promise<ShapedArtist> {
-  const accessToken = await getTokenFn();
+  return withCache(`artist:${artistId}`, ENTITY_CACHE_TTL_MS, async () => {
+    const accessToken = await getTokenFn();
 
-  const response = await fetchFn(`${SPOTIFY_API_BASE}/artists/${encodeURIComponent(artistId)}`, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+    const response = await fetchFn(`${SPOTIFY_API_BASE}/artists/${encodeURIComponent(artistId)}`, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-  if (!response.ok) {
-    let message = `${response.status}`;
-    try {
-      const errBody = (await response.json()) as {
-        error?: { message?: string };
-      };
-      if (errBody.error?.message) {
-        message = `${response.status} ${errBody.error.message}`;
+    if (!response.ok) {
+      let message = `${response.status}`;
+      try {
+        const errBody = (await response.json()) as {
+          error?: { message?: string };
+        };
+        if (errBody.error?.message) {
+          message = `${response.status} ${errBody.error.message}`;
+        }
+      } catch {
+        // Ignore JSON parse failures on the error body; fall back to status.
       }
-    } catch {
-      // Ignore JSON parse failures on the error body; fall back to status.
+      throw new Error(`Spotify artist lookup failed: ${message}`);
     }
-    throw new Error(`Spotify artist lookup failed: ${message}`);
-  }
 
-  const artist = (await response.json()) as SpotifyArtistResponse;
+    const artist = (await response.json()) as SpotifyArtistResponse;
 
-  return {
-    id: artist.id,
-    name: artist.name,
-    genres: artist.genres,
-    // Spotify returns artist images sorted largest-first; use the first one.
-    // Spotify's response shape for a given artist ID isn't fully reliable —
-    // `images` and `followers` have been observed missing/undefined for some
-    // artist IDs, so both are guarded rather than trusted as always-present.
-    imageUrl: artist.images?.[0]?.url ?? null,
-    followers: artist.followers?.total ?? 0,
-  };
+    return {
+      id: artist.id,
+      name: artist.name,
+      genres: artist.genres,
+      // Spotify returns artist images sorted largest-first; use the first one.
+      // Spotify's response shape for a given artist ID isn't fully reliable —
+      // `images` and `followers` have been observed missing/undefined for some
+      // artist IDs, so both are guarded rather than trusted as always-present.
+      imageUrl: artist.images?.[0]?.url ?? null,
+      followers: artist.followers?.total ?? 0,
+    };
+  });
 }
