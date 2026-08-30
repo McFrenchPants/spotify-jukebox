@@ -1,9 +1,11 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Outlet } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { AppShell } from './AppShell'
 import { BottomNav } from './nav/BottomNav'
 import { SideNav } from './nav/SideNav'
 import { useEventStream, type EventStream } from '../hooks/useEventStream'
+import { VolumeControl } from '../lib/volumeControlPlugin'
 
 /** Shared state/handlers threaded to every routed page via <Outlet context>. */
 export interface RootLayoutContext {
@@ -48,6 +50,24 @@ export function RootLayout() {
     setRefreshKey((k) => k + 1)
     setBannerDismissed(true)
   }, [])
+
+  // Master Device Mode: the backend broadcasts jukebox-volume-command to
+  // every connected SSE client (no per-client filtering server-side — see
+  // useEventStream.ts), including ordinary guest browser tabs. Only act on
+  // it when this build is actually running as the native Jukebox device;
+  // everyone else must ignore it.
+  useEffect(() => {
+    return subscribe('jukebox-volume-command', (data) => {
+      if (!Capacitor.isNativePlatform()) return
+
+      const command = data as { volumePercent?: number } | undefined
+      if (typeof command?.volumePercent !== 'number') return
+
+      VolumeControl.setVolume({ percent: command.volumePercent }).catch((error) => {
+        console.error('Failed to apply jukebox-volume-command', error)
+      })
+    })
+  }, [subscribe])
 
   const showStaleBanner = isStale && !bannerDismissed
 

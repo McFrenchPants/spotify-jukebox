@@ -1,6 +1,9 @@
 import { Response, Router } from "express";
 import { verifyAdminToken } from "../auth/adminToken";
 import { getSetting } from "../db";
+import { getRegisteredJukeboxDeviceId } from "../db/jukeboxDevice";
+import { emitEvent } from "../events/bus";
+import { isJukeboxDeviceOnline } from "../events/jukeboxDeviceOnline";
 import { PlaybackCapability, resolveEffectivePermission } from "../guardrails/playbackPermissions";
 import { ADMIN_TOKEN_HEADER } from "../middleware/adminAuth";
 import { pausePlayback, resumePlayback, setVolume, skipToNext, skipToPrevious } from "../spotify/playback";
@@ -145,6 +148,20 @@ playbackRouter.post("/volume", async (req, res) => {
   }
 
   if (!checkTrustModeGate(req, res, "volume")) return;
+
+  // M1.3 — Master Device Mode: when a Jukebox device is registered and
+  // currently online, volume commands are routed to it over SSE instead of
+  // Spotify's Volume API (which doesn't work for a phone acting as a
+  // Spotify Connect receiver). This branch bypasses requireDeviceId()
+  // entirely — no Spotify API call happens, so no Spotify device id is
+  // needed. When no Jukebox device is registered, or one is registered but
+  // offline, behavior is unchanged: fall through to the existing
+  // Spotify-volume-API path below.
+  if (getRegisteredJukeboxDeviceId() !== null && isJukeboxDeviceOnline()) {
+    emitEvent("jukebox-volume-command", { volumePercent });
+    res.status(200).json({ status: "ok" });
+    return;
+  }
 
   const deviceId = requireDeviceId(res);
   if (!deviceId) return;

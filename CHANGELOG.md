@@ -2,6 +2,11 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.14
+
+- Added Master Device Mode: an optional native Android build (built separately, see `docs/MASTER_DEVICE_MODE.md`) that can register itself as "the Jukebox device" from Settings, giving guests real working volume control on a phone-based Bluetooth-speaker bridge — something Spotify's own API can't do remotely for that setup. No effect on the standard web/guest experience if you don't build/use the Android app.
+- Added global CORS support so the native app (and anything else) can reach this backend across origins.
+
 ## 1.0.13
 
 - Fixed the bottom nav bar reading as transparent in some embedded views (e.g. a Home Assistant dashboard's "Website" card), letting page content behind it overlap and clash with the bar's own icons/labels. The bar is now solid enough to stay legible even where the intended frosted-glass blur effect doesn't render, and page content now fades out completely before it ever reaches the bar instead of relying on the blur alone to obscure it.

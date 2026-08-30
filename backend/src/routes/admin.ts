@@ -3,6 +3,7 @@ import { issueAdminToken, verifyAdminPin } from "../auth/adminToken";
 import { addBlacklistedArtist } from "../db/artistBlacklist";
 import { applyAppSettingsUpdate, getAllAppSettings, validateAppSettingsUpdate } from "../db/appSettings";
 import { getSetting } from "../db";
+import { getRegisteredJukeboxDeviceId, registerJukeboxDeviceId } from "../db/jukeboxDevice";
 import { clearQueueEntries, deleteQueueEntry, listQueueEntries } from "../db/queueEntries";
 import { setTrackBlacklisted } from "../db/trackStats";
 import { emitEvent } from "../events/bus";
@@ -138,4 +139,27 @@ adminRouter.post("/blacklist", requireAdminAuth, (req, res) => {
 
   emitEvent("leaderboard-update", { blacklisted: { type, value } });
   res.status(200).json({ status: "ok" });
+});
+
+// M1.1 — Jukebox device registration. Protected individually, same pattern
+// as the settings/queue routes above. Storage-only for now: no volume
+// routing, SSE, or native client wiring yet (later tasks in this proposal).
+adminRouter.get("/jukebox-device", requireAdminAuth, (_req, res) => {
+  res.status(200).json({ clientId: getRegisteredJukeboxDeviceId() });
+});
+
+adminRouter.post("/jukebox-device/register", requireAdminAuth, (req, res) => {
+  const { clientId } = req.body ?? {};
+
+  if (typeof clientId !== "string" || clientId.trim() === "") {
+    res.status(400).json({
+      error: "invalid_jukebox_device_request",
+      message: "clientId is required and must be a non-empty string.",
+    });
+    return;
+  }
+
+  const trimmed = clientId.trim();
+  registerJukeboxDeviceId(trimmed);
+  res.status(200).json({ clientId: trimmed });
 });

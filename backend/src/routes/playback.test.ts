@@ -12,6 +12,9 @@ vi.mock("../spotify/playback", () => ({
 
 import { db, runMigrations, setSetting } from "../db";
 import { ACTIVE_MODE_KEY, ALLOW_PAUSE_RESUME_KEY, ALLOW_SKIP_KEY, ALLOW_VOLUME_KEY } from "../db/appSettings";
+import { JUKEBOX_DEVICE_CLIENT_ID_KEY, registerJukeboxDeviceId } from "../db/jukeboxDevice";
+import { clientConnected, clientDisconnected, resetJukeboxDeviceOnlineForTests } from "../events/jukeboxDeviceOnline";
+import { subscribe } from "../events/bus";
 import { issueAdminToken } from "../auth/adminToken";
 import { ADMIN_TOKEN_HEADER } from "../middleware/adminAuth";
 import { pausePlayback, setVolume, skipToPrevious } from "../spotify/playback";
@@ -27,9 +30,10 @@ beforeEach(async () => {
   // Real shared-file DB with no per-test reset — reset every setting we
   // touch to a known value, following the pattern in queue.test.ts.
   db.prepare(
-    `DELETE FROM app_settings WHERE key IN (?, ?, ?, ?)`
-  ).run(ACTIVE_MODE_KEY, ALLOW_PAUSE_RESUME_KEY, ALLOW_SKIP_KEY, ALLOW_VOLUME_KEY);
+    `DELETE FROM app_settings WHERE key IN (?, ?, ?, ?, ?)`
+  ).run(ACTIVE_MODE_KEY, ALLOW_PAUSE_RESUME_KEY, ALLOW_SKIP_KEY, ALLOW_VOLUME_KEY, JUKEBOX_DEVICE_CLIENT_ID_KEY);
   setSetting("spotify_device_id", DEVICE_ID);
+  resetJukeboxDeviceOnlineForTests();
 
   vi.clearAllMocks();
   vi.mocked(pausePlayback).mockResolvedValue(undefined);
@@ -234,5 +238,94 @@ describe("POST /api/playback/volume", () => {
     expect(res.status).toBe(200);
     expect(body).toEqual({ status: "ok" });
     expect(setVolume).toHaveBeenCalledWith(42, DEVICE_ID);
+  });
+
+  it("no Jukebox device registered -> existing Spotify-volume-API path unchanged", async () => {
+    setSetting(ACTIVE_MODE_KEY, "trusted");
+
+    const res = await fetch(`${baseUrl}/api/playback/volume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ volumePercent: 37 }),
+    });
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ status: "ok" });
+    expect(setVolume).toHaveBeenCalledTimes(1);
+    expect(setVolume).toHaveBeenCalledWith(37, DEVICE_ID);
+  });
+
+  it("Jukebox device registered but offline -> falls back to Spotify-volume-API path unchanged", async () => {
+    setSetting(ACTIVE_MODE_KEY, "trusted");
+    registerJukeboxDeviceId("jukebox-client-1");
+    // Registered, but no SSE connection is open — isJukeboxDeviceOnline() is false.
+
+    const res = await fetch(`${baseUrl}/api/playback/volume`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ volumePercent: 55 }),
+    });
+    const body = (await res.json()) as any;
+
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ status: "ok" });
+    expect(setVolume).toHaveBeenCalledTimes(1);
+    expect(setVolume).toHaveBeenCalledWith(55, DEVICE_ID);
+  });
+
+  it("Jukebox device registered and online -> emits jukebox-volume-command instead of calling Spotify", async () => {
+    setSetting(ACTIVE_MODE_KEY, "trusted");
+    registerJukeboxDeviceId("jukebox-client-1");
+    clientConnected("jukebox-client-1");
+
+    const received: Array<{ name: string; data: unknown }> = [];
+    const unsubscribe = subscribe((event) => received.push(event));
+
+    try {
+      const res = await fetch(`${baseUrl}/api/playback/volume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ volumePercent: 68 }),
+      });
+      const body = (await res.json()) as any;
+
+      expect(res.status).toBe(200);
+      expect(body).toEqual({ status: "ok" });
+      expect(setVolume).not.toHaveBeenCalled();
+      expect(received).toContainEqual({
+        name: "jukebox-volume-command",
+        data: { volumePercent: 68 },
+      });
+    } finally {
+      unsubscribe();
+      clientDisconnected("jukebox-client-1");
+    }
+  });
+
+  it("Jukebox device registered and online -> still gated by trust mode (403, no event)", async () => {
+    setSetting(ACTIVE_MODE_KEY, "restricted");
+    registerJukeboxDeviceId("jukebox-client-1");
+    clientConnected("jukebox-client-1");
+
+    const received: Array<{ name: string; data: unknown }> = [];
+    const unsubscribe = subscribe((event) => received.push(event));
+
+    try {
+      const res = await fetch(`${baseUrl}/api/playback/volume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ volumePercent: 20 }),
+      });
+      const body = (await res.json()) as any;
+
+      expect(res.status).toBe(403);
+      expect(body.error).toBe("trust_mode_denied");
+      expect(setVolume).not.toHaveBeenCalled();
+      expect(received).toHaveLength(0);
+    } finally {
+      unsubscribe();
+      clientDisconnected("jukebox-client-1");
+    }
   });
 });

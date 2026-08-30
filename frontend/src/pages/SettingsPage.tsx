@@ -4,6 +4,7 @@ import { PinEntry } from '../components/admin/PinEntry'
 import { SettingsForm } from '../components/admin/SettingsForm'
 import { QueueModeration } from '../components/admin/QueueModeration'
 import { DeviceSelector } from '../components/admin/DeviceSelector'
+import { JukeboxDeviceCard } from '../components/admin/JukeboxDeviceCard'
 import { GuestUrlCard } from '../components/admin/GuestUrlCard'
 import { AdminAuthProvider, useAdminAuth } from '../context/AdminAuthContext'
 import type { RootLayoutContext } from '../components/RootLayout'
@@ -44,6 +45,11 @@ function AdminPanel() {
         </div>
         <div className="lg:w-1/2">
           <GuestUrlCard />
+        </div>
+      </div>
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div className="lg:w-1/2">
+          <JukeboxDeviceCard token={token} />
         </div>
       </div>
     </div>

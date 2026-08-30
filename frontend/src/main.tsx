@@ -11,6 +11,7 @@ import { SettingsPage } from './pages/SettingsPage.tsx'
 import StyleGuide from './pages/StyleGuide.tsx'
 import { SessionProvider } from './context/SessionContext.tsx'
 import { ToastProvider } from './context/ToastContext.tsx'
+import { NativeBackendGate } from './components/NativeBackendGate.tsx'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -19,9 +20,11 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route
             element={
-              <SessionProvider>
-                <RootLayout />
-              </SessionProvider>
+              <NativeBackendGate>
+                <SessionProvider>
+                  <RootLayout />
+                </SessionProvider>
+              </NativeBackendGate>
             }
           >
             <Route path="/" element={<NowPlayingPage />} />

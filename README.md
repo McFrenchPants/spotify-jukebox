@@ -36,6 +36,8 @@ Three ways to run this, depending on your setup:
 
 Either deployment method serves guests at `http://<host-lan-ip>:8085` — see [docs/LAN_ACCESS.md](docs/LAN_ACCESS.md) for finding that URL and getting the admin panel's QR code to point at it.
 
+Want real volume control on a phone-based bridge device? See [docs/MASTER_DEVICE_MODE.md](docs/MASTER_DEVICE_MODE.md) for an optional native Android build.
+
 **Tip for either Docker-based method**: if you've already completed the one-time Spotify consent for that *same* Spotify Developer app somewhere else (e.g. another deployment using the same client ID/secret), you can skip repeating that browser flow — copy the `spotify_refresh_token` value out of that setup's SQLite `app_settings` table and paste it into the new deployment's `SPOTIFY_REFRESH_TOKEN` config (env var for Docker Compose, or the Add-on's options form). See `backend/src/config/seedRefreshToken.ts`. This only works across deployments sharing the same client ID — a refresh token is bound to the app that issued it, so it can't be reused with a *different* Spotify app's credentials (see the "use a separate Spotify app for local dev" note below). Don't use this to reuse local dev's token for production, or vice versa.
 
 ## Running locally

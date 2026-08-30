@@ -1,13 +1,20 @@
 import { AddressInfo } from "net";
 import { Server } from "http";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { emitEvent } from "../events/bus";
+import { emitEvent, subscribe } from "../events/bus";
 import { createApp } from "../app";
+import { db, runMigrations } from "../db";
+import { JUKEBOX_DEVICE_CLIENT_ID_KEY, registerJukeboxDeviceId } from "../db/jukeboxDevice";
+import { resetJukeboxDeviceOnlineForTests } from "../events/jukeboxDeviceOnline";
 
 let server: Server;
 let baseUrl: string;
 
 beforeEach(async () => {
+  runMigrations();
+  db.prepare("DELETE FROM app_settings WHERE key = ?").run(JUKEBOX_DEVICE_CLIENT_ID_KEY);
+  resetJukeboxDeviceOnlineForTests();
+
   const app = createApp();
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => {
@@ -92,5 +99,70 @@ describe("GET /api/events", () => {
 
     // Should not throw even though the subscriber disconnected.
     expect(() => emitEvent("queue-update", { foo: "baz" })).not.toThrow();
+  });
+
+  it("connecting without ?clientId triggers no jukebox-device-status tracking", async () => {
+    registerJukeboxDeviceId("device-abc");
+    const received: unknown[] = [];
+    const unsubscribe = subscribe((event) => {
+      if (event.name === "jukebox-device-status") received.push(event.data);
+    });
+
+    const res = await fetch(`${baseUrl}/api/events`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await res.body?.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(received).toEqual([]);
+    unsubscribe();
+  });
+
+  it("connecting with ?clientId matching the registered Jukebox device emits jukebox-device-status online: true", async () => {
+    registerJukeboxDeviceId("device-abc");
+    const received: unknown[] = [];
+    const unsubscribe = subscribe((event) => {
+      if (event.name === "jukebox-device-status") received.push(event.data);
+    });
+
+    const res = await fetch(`${baseUrl}/api/events?clientId=device-abc`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(received).toEqual([{ online: true }]);
+
+    await res.body?.cancel();
+    unsubscribe();
+  });
+
+  it("disconnecting the registered Jukebox device's clientId emits jukebox-device-status online: false", async () => {
+    registerJukeboxDeviceId("device-abc");
+    const res = await fetch(`${baseUrl}/api/events?clientId=device-abc`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const received: unknown[] = [];
+    const unsubscribe = subscribe((event) => {
+      if (event.name === "jukebox-device-status") received.push(event.data);
+    });
+
+    await res.body?.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(received).toEqual([{ online: false }]);
+    unsubscribe();
+  });
+
+  it("a clientId that doesn't match the registered Jukebox device never triggers jukebox-device-status", async () => {
+    registerJukeboxDeviceId("device-abc");
+    const received: unknown[] = [];
+    const unsubscribe = subscribe((event) => {
+      if (event.name === "jukebox-device-status") received.push(event.data);
+    });
+
+    const res = await fetch(`${baseUrl}/api/events?clientId=guest-tab-1`);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await res.body?.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(received).toEqual([]);
+    unsubscribe();
   });
 });
