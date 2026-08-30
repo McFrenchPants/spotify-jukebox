@@ -12,7 +12,7 @@ branch before making any changes. The branch was fast-forwarded to current
 `master` (`b49e7e3`) on 2026-08-29 before implementation started, since it
 had sat untouched (0 unique commits) since being cut.
 
-## Status: Phases M0-M4 done. M5.2 in progress — two real-hardware bugs found so far (missing backend-URL config + no CORS, then Android's default cleartext-HTTP block), both fixed and rebuilt; awaiting user retest. M5.3 (close-out/merge) remains after that.
+## Status: Phases M0-M4 done. M5.2 real-hardware testing found and fixed four real bugs the original plan missed (see session log); user confirms the app now works end-to-end on the real bridge Pixel 7 Pro. Still need explicit confirmation the volume slider itself audibly changes the Bluetooth speaker's volume (the actual §7 success criterion) before M5.2 is marked fully done. M5.3 (close-out/merge) remains after that, pending user go-ahead.
 
 ## Task Table
 
@@ -52,6 +52,40 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-30** — **User confirms the app works end-to-end on the real bridge
+  Pixel 7 Pro.** Full chain of what it took to get there, for the record:
+  (1) no backend-URL config + no CORS (fixed), (2) Android's default
+  cleartext-HTTP block (fixed, `usesCleartextTraffic`), (3) Capacitor's
+  default `https://localhost` virtual origin causing a mixed-content block
+  independent of (2) (fixed, `androidScheme: 'http'`), (4) even after (1)-(3),
+  the setup screen's own error handling was swallowing the real fetch error
+  behind a canned message — fixed by surfacing the actual error text and
+  enabling `WebView.setWebContentsDebuggingEnabled(true)` for remote
+  `chrome://inspect` access; **`adb logcat` (phone already connected via
+  USB) turned out to be the fastest path** — pulled the real browser-level
+  error directly (`blocked by CORS policy`), which revealed the actual
+  remaining cause: the user's *deployed* HA Add-on backend hadn't been
+  rebuilt with the CORS fix yet (still running old code from before this
+  branch existed). Add-on repositories support a `#branch` URL suffix
+  (`...#feature/master-device-mode`) to point the Supervisor at an unmerged
+  branch for testing — bumped `config.yaml` to `1.0.14` (+ `CHANGELOG.md`
+  entry) so the Supervisor would actually detect and rebuild it, user
+  pushed the branch and repointed their add-on, rebuild succeeded. Separately
+  hit a stale/never-changed admin PIN (the PIN hash is lazily created once,
+  ever, on first login — changing the `ADMIN_PIN` config value afterward has
+  no effect on an already-initialized hash) — resolved by deleting the
+  `admin_pin_hash` row directly from the add-on's persisted SQLite file via
+  `docker exec` + a short Node one-liner reusing the app's own
+  `better-sqlite3` module, letting the existing lazy-init logic recreate it
+  correctly on the next login. Also added a dev-convenience default backend
+  URL (`frontend/.env.local`, gitignored) so the setup screen doesn't need
+  retyping on every reinstall during iteration.
+  **Still to confirm before M5.2 is done**: the actual audible
+  volume-control behavior (guest slider → real Bluetooth speaker volume
+  change) and the all-controls-disabled-when-offline behavior — "the app
+  seems to be working well" is encouraging but doesn't by itself confirm
+  the feature's actual point. User is also adding new backlog items (10-18)
+  from real-world use as they go, committed separately.
 - **2026-08-29** — **Second real-hardware bug found and fixed.** After the
   backend-URL/CORS fix below, the user retried with both a LAN IP
   (`http://192.168.50.179:8085`) and a `.local` hostname
