@@ -38,7 +38,10 @@ export function NativeBackendGate({ children }: { children: ReactNode }) {
 }
 
 function BackendSetupScreen({ onSaved }: { onSaved: () => void }) {
-  const [url, setUrl] = useState('')
+  // Dev convenience: pre-fill from VITE_DEFAULT_BACKEND_URL (frontend/.env.local,
+  // gitignored/machine-specific) so this doesn't need retyping on every
+  // reinstall during native build iteration. Empty/unset in any real build.
+  const [url, setUrl] = useState(import.meta.env.VITE_DEFAULT_BACKEND_URL ?? '')
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
