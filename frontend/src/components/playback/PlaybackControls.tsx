@@ -263,7 +263,7 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
       </div>
 
       <label className="flex flex-col gap-1">
-        <span className="text-caption text-text-secondary">Volume</span>
+        <span className="block text-caption text-text-secondary lg:mx-auto lg:max-w-sm">Volume</span>
         <input
           type="range"
           min={0}
@@ -289,7 +289,7 @@ export function PlaybackControls({ isPlaying }: PlaybackControlsProps) {
             </p>
           )}
           {permissions?.volume && !deviceSupportsVolume && !jukeboxOnline && (
-            <p className="text-caption text-text-muted">{VOLUME_UNSUPPORTED_COPY}</p>
+            <p className="text-caption text-text-muted lg:mx-auto lg:max-w-sm">{VOLUME_UNSUPPORTED_COPY}</p>
           )}
         </>
       )}
