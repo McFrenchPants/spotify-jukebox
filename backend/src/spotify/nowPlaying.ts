@@ -275,7 +275,7 @@ export async function pollNowPlaying(
     // lets a device-list failure abort this poll).
     await checkDeviceStatusFallback(fetchFn, accessToken);
   } else if (!response.ok) {
-    if (recordRateLimitFromResponse(response)) {
+    if (recordRateLimitFromResponse(response, "nowPlaying poll")) {
       // Arms the backoff window so the next tick skips outright instead of
       // immediately re-triggering the same 429 — see rateLimitBackoff.ts.
       // Not an error worth logging every tick; the poller will just resume

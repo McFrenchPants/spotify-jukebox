@@ -54,7 +54,7 @@ export async function listDevices(
     // caller (an admin's manual retry, or the poller itself) still gets a
     // real, honest error; this just stops the *automatic* pollers from
     // continuing to hammer Spotify while the window is active.
-    const wasRateLimited = recordRateLimitFromResponse(response);
+    const wasRateLimited = recordRateLimitFromResponse(response, "device list");
 
     let message = `${response.status}`;
     try {

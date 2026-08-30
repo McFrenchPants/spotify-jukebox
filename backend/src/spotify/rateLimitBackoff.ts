@@ -18,6 +18,8 @@
  * both pollers kept re-triggering it every ~4s regardless.
  */
 
+import { logWarn } from "../logger";
+
 const DEFAULT_BACKOFF_SECONDS = 30;
 
 let blockedUntil = 0;
@@ -32,11 +34,23 @@ export function isRateLimited(): boolean {
  * — using Spotify's `Retry-After` header (seconds) when present, or a
  * default otherwise. No-ops (returns false) for any other status. Safe to
  * call on every Spotify response; only actually does anything on a 429.
+ *
+ * Logs a warning whenever this actually arms the window. This case used to
+ * be entirely silent by design (a single expected 429 isn't worth logging
+ * every tick) — but that meant a *real, ongoing* Spotify-side rate limit or
+ * quota block produced zero log output at all, which is exactly what made a
+ * real incident look like nothing was happening (BACKLOG.md item 21: a
+ * fresh restart's very first poll silently re-armed this window with no
+ * trace in the logs). `source` just identifies which caller hit the 429
+ * (e.g. "nowPlaying poll", "device list") for that log line.
  */
-export function recordRateLimitFromResponse(response: {
-  status: number;
-  headers: { get(name: string): string | null };
-}): boolean {
+export function recordRateLimitFromResponse(
+  response: {
+    status: number;
+    headers: { get(name: string): string | null };
+  },
+  source = "spotify"
+): boolean {
   if (response.status !== 429) {
     return false;
   }
@@ -49,6 +63,10 @@ export function recordRateLimitFromResponse(response: {
       : DEFAULT_BACKOFF_SECONDS;
 
   blockedUntil = Date.now() + seconds * 1000;
+  logWarn(
+    "rateLimitBackoff",
+    `${source} got a 429 from Spotify — backing off for ${seconds}s (until ${new Date(blockedUntil).toISOString()})`
+  );
   return true;
 }
 
