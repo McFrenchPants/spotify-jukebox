@@ -49,8 +49,11 @@ interface SpotifyArtistResponse {
   id: string;
   name: string;
   genres: string[];
-  images: Array<{ url: string; height: number | null; width: number | null }>;
-  followers: { total: number };
+  // Observed missing/undefined for some real artist IDs despite Spotify's
+  // documented schema marking these required; typed optional to match
+  // reality and force callers to guard rather than assume.
+  images?: Array<{ url: string; height: number | null; width: number | null }>;
+  followers?: { total: number };
 }
 
 /**
@@ -247,7 +250,10 @@ export async function getArtist(
     name: artist.name,
     genres: artist.genres,
     // Spotify returns artist images sorted largest-first; use the first one.
-    imageUrl: artist.images[0]?.url ?? null,
-    followers: artist.followers.total,
+    // Spotify's response shape for a given artist ID isn't fully reliable —
+    // `images` and `followers` have been observed missing/undefined for some
+    // artist IDs, so both are guarded rather than trusted as always-present.
+    imageUrl: artist.images?.[0]?.url ?? null,
+    followers: artist.followers?.total ?? 0,
   };
 }
