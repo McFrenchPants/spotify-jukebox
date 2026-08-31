@@ -18,8 +18,8 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | ID | Task | Status | Notes |
 |---|---|---|---|
 | LY0.1 | Lyrics DB table + LRCLIB client | done | `backend/src/db/lyrics.ts` (get/save-upsert/evict-if-not-favorited) + `backend/src/lyrics/lrclib.ts` (get→search fallback→null/throw); new `lyrics` table in `db/index.ts`'s migration block |
-| LY0.2 | Lyrics lookup + cache orchestration | todo | Depends on LY0.1 (done) |
-| LY1.1 | Trigger lookup on track change, emit SSE event | todo | Depends on LY0.2 |
+| LY0.2 | Lyrics lookup + cache orchestration | done | `backend/src/lyrics/lyricsService.ts`: `getLyricsForTrack()` (cache-then-LRCLIB, never caches a transient failure), `evictPreviousTrackLyrics()`. **Phase LY0 (backend foundation) now fully done.** |
+| LY1.1 | Trigger lookup on track change, emit SSE event | todo | Depends on LY0.2 (done) |
 | LY1.2 | `GET /api/lyrics` route | todo | Depends on LY1.1. **Phase LY0+LY1 (backend) complete once done.** |
 | LY2.1 | API client + types | todo | Depends on LY1.2 |
 | LY2.2 | LRC parsing + auto-scroll hook | todo | Depends on LY1.2 (types only, can start alongside LY2.1) |
@@ -36,6 +36,15 @@ enough to resolve during implementation, per the spec itself)*
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-30** — LY0.2 done via a subagent, depended on LY0.1 (done just
+  before). Diff verified directly: `getLyricsForTrack()` matches the
+  cache-then-LRCLIB-then-cache-result design exactly, including not
+  caching a transient LRCLIB failure; `evictPreviousTrackLyrics()` is a
+  thin null-guarded wrapper as specified. Re-ran the full backend suite
+  and typecheck myself: 44 files/376 tests green (no flake this run),
+  `tsc --noEmit` clean. Committed (`263135c`). **Phase LY0 (backend
+  foundation) is now fully done.** LY1.1 (wire into the now-playing
+  poller) is next, no blockers.
 - **2026-08-30** — LY0.1 done via a subagent (backend-only, no dependencies).
   Diff verified directly against the plan before accepting — table columns,
   upsert semantics, and the `NOT EXISTS`-guarded eviction delete all match.
