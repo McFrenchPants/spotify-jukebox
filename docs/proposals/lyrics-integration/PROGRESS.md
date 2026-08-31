@@ -19,8 +19,8 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 |---|---|---|---|
 | LY0.1 | Lyrics DB table + LRCLIB client | done | `backend/src/db/lyrics.ts` (get/save-upsert/evict-if-not-favorited) + `backend/src/lyrics/lrclib.ts` (get→search fallback→null/throw); new `lyrics` table in `db/index.ts`'s migration block |
 | LY0.2 | Lyrics lookup + cache orchestration | done | `backend/src/lyrics/lyricsService.ts`: `getLyricsForTrack()` (cache-then-LRCLIB, never caches a transient failure), `evictPreviousTrackLyrics()`. **Phase LY0 (backend foundation) now fully done.** |
-| LY1.1 | Trigger lookup on track change, emit SSE event | todo | Depends on LY0.2 (done) |
-| LY1.2 | `GET /api/lyrics` route | todo | Depends on LY1.1. **Phase LY0+LY1 (backend) complete once done.** |
+| LY1.1 | Trigger lookup on track change, emit SSE event | done | `nowPlaying.ts`: evicts previous track's cache + fire-and-forget lookup on an actual track change (skips on a mere play/pause toggle); new `getLyricsSnapshot()` accessor |
+| LY1.2 | `GET /api/lyrics` route | todo | Depends on LY1.1 (done). **Phase LY0+LY1 (backend) complete once done.** |
 | LY2.1 | API client + types | todo | Depends on LY1.2 |
 | LY2.2 | LRC parsing + auto-scroll hook | todo | Depends on LY1.2 (types only, can start alongside LY2.1) |
 | LY2.3 | `LyricsPanel` + wiring into `NowPlaying.tsx` | todo | Depends on LY2.1, LY2.2 |
@@ -36,6 +36,21 @@ enough to resolve during implementation, per the spec itself)*
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-30** — LY1.1 done via a subagent. Diff reviewed directly
+  against `nowPlaying.ts`'s existing careful structure: correctly
+  distinguishes "track actually changed" (old vs. new trackId) from
+  `hasChanged()`'s broader definition (which also fires on a same-track
+  play/pause flip) so the lyrics lookup+eviction only runs on a real track
+  change; eviction still runs when playback stops (trackId → null) but no
+  new lookup is kicked off in that case; the lyrics lookup is genuinely
+  fire-and-forget (`.then()/.catch()`, never awaited) so it cannot delay
+  the existing synchronous `now-playing` emit; a lookup failure is caught
+  and logged via the file's existing `logError` convention, never
+  rethrown or turned into an emitted event. New `getLyricsSnapshot()`
+  mirrors `getNowPlayingState()`'s existing accessor pattern for LY1.2 to
+  use. Re-ran the full suite and typecheck myself: 44 files/383 tests
+  green, `tsc --noEmit` clean. Committed (`f20333e`). LY1.2 (the
+  `GET /api/lyrics` route) is next, no blockers.
 - **2026-08-30** — LY0.2 done via a subagent, depended on LY0.1 (done just
   before). Diff verified directly: `getLyricsForTrack()` matches the
   cache-then-LRCLIB-then-cache-result design exactly, including not
