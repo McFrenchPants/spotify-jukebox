@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved by the user 2026-08-30).
 All work happens on `feature/lyrics-integration` — confirm you're on that
 branch before making any changes.
 
-## Status: Implementation starting — LY0 (backend foundation) in progress
+## Status: Backend (LY0+LY1) fully done. Starting frontend (LY2).
 
 ## Task Table
 
@@ -20,8 +20,8 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | LY0.1 | Lyrics DB table + LRCLIB client | done | `backend/src/db/lyrics.ts` (get/save-upsert/evict-if-not-favorited) + `backend/src/lyrics/lrclib.ts` (get→search fallback→null/throw); new `lyrics` table in `db/index.ts`'s migration block |
 | LY0.2 | Lyrics lookup + cache orchestration | done | `backend/src/lyrics/lyricsService.ts`: `getLyricsForTrack()` (cache-then-LRCLIB, never caches a transient failure), `evictPreviousTrackLyrics()`. **Phase LY0 (backend foundation) now fully done.** |
 | LY1.1 | Trigger lookup on track change, emit SSE event | done | `nowPlaying.ts`: evicts previous track's cache + fire-and-forget lookup on an actual track change (skips on a mere play/pause toggle); new `getLyricsSnapshot()` accessor |
-| LY1.2 | `GET /api/lyrics` route | todo | Depends on LY1.1 (done). **Phase LY0+LY1 (backend) complete once done.** |
-| LY2.1 | API client + types | todo | Depends on LY1.2 |
+| LY1.2 | `GET /api/lyrics` route | done | `routes/lyrics.ts` + registration in `app.ts`. `loading: true` present only while a track is playing but its lookup hasn't resolved yet; omitted otherwise. **Phase LY0+LY1 (backend) now fully done.** |
+| LY2.1 | API client + types | todo | Depends on LY1.2 (done) |
 | LY2.2 | LRC parsing + auto-scroll hook | todo | Depends on LY1.2 (types only, can start alongside LY2.1) |
 | LY2.3 | `LyricsPanel` + wiring into `NowPlaying.tsx` | todo | Depends on LY2.1, LY2.2 |
 | LY3.1 | Cross-cutting regression pass | todo | Depends on LY2.3 |
@@ -36,6 +36,23 @@ enough to resolve during implementation, per the spec itself)*
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-30** — LY1.2 done via a subagent — the last backend task.
+  Diff reviewed: route reads `getNowPlayingState().trackId` internally
+  (no query params, matching `/api/now-playing`'s own shape), never
+  404s/500s for the normal not-ready case, and the `loading: true` field
+  is present only in the genuinely-not-yet-resolved case (chosen
+  convention: omitted otherwise, not `loading: false`) — worth remembering
+  for LY2.1's frontend type. `app.ts` registration mirrors the existing
+  `nowPlayingRouter` pattern exactly, nothing else touched. One full-suite
+  run hit an unrelated one-off flake (`middleware/adminAuth.test.ts`, a
+  different file than the previously-known `queue.test.ts` flake) — reran
+  the full suite twice myself independently of the subagent's own run,
+  both clean (45 files/387 tests). `tsc --noEmit` clean. Committed
+  (`5e7c8d9`). **Phase LY0+LY1 (all backend work) is now fully done.**
+  LY2 (frontend — three tasks: API client, LRC parsing/sync hook, the
+  LyricsPanel component + NowPlaying wiring) is next; per the
+  implementation plan LY2.1 and LY2.2 have no dependency on each other and
+  could run in parallel, though LY2.3 depends on both.
 - **2026-08-30** — LY1.1 done via a subagent. Diff reviewed directly
   against `nowPlaying.ts`'s existing careful structure: correctly
   distinguishes "track actually changed" (old vs. new trackId) from
