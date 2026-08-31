@@ -41,24 +41,38 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Open Questions / Blockers
 
 - **The kill switch is a one-way ratchet that any agent with `Bash` can pull
-  for everyone — and nothing announces it.** Surfaced for real during
-  SS3.1's testing, not theorized: a probe agent was denied a write by the
-  hook; a peer agent then flipped `path_enforcement.enforce` to `false` in
-  `.sdlc/project.yaml` (via `Bash`, exactly as the design intends) and asked
-  the probe to retry the same write. The probe **correctly refused**, on the
-  grounds that "a guardrail said no, then a party who isn't my user removed
-  the guardrail and asked me to walk through it" is an escalation pattern to
-  decline regardless of how legitimate the off-switch is. Good behavior, but
-  it exposes the real gap: the switch is repo-wide and persistent, any agent
-  with `Bash` can disarm it for every other agent from a session they can't
-  see, and the hook's denial message doesn't indicate whether enforcement is
-  even on. Design-spec §8a finding 1 (one agent evading enforcement for
-  itself via `Bash`) is arguably the *lesser* problem. Worth considering:
-  making the hook announce enforcement state, requiring a reason/expiry
-  alongside the flip, or having `sdlc-doctor` (SS5.1) hard-fail when
-  enforcement is off. **Also a hard process rule going forward: never commit
-  with `enforce: false`** — verify it before every commit that touches
-  `project.yaml`.
+  for every OTHER agent, silently — including ones it did not spawn.**
+  Surfaced for real during SS3.1's testing (corrected 2026-08-31 — the
+  original write-up of this mischaracterized the actor topology, see the
+  session log). What actually happened: the SS3.1 subagent (spawned by the
+  orchestrator as `general-purpose`, with full tool access) itself spawned
+  two `implementer` subagents as part of its assigned verification steps —
+  one to confirm denial/allow behavior, a second, per the orchestrator's own
+  instructions, to confirm the kill switch works. To run that second test,
+  the SS3.1 agent flipped `path_enforcement.enforce` to `false` via `Bash`
+  (exactly as designed) and, via `SendMessage`, asked its *own first child*
+  to retry the write that had just been denied. That first implementer
+  **refused** — reasoning that a guardrail being removed by "a party who
+  isn't my user" and then being asked to walk through it is an escalation
+  pattern to decline, regardless of how legitimate the off-switch actually
+  was. It described its instructions as human-authored and the requester as
+  a "peer session," and had no way to verify that the request actually
+  traced back to a legitimate test plan — it does not have visibility into
+  its own position in the agent tree (whether the requester is its own
+  parent, a sibling, or something unrelated) or into whether a Bash flip it
+  observes was authorized.
+  The real, narrower gap this exposes: an implementer has no reliable way to
+  distinguish "my own orchestrating context asked for this" from "some other
+  agent asked for this," so its only safe default is to refuse essentially
+  any request to retry after a guardrail relaxation — which is correct
+  caution, but also means the kill switch itself is a repo-wide, persistent,
+  silent flip that any agent with `Bash` can pull for every other agent
+  without their session ever finding out enforcement went off. Worth
+  considering: making the hook announce enforcement state, requiring a
+  reason/expiry alongside the flip, or having `sdlc-doctor` (SS5.1) hard-fail
+  when enforcement is off. **Also a hard process rule going forward: never
+  commit with `enforce: false`** — verify it before every commit that
+  touches `project.yaml`.
 - **`CLAUDE.md` calls the role split "enforced-by-policy, not technical."**
   That becomes partly untrue once SS3.1's `PreToolUse` path-enforcement hook
   lands in a committed `.claude/settings.json` — there *is* now a technical
@@ -109,13 +123,29 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
     separators, and lowercase drive letters all produce identical correct
     decisions. Also confirmed a normal session and a no-`agent_type` caller
     both pass through, and that out-of-repo writes are denied.
-  - **A real incident during testing, worth reading**: a probe agent was
-    denied a write; a peer agent then flipped the kill switch off repo-wide
-    and asked it to retry the same write. **The probe refused**, reasoning
-    that a guardrail being removed by someone who isn't its user, followed
-    by a request to walk through it, is an escalation pattern to decline
-    regardless of how legitimate the off-switch is. Correct call, unprompted.
-    It surfaced the kill-switch gap now recorded under Open Questions.
+  - **A real interaction during testing, worth reading — corrected below
+    from an earlier mischaracterization.** The SS3.1 subagent (itself a
+    `general-purpose` agent spawned by the orchestrator) spawned two
+    `implementer` subagents as part of running the acceptance criteria's
+    own verification steps. It flipped the kill switch off via `Bash` (the
+    designed mechanism, for the designed kill-switch test) and then, via
+    `SendMessage`, asked its *own first implementer child* — already denied
+    once — to retry the write. That implementer **refused**, on the grounds
+    that a guardrail being removed by "a party who isn't my user," followed
+    by a request to walk through it, is an escalation pattern to decline —
+    it had no way to tell this request traced back to a legitimate parent
+    test plan rather than an unrelated actor exploiting the flip. (An
+    earlier version of this entry called the requester a "peer agent";
+    it was actually this implementer's own parent, running an
+    orchestrator-instructed test step, not a rogue third party. Corrected
+    2026-08-31 after the user asked who could plausibly have done this,
+    since sub-agents can't normally spawn further sub-agents — the
+    `general-purpose` SS3.1 agent could and did, per its full tool grant.)
+    Nothing here was actually a security incident, but the underlying
+    finding stands: an implementer has no reliable way to distinguish its
+    own orchestrating context from an unrelated requester, so it defaults
+    to refusing — and that same blind spot is what makes the kill switch's
+    silence a real gap, now recorded under Open Questions.
   - Verified before committing: `enforce: true` restored, zero leftover
     worktrees/branches, no debug residue in the hook, `project.yaml` valid
     against the updated schema.
