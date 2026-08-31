@@ -21,9 +21,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | LY0.2 | Lyrics lookup + cache orchestration | done | `backend/src/lyrics/lyricsService.ts`: `getLyricsForTrack()` (cache-then-LRCLIB, never caches a transient failure), `evictPreviousTrackLyrics()`. **Phase LY0 (backend foundation) now fully done.** |
 | LY1.1 | Trigger lookup on track change, emit SSE event | done | `nowPlaying.ts`: evicts previous track's cache + fire-and-forget lookup on an actual track change (skips on a mere play/pause toggle); new `getLyricsSnapshot()` accessor |
 | LY1.2 | `GET /api/lyrics` route | done | `routes/lyrics.ts` + registration in `app.ts`. `loading: true` present only while a track is playing but its lookup hasn't resolved yet; omitted otherwise. **Phase LY0+LY1 (backend) now fully done.** |
-| LY2.1 | API client + types | todo | Depends on LY1.2 (done) |
-| LY2.2 | LRC parsing + auto-scroll hook | todo | Depends on LY1.2 (types only, can start alongside LY2.1) |
-| LY2.3 | `LyricsPanel` + wiring into `NowPlaying.tsx` | todo | Depends on LY2.1, LY2.2 |
+| LY2.1 | API client + types | done | `getLyrics()`/`LyricsSnapshot` in `frontend/src/lib/api.ts`, mirrors `getNowPlaying()` |
+| LY2.2 | LRC parsing + auto-scroll hook | done | `frontend/src/lib/lrc.ts` (`parseLrc`) + `frontend/src/hooks/useSyncedLyrics.ts`; no frontend test runner exists in this project, verified manually (documented in session log) |
+| LY2.3 | `LyricsPanel` + wiring into `NowPlaying.tsx` | todo | Depends on LY2.1 (done), LY2.2 (done) |
 | LY3.1 | Cross-cutting regression pass | todo | Depends on LY2.3 |
 | LY3.2 | Close out (backlog, PROGRESS.md, merge) | todo | Depends on LY3.1. Needs explicit user go-ahead to merge |
 
@@ -36,6 +36,26 @@ enough to resolve during implementation, per the spec itself)*
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-30** — LY2.1 and LY2.2 done via two parallel subagents (disjoint
+  files — `lib/api.ts` vs. new `lib/lrc.ts`/`hooks/useSyncedLyrics.ts` — no
+  conflict). Both diffs verified directly: LY2.1's `getLyrics()`/
+  `LyricsSnapshot` mirror `getNowPlaying()`'s exact pattern and correctly
+  reflect the backend's `loading`-present-only-when-true wire shape (not
+  normalized to `false` client-side). LY2.2's `parseLrc()` handles
+  multi-leading-timestamp repeated lines, variable fraction-digit counts,
+  and skips metadata/malformed lines without throwing, sorting
+  defensively; `useSyncedLyrics()` is a pure `useMemo` derivation with no
+  internal timer, keyed on the caller's own `progressMs` so it can't drift
+  from the progress bar's existing clock. **No frontend test runner exists
+  in this project** (confirmed again this session) — LY2.2 was verified via
+  throwaway `npx tsx` scripts (deleted after use, not committed) covering
+  well-formed input, repeated-timestamp lines, metadata lines, malformed
+  lines, empty-text timestamps, 3-digit fractions, and `useSyncedLyrics`'s
+  boundary cases; this is real but manual verification, flagged explicitly
+  rather than implied to be automated. `tsc -b` clean after each, and
+  again after both landed together. Committed separately (`fecea6a`,
+  `f3528e9`). LY2.3 (the `LyricsPanel` component + `NowPlaying.tsx`
+  wiring) is next — depends on both, no longer blocked.
 - **2026-08-30** — LY1.2 done via a subagent — the last backend task.
   Diff reviewed: route reads `getNowPlayingState().trackId` internally
   (no query params, matching `/api/now-playing`'s own shape), never
