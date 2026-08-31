@@ -2,6 +2,10 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.24
+
+- Added synced lyrics: tap "Lyrics" on the Now Playing screen to reveal a lyrics card that auto-scrolls in time with the song, and can be expanded to read the full lyrics freely. Lyrics come from LRCLIB, a free open lyrics database — not every song will have a match.
+
 ## 1.0.23
 
 - A real Spotify rate-limit/quota 429 is now actually logged (which caller hit it, how long the backoff is, and exactly when it resumes) — previously this was silent by design, which made a restart's very first 429 look like nothing had happened at all.
