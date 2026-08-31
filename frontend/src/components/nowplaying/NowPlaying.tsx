@@ -7,6 +7,7 @@ import type { EventStream } from '../../hooks/useEventStream'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useFavoritesStatus } from '../../hooks/useFavoritesStatus'
 import { FavoriteButton } from '../favorites/FavoriteButton'
+import { LyricsPanel } from './LyricsPanel'
 
 /** Matches --duration-slow in index.css — the crossfade should ride the same token. */
 const CROSSFADE_MS = 320
@@ -58,6 +59,7 @@ export function NowPlaying({
   const [visible, setVisible] = useState(true)
   const [progressMs, setProgressMs] = useState(0)
   const [expanded, setExpanded] = useState(false)
+  const [showLyrics, setShowLyrics] = useState(false)
   const [detailArtist, setDetailArtist] = useState<ArtistInfo | null>(null)
   const [detailPlayCount, setDetailPlayCount] = useState<number | null>(null)
   const pendingRef = useRef<NowPlayingState | null>(null)
@@ -277,23 +279,36 @@ export function NowPlaying({
                 <p className="truncate text-body font-semibold text-text-primary">{displaySnapshot.name}</p>
                 <p className="truncate text-caption text-text-secondary">{displaySnapshot.artist}</p>
               </div>
-              <FavoriteButton
-                className="mt-0.5 shrink-0"
-                size="md"
-                favoritedByMe={favoritesStatus[displaySnapshot.trackId]?.favoritedByMe ?? false}
-                favoritedByAnyone={favoritesStatus[displaySnapshot.trackId]?.favoritedByAnyone ?? false}
-                onToggle={() => {
-                  const track: Track = {
-                    id: displaySnapshot.trackId as string,
-                    name: displaySnapshot.name ?? '',
-                    artist: displaySnapshot.artist ?? '',
-                    albumArt: displaySnapshot.albumArt ?? null,
-                    durationMs: displaySnapshot.durationMs ?? 0,
-                    explicit: false,
-                  }
-                  toggleFavorite(track)
-                }}
-              />
+              <div className="flex shrink-0 items-center gap-1">
+                <button
+                  type="button"
+                  className="mt-0.5 rounded-full px-2.5 py-1 text-caption text-text-secondary transition-fast hover:bg-white/5 active:bg-white/10"
+                  aria-pressed={showLyrics}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setShowLyrics((prev) => !prev)
+                  }}
+                >
+                  Lyrics
+                </button>
+                <FavoriteButton
+                  className="mt-0.5 shrink-0"
+                  size="md"
+                  favoritedByMe={favoritesStatus[displaySnapshot.trackId]?.favoritedByMe ?? false}
+                  favoritedByAnyone={favoritesStatus[displaySnapshot.trackId]?.favoritedByAnyone ?? false}
+                  onToggle={() => {
+                    const track: Track = {
+                      id: displaySnapshot.trackId as string,
+                      name: displaySnapshot.name ?? '',
+                      artist: displaySnapshot.artist ?? '',
+                      albumArt: displaySnapshot.albumArt ?? null,
+                      durationMs: displaySnapshot.durationMs ?? 0,
+                      explicit: false,
+                    }
+                    toggleFavorite(track)
+                  }}
+                />
+              </div>
             </div>
 
             <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-surface-overlay">
@@ -355,6 +370,15 @@ export function NowPlaying({
           </div>
         )}
       </div>
+
+      {showLyrics && displaySnapshot.trackId && (
+        <LyricsPanel
+          key={displaySnapshot.trackId}
+          trackId={displaySnapshot.trackId}
+          subscribe={subscribe}
+          progressMs={progressMs}
+        />
+      )}
     </Card>
   )
 }

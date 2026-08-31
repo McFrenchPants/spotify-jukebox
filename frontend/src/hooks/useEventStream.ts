@@ -14,6 +14,7 @@ const NAMED_EVENTS = [
   'leaderboard-update',
   'device-status',
   'favorites-update',
+  'lyrics-update',
   'jukebox-volume-command',
   'jukebox-volume-status',
 ] as const
