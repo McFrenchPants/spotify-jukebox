@@ -1,0 +1,40 @@
+{
+  "task_id": "SS-EX.1",
+  "plan_revision": "uncommitted:2026-08-31T16:27:10.726Z",
+  "objective": "Add a small `GET /api/queue/stats` route to `backend/src/routes/queue.ts` that\nreturns basic queue metrics (current entry count and average wait time) by\nreading from `backend/src/db/queueEntries.ts`. Register the new route the\nsame way the existing `queue.ts` routes are already registered in\n`backend/src/app.ts`. Add a corresponding test in `backend/src/routes/queue.test.ts`\nfollowing the existing test style in that file.",
+  "non_goals": [],
+  "dependencies": [
+    "SS0.1"
+  ],
+  "read_paths": [
+    "CLAUDE.md",
+    "backend/src/app.ts",
+    "backend/src/db/queueEntries.ts",
+    "backend/src/routes/queue.test.ts",
+    "backend/src/routes/queue.ts",
+    "backend/src/spotify/queue.ts",
+    "docs/TESTING.md"
+  ],
+  "write_paths": [
+    "backend/src/routes/queue.test.ts",
+    "backend/src/routes/queue.ts"
+  ],
+  "forbidden_paths": [
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    "docs/sdlc/IMPLEMENTATION_PLAN.md",
+    "docs/sdlc/PROGRESS.md"
+  ],
+  "acceptance_criteria": [
+    "`GET /api/queue/stats` returns 200 with `{ count, avgWaitMs }` for a non-empty queue.",
+    "Returns `{ count: 0, avgWaitMs: null }` for an empty queue.",
+    "`npx tsc --noEmit` and `npx vitest run` are both clean in `backend/`."
+  ],
+  "verification_commands": [
+    "cd backend",
+    "npx tsc --noEmit",
+    "npx vitest run"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}

@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Implementation started. SS0.1 done. Next: SS0.2.
+## Status: Phase SS0 (machine state foundation) done. Next: SS1.1.
 
 ## Task Table
 
@@ -23,7 +23,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 |---|---|---|---|
 | SS0.1 | `.sdlc/state.json` + `project.yaml` schema | done | Schemas at `docs/sdlc/schemas/{state,project}.schema.json`; example `.sdlc/state.json`/`project.yaml` for this repo's real in-flight state, validated against both (`jsonschema`, re-verified independently). Introduced a deliberate `status`/`lifecycle_state` split per task (coarse todo/in-progress/blocked/done vs. the full evidence-gated `draft→…→released` enum, null until a task packet exists) — SS0.2 needs to decide which field(s) its transition validator actually checks. |
 | SS0.2 | State-transition validator | done | `scripts/sdlc/validate-state.mjs` (library API + CLI + `--self-test`, no external test dep). Evidence-gates both `ready_to_release` and `released` (not just `released`); allows same-state no-ops; documents the `<task-id>-*` evidence-file naming convention SS0.3's generator must follow. |
-| SS0.3 | Task-packet + completion-report templates/generator | todo | depends on SS0.1 |
+| SS0.3 | Task-packet + completion-report templates/generator | done | Schemas at `docs/sdlc/schemas/{task-packet,completion-report}.schema.json`; generator at `scripts/sdlc/generate-task-packet.mjs` (regex/proximity heuristic for `read_paths`/`write_paths`, honestly documented limits, falls back to `"NEEDS_MANUAL_REVIEW"`). Tested against a synthetic example (no real proposal had a `todo` task) at `.sdlc/task-packets/SS-EX.1.packet.json`, re-validated independently. |
 | SS1.1 | `implementer` agent | todo | depends on SS0.3 |
 | SS1.2 | `verifier` agent | todo | depends on SS0.3 |
 | SS1.3 | Reframe `supervisor.md` as release operator | todo | depends on SS1.1 |
@@ -53,6 +53,35 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-31** — `/continue-development`: implemented SS0.2 and SS0.3 in
+  parallel (both depend only on SS0.1, independent of each other), each via
+  a scoped subagent, each independently re-verified (diff review + rerunning
+  its own validation myself, not trusting the subagent's claim alone) before
+  committing. **SS0.2**: `scripts/sdlc/validate-state.mjs` — library API
+  (`validateTransition`) + CLI + built-in `--self-test` (no external test
+  framework needed). Two real judgment calls worth remembering: same-state
+  no-op transitions are allowed (state.json gets rewritten on every save,
+  not every save advances every task), and evidence-gating applies to
+  *both* `ready_to_release` and `released`, not just `released` — and it
+  fixes the evidence-file naming convention (`<task-id>` or
+  `<task-id>-*`/`<task-id>.*` directly under `.sdlc/evidence/`) that SS0.3's
+  generator now follows. **SS0.3**: `docs/sdlc/schemas/{task-packet,
+  completion-report}.schema.json` + `scripts/sdlc/generate-task-packet.mjs`.
+  No real proposal had a still-`todo` task to use as a live example
+  (lyrics-integration is fully implemented, only its merge step remains) so
+  the subagent used a clearly-labeled synthetic example
+  (`.sdlc/task-packets/SS-EX.1.packet.json`, a fictional queue-stats
+  endpoint) — re-validated independently against the schema, passes. The
+  `read_paths`/`write_paths` inference heuristic is regex/proximity-based
+  (explicit path tokens + known-filename resolution against repo
+  directories + a write-verb proximity check), honestly documented as
+  non-semantic (won't resolve "the lyrics feature" to a directory without
+  an explicit path mention), with a `"NEEDS_MANUAL_REVIEW"` fallback when
+  nothing is inferable. All of SS0 (machine-state foundation) is now done.
+  Phase boundary reached — stopping here for review before starting Phase
+  SS1 (agent roles: `implementer.md`, `verifier.md`), since those tasks
+  define restricted-tool-list agents that later phases build heavily on and
+  are worth a sanity check first. Committed on this branch; not merged.
 - **2026-08-31** — `/continue-development`: implemented SS0.1 (`.sdlc/state.json`
   + `.sdlc/project.yaml` schemas) via a scoped subagent, verified independently
   (diff review + a fresh `jsonschema.validate()` run against both example
