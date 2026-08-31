@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Design approved. SS3.1's core mechanism feasibility-spiked and confirmed live. Implementation not yet started (SS0.1 is next).
+## Status: Implementation started. SS0.1 done. Next: SS0.2.
 
 ## Task Table
 
@@ -21,7 +21,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| SS0.1 | `.sdlc/state.json` + `project.yaml` schema | todo | |
+| SS0.1 | `.sdlc/state.json` + `project.yaml` schema | done | Schemas at `docs/sdlc/schemas/{state,project}.schema.json`; example `.sdlc/state.json`/`project.yaml` for this repo's real in-flight state, validated against both (`jsonschema`, re-verified independently). Introduced a deliberate `status`/`lifecycle_state` split per task (coarse todo/in-progress/blocked/done vs. the full evidence-gated `draft→…→released` enum, null until a task packet exists) — SS0.2 needs to decide which field(s) its transition validator actually checks. |
 | SS0.2 | State-transition validator | todo | depends on SS0.1 |
 | SS0.3 | Task-packet + completion-report templates/generator | todo | depends on SS0.1 |
 | SS1.1 | `implementer` agent | todo | depends on SS0.3 |
@@ -53,6 +53,24 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-31** — `/continue-development`: implemented SS0.1 (`.sdlc/state.json`
+  + `.sdlc/project.yaml` schemas) via a scoped subagent, verified independently
+  (diff review + a fresh `jsonschema.validate()` run against both example
+  files, not just the subagent's own claim). Schemas live at
+  `docs/sdlc/schemas/state.schema.json` and `project.schema.json`; hand-written
+  examples at `.sdlc/state.json` (this repo's real task table, SS0.1 marked
+  `implementing`/leased to this run, everything else `todo` matching the table
+  above) and `.sdlc/project.yaml` (budget defaults, the immutable §6
+  verification floor plus two project-specific `widen` entries reflecting
+  `CLAUDE.md`'s actual risk areas — Spotify credentials, HA/Android device
+  access). Real judgment call worth flagging forward: `state.json` tracks
+  `status` (todo/in-progress/blocked/done, matching this table's legend) and
+  `lifecycle_state` (the full evidence-gated enum, null until a task has a
+  generated task packet) as two separate fields rather than one — SS0.2's
+  transition validator needs to pick which it actually validates transitions
+  against. No JSON Schema validator exists as a repo dependency (checked both
+  `package.json`s); used the system's Python `jsonschema`/`pyyaml` ad hoc,
+  nothing added to the repo. Committed on this branch; not merged.
 - **2026-08-31** — Spiked SS3.1's `PreToolUse` path-enforcement mechanism
   before committing further design to it, per the user's request to verify
   feasibility and a toggle mechanism. Confirmed live: denial pre-execution,

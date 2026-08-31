@@ -1,0 +1,35 @@
+# Project policy for the sdlc-supervisor framework.
+# Shape documented at docs/sdlc/schemas/project.schema.json.
+framework_version: "0.1.0"
+schema_version: "1.0.0"
+
+budgets:
+  max_tasks_per_run: 5
+  max_concurrent_implementers: 1
+  max_attempts_per_task: 3
+  max_verifier_retries: 2
+  token_or_time_budget:
+    tokens: null
+    minutes: 120
+
+verification_profile:
+  # Fixed floor from design-spec.md §6 -- reproduced verbatim, do not edit.
+  # Widen coverage via `widen` below instead of touching this list.
+  floor_triggers:
+    - authentication_authorization
+    - data_persistence_migrations
+    - deployment_release_tooling
+    - production_mutation_tier_or_above
+  # Project-specific additions to the floor, per this repo's real risk areas
+  # (see CLAUDE.md: Spotify auth is shared with the live party deployment,
+  # and the supervisor-only boundary around the Home Assistant host / Android
+  # Master Device).
+  widen:
+    - spotify_credential_or_token_handling
+    - home_assistant_or_android_device_access
+
+owned_files:
+  - ".sdlc/**"
+  - "docs/sdlc/**"
+  - ".claude/agents/implementer.md"
+  - ".claude/agents/verifier.md"

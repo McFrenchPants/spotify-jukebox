@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://spotify-jukebox.local/sdlc/schemas/project.schema.json",
+  "title": "sdlc-supervisor project.yaml",
+  "description": "Project policy for the sdlc-supervisor framework: framework/schema version, run budgets (design-spec.md §7), verification-profile floor (design-spec.md §6), and the bootstrap owned-files list. Authored as YAML on disk (.sdlc/project.yaml); this schema describes its parsed (JSON-equivalent) shape.",
+  "type": "object",
+  "required": ["framework_version", "schema_version", "budgets", "verification_profile", "owned_files"],
+  "additionalProperties": false,
+  "properties": {
+    "framework_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Version of the sdlc-supervisor framework itself (the orchestrator/agent/hook machinery), independent of any one schema's shape."
+    },
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Version of THIS schema's shape (semver) -- should track docs/sdlc/schemas/project.schema.json, and does not need to move in lockstep with state.schema.json's schema_version."
+    },
+    "budgets": {
+      "type": "object",
+      "description": "Run budgets from design-spec.md §7. All but token_or_time_budget are hard caps enforced by the orchestrator; token_or_time_budget is explicitly soft (logged and flagged, not a hard kill).",
+      "required": [
+        "max_tasks_per_run",
+        "max_concurrent_implementers",
+        "max_attempts_per_task",
+        "max_verifier_retries",
+        "token_or_time_budget"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "max_tasks_per_run": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of tasks the orchestrator will drive to completion in a single run before stopping. Default used in this project's example: 5 -- small enough that a run staying within one phase of docs/sdlc/IMPLEMENTATION_PLAN.md is normal, not a limiter."
+        },
+        "max_concurrent_implementers": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum number of implementer agents the orchestrator may have leased/running at once. Default used in this project's example: 1 -- this project has no parallel-safe task pairs yet (see the dependency graph in .sdlc/state.json), so concurrency isn't yet useful and raising it before it is would just add coordination risk."
+        },
+        "max_attempts_per_task": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum attempts an implementer may make on one task (tracked via that task's lease.attempt_count in state.json) before the task escalates to the orchestrator instead of being retried automatically. Default used in this project's example: 3."
+        },
+        "max_verifier_retries": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Maximum times a Verifier subagent (design-spec.md §6) may be re-run on the same task/report before escalating. Default used in this project's example: 2."
+        },
+        "token_or_time_budget": {
+          "type": "object",
+          "description": "Soft, per-run budget -- logged and flagged when exceeded, never used to hard-kill a run. Either field (or both) may be null to mean 'not tracked'.",
+          "additionalProperties": false,
+          "required": ["tokens", "minutes"],
+          "properties": {
+            "tokens": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Rough token budget for a run. null = not tracked. No default enforced by this schema; this project's example leaves it null pending real usage data from dogfooding (SS6.1)."
+            },
+            "minutes": {
+              "type": ["integer", "null"],
+              "minimum": 0,
+              "description": "Rough wall-clock time budget for a run, in minutes. null = not tracked. Default used in this project's example: 120."
+            }
+          }
+        }
+      }
+    },
+    "verification_profile": {
+      "type": "object",
+      "description": "Strong verification (a separate read-only Verifier subagent, design-spec.md §6) is required, not optional, for any task packet touching floor_triggers. A project may widen that list; it cannot narrow it.",
+      "required": ["floor_triggers", "widen"],
+      "additionalProperties": false,
+      "properties": {
+        "floor_triggers": {
+          "type": "array",
+          "description": "Fixed floor from design-spec.md §6. This exact set is immutable framework policy -- a conforming project.yaml MUST reproduce it verbatim here (do not edit; widen coverage via the `widen` array instead).",
+          "const": [
+            "authentication_authorization",
+            "data_persistence_migrations",
+            "deployment_release_tooling",
+            "production_mutation_tier_or_above"
+          ]
+        },
+        "widen": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Project-specific additional triggers (free-form strings or path/description patterns) that also require strong verification for this project, on top of the immutable floor. May be empty."
+        }
+      }
+    },
+    "owned_files": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Path globs this project's sdlc tooling considers itself the owner/bootstrapper of -- used by tooling (e.g. the future sdlc-doctor command, SS5.1) to know what it's safe to scaffold, check, or regenerate without being told file-by-file."
+    }
+  }
+}
