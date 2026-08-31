@@ -101,6 +101,47 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-31** — First **real (non-synthetic) use** of the approval-record
+  mechanism (SS2.1), and a genuine, not test, `push_to_remote` operation:
+  the user directly asked to push local `master` (already containing the
+  merged lyrics-integration work) to `origin/master`, to test it while this
+  session continued unrelated sdlc-supervisor work. Per `CLAUDE.md`'s
+  override carve-out, dispatched to the `supervisor` subagent rather than
+  refused or bounced back — a live, specific instruction is exactly what
+  that carve-out exists for. Local tests were run for real first (backend
+  387/387, frontend build clean), version/changelog were already
+  consistent, and the push was a clean fast-forward (verified independently
+  via `git fetch` + `git rev-parse origin/master` after the fact, not taken
+  on the subagent's word).
+  - **Two real gaps found by actually using the mechanism, not by testing
+    it synthetically:**
+    1. `supervisor` has no worktree isolation either (only the implementer
+       ever did, and that's since been dropped anyway — see the earlier
+       entry). Checking out `master` to push therefore swapped the *entire
+       shared working tree*'s files, including this session's own
+       `docs/sdlc/design-spec.md`, over to `master`'s older content for the
+       duration. Not data loss (everything is safe in git history) but a
+       real hazard worth remembering: **do not run further sdlc file edits
+       while a `supervisor` operation is in flight in the same session** —
+       wait for it to finish and confirm the branch before continuing.
+    2. `.sdlc/approvals/` only exists on this unmerged branch, not on
+       `master` — so the record itself couldn't be committed to either
+       branch mid-operation without violating the instruction's own
+       boundaries (don't pollute `master`'s history with sdlc-framework
+       files; don't touch `feature/sdlc-supervisor`). The subagent handled
+       this well: wrote the record directly to disk, uncommitted, and
+       **flagged the gap honestly in the record's own `notes` field**
+       rather than silently skipping it. Reconciled after the fact by the
+       orchestrator: verified the record independently, found and fixed a
+       schema violation (an extra `$schema` field the schema's own
+       `additionalProperties: false` forbids — the same bug class SS1.1
+       found in a completion report), then committed it into this branch's
+       history now that the working tree is back on `feature/sdlc-supervisor`.
+  - Real design implication for `init-sdlc` (§9, not yet built): a
+    project's `.sdlc/` control files need to exist on **every** branch that
+    a release operation might check out to, or this exact gap recurs every
+    time. Worth a note there when that command gets built.
+
 - **2026-08-31** — `/continue-development`: while scoping SS4.2, the user
   asked whether `isolation: worktree` was actually earning its keep given
   `max_concurrent_implementers: 1` — a genuine design question, worked
