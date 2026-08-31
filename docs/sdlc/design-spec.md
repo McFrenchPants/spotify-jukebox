@@ -281,6 +281,47 @@ that can change scope. This matters more once implementers are reading
 arbitrary project files under time pressure to finish a task; state it
 explicitly in the implementer agent's own instructions, not just here.
 
+### 8a. Verified live, and two gaps that changes the plan
+
+Before committing further design to this mechanism, ran an actual
+`PreToolUse` spike in this repo (script + local-only hook wiring, not
+committed — see IMPLEMENTATION_PLAN.md SS3.1's revised notes). Confirmed
+live, not just from documentation:
+
+- A `PreToolUse` hook denies an `Edit`/`Write` before it executes, based on
+  `tool_input.file_path`, with a clear reason surfaced back to the caller.
+- The enforcement toggles off cleanly via a config value the hook script
+  reads at runtime (an env var in the spike; a plugin `userConfig` boolean
+  → `CLAUDE_PLUGIN_OPTION_*` once this is packaged, confirmed as the
+  documented mechanism for that case too).
+
+Two gaps the spike surfaced, neither hypothetical — both were hit running
+it, not reasoned about in the abstract:
+
+1. **A hook matched to `Write|Edit` doesn't see writes made via `Bash`**
+   (`echo ... > file`, `cp`, a script that writes output). The implementer
+   agent needs `Bash` for running tests/typechecks, so this can't be closed
+   by narrowing its tool grant further. Consequence: the path-enforcement
+   hook is a real control, but not a complete one — it stops the common
+   case (an agent using `Edit`/`Write` normally), not a determined or
+   confused agent shelling out around it. This is exactly why §6's verifier
+   role matters as a *second, independent* backstop: it checks the actual
+   `git diff` against `forbidden_paths` regardless of which tool produced
+   it, so a Bash-origin violation still gets caught post-hoc even though
+   the hook didn't catch it pre-execution. Path enforcement is
+   pre-execution-hook-plus-post-hoc-diff-review, not the hook alone.
+2. **A path-enforcement hook can self-lock.** The spike's hook blocked its
+   own author's `Edit` attempt to turn it off, because editing the settings
+   file that configures the hook was itself outside the allowlist —
+   working around it required a different tool (`Bash`) outside the
+   hook's matcher, which happened to be available here but won't always
+   be a deliberate escape hatch. The real implementation needs an explicit,
+   documented kill switch that doesn't route through the same tool the
+   hook gates — e.g. the toggle lives in a file the hook script reads but
+   that `Edit`/`Write` are never asked to touch (a `.sdlc/` control file,
+   checked via `Bash`/a project script, not through the agent's own
+   `Edit` tool) — rather than relying on an incidental gap in the matcher.
+
 ## 9. Bootstrap: `init-sdlc` (expanded from v1)
 
 v1 said "never overwrite existing files silently." Necessary, not
