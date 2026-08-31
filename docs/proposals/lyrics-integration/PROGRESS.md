@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved by the user 2026-08-30).
 All work happens on `feature/lyrics-integration` — confirm you're on that
 branch before making any changes.
 
-## Status: Backend (LY0+LY1) and frontend (LY2) fully done. Starting LY3 (verification/close-out).
+## Status: All implementation and verification done (LY0-LY3.1). LY3.2 close-out docs done. Only the merge to `master` remains, pending explicit user go-ahead.
 
 ## Task Table
 
@@ -25,7 +25,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | LY2.2 | LRC parsing + auto-scroll hook | done | `frontend/src/lib/lrc.ts` (`parseLrc`) + `frontend/src/hooks/useSyncedLyrics.ts`; no frontend test runner exists in this project, verified manually (documented in session log) |
 | LY2.3 | `LyricsPanel` + wiring into `NowPlaying.tsx` | done | New `LyricsPanel.tsx` + `NowPlaying.tsx` wiring + `NAMED_EVENTS` addition. Two issues found and fixed directly before accepting: a wide-screen layout squeeze against the artist-detail split, and an auto-scroll/manual-scroll detection bug. Live-verified via a temporary reverted debug fixture (no real Spotify session in this dev environment). **Phase LY2 (frontend) now fully done.** |
 | LY3.1 | Cross-cutting regression pass | done | Backend: 45 files/387 tests green, `tsc --noEmit` clean. Frontend: `tsc -b`/`npm run build` clean. Real LRCLIB spot-check (throwaway script, deleted after) against live data: a mainstream track ("Bohemian Rhapsody") returned synced+plain lyrics, a nonsense track correctly returned not-found. Full Spotify-session smoke test not possible in this dev environment (no working credentials, documented recurring gap in this project — see session log) |
-| LY3.2 | Close out (backlog, PROGRESS.md, merge) | todo | Depends on LY3.1 (done). Needs explicit user go-ahead to merge |
+| LY3.2 | Close out (backlog, PROGRESS.md, merge) | in-progress | Backlog/root-PROGRESS.md/CHANGELOG.md/config.yaml done. Only the merge to `master` remains — needs explicit user go-ahead |
 
 ## Open Questions / Blockers
 
