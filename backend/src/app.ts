@@ -9,6 +9,7 @@ import { eventsRouter } from "./routes/events";
 import { favoritesRouter } from "./routes/favorites";
 import { jukeboxDeviceStatusRouter } from "./routes/jukeboxDeviceStatus";
 import { leaderboardRouter } from "./routes/leaderboard";
+import { lyricsRouter } from "./routes/lyrics";
 import { nowPlayingRouter } from "./routes/nowPlaying";
 import { playbackRouter } from "./routes/playback";
 import { queueRouter } from "./routes/queue";
@@ -56,6 +57,7 @@ export function createApp(): Express {
   app.use("/api/favorites", favoritesRouter);
   app.use("/api/jukebox-device", jukeboxDeviceStatusRouter);
   app.use("/api/leaderboard", leaderboardRouter);
+  app.use("/api/lyrics", lyricsRouter);
   app.use("/api/now-playing", nowPlayingRouter);
   app.use("/api/playback", playbackRouter);
   app.use("/api/queue", queueRouter);
