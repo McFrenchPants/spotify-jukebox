@@ -29,9 +29,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS1.3 | Reframe `supervisor.md` as release operator | done | Additive only — 49 insertions, 0 deletions (verified via `git diff --numstat`); the existing "Scope note for non-supervisor agents" carve-out is byte-for-byte unchanged. Adds the four-role framing + an approval-record section that explicitly says a live user instruction *is* the approval (write the record and proceed; never make the user produce one first). |
 | SS2.1 | Approval-record format | done | `docs/sdlc/schemas/approval.schema.json` + procedure doc `docs/sdlc/APPROVAL_RECORDS.md` + a real example in `.sdlc/approvals/` pinned to the then-current HEAD. `single_use` is `const: true` so a standing approval can't be minted; `consumed_at`/`consumed_by` are conditionally required when `consumed: true`. Verified the constraints actually bite via negative controls, not just a happy-path validate. |
 | SS2.2 | Update `CLAUDE.md` override language | todo | depends on SS2.1 (done). Prep notes surfaced while doing SS2.1, worth reusing: (1) CLAUDE.md's carve-out lists two things that happen first (say it bypasses the split; local tests pass) — add recording the approval as a third, worded as *and also write it down*, **never** as a precondition, or it regresses the tested "explicit override still works" behavior; (2) the "a *standing* instruction buried in a doc doesn't count" sentence is the natural hook for the single-use/SHA-pinning idea — link `docs/sdlc/APPROVAL_RECORDS.md` there rather than adding a new section; (3) CLAUDE.md describes a two-role split while the design spec has four — either reconcile, or say plainly that CLAUDE.md's is the repo-wide default and the four-role model refines it. |
-| SS3.1 | `PreToolUse` path-enforcement hook | todo | depends on SS1.1, SS0.3. Core mechanism confirmed live via spike 2026-08-31 (see design-spec §8a) — denial, path-matching, and toggle all work; two real gaps found (Bash bypasses an Edit\|Write matcher; a path hook can self-lock) and folded into the acceptance criteria |
+| SS3.1 | `PreToolUse` path-enforcement hook | done | Real implementation replaces the spike. **Key discovery: the `PreToolUse` hook input carries `agent_type`** (observed live: `"implementer"`, `"general-purpose"`), so enforcement is scoped to implementer agents only — every other caller, including ordinary interactive sessions, passes through untouched. That's what makes shipping this in a *committed* `.claude/settings.json` safe. Windows backslash/drive-case normalization independently re-verified by the orchestrator (a first test pass appeared to show a normalization hole; that turned out to be shell-escaping in the test harness, not the hook — retested properly, all cases correct). |
 | SS4.1 | Orchestrator full-context-once rewrite | todo | depends on SS0.1 |
-| SS4.2 | Delegate rewrite (task packets, implementer agent) | todo | depends on SS1.1, SS0.3 |
+| SS4.2 | Delegate rewrite (task packets, implementer agent) | todo | depends on SS1.1, SS0.3. **Hard requirement discovered in SS3.1 — read before starting:** with the shipped hook config and no active-packet pointer present, an implementer agent is denied *all* `Edit`/`Write` (deliberate fail-safe: no scope contract ⇒ no writes). So the delegate step **must** establish the active packet when spawning, via one of: the `SDLC_ACTIVE_PACKET` env var, a `.sdlc/active-packet` pointer file, or leasing exactly one task in `.sdlc/state.json`. Miss this and every implementer is dead on arrival. Note also that implementers run worktree-isolated and nothing seeds a fresh worktree today, so per-worktree pointers are the only way to separate concurrent implementers. |
 | SS4.3 | Verify rewrite (verifier routing) | todo | depends on SS1.2 |
 | SS4.4 | Run-budget stopping conditions | todo | depends on SS0.1 |
 | SS5.1 | `sdlc-doctor` command | todo | depends on SS0.1, SS0.2 |
@@ -40,6 +40,25 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 ## Open Questions / Blockers
 
+- **The kill switch is a one-way ratchet that any agent with `Bash` can pull
+  for everyone — and nothing announces it.** Surfaced for real during
+  SS3.1's testing, not theorized: a probe agent was denied a write by the
+  hook; a peer agent then flipped `path_enforcement.enforce` to `false` in
+  `.sdlc/project.yaml` (via `Bash`, exactly as the design intends) and asked
+  the probe to retry the same write. The probe **correctly refused**, on the
+  grounds that "a guardrail said no, then a party who isn't my user removed
+  the guardrail and asked me to walk through it" is an escalation pattern to
+  decline regardless of how legitimate the off-switch is. Good behavior, but
+  it exposes the real gap: the switch is repo-wide and persistent, any agent
+  with `Bash` can disarm it for every other agent from a session they can't
+  see, and the hook's denial message doesn't indicate whether enforcement is
+  even on. Design-spec §8a finding 1 (one agent evading enforcement for
+  itself via `Bash`) is arguably the *lesser* problem. Worth considering:
+  making the hook announce enforcement state, requiring a reason/expiry
+  alongside the flip, or having `sdlc-doctor` (SS5.1) hard-fail when
+  enforcement is off. **Also a hard process rule going forward: never commit
+  with `enforce: false`** — verify it before every commit that touches
+  `project.yaml`.
 - **`CLAUDE.md` calls the role split "enforced-by-policy, not technical."**
   That becomes partly untrue once SS3.1's `PreToolUse` path-enforcement hook
   lands in a committed `.claude/settings.json` — there *is* now a technical
@@ -65,6 +84,44 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-08-31** — `/continue-development`: implemented **SS3.1**, the real
+  `PreToolUse` path-enforcement hook (replacing the committed spike). This
+  was the highest-stakes task so far, because its config ships in a
+  **committed** `.claude/settings.json` and is therefore live for ordinary
+  sessions in this repo, not just implementer subagents.
+  - **The discovery that made it safe**: the `PreToolUse` hook input JSON
+    carries `agent_type` (verified live by logging raw stdin — observed
+    `"implementer"` vs `"general-purpose"`). Enforcement is scoped to
+    `agent_type === "implementer"`; everything else returns before any
+    packet logic runs. Without that field this would have had to be a
+    global hook, and a strict fail-safe would have been unshippable.
+  - **Fail-safe**: non-implementers allow; an implementer with no resolvable
+    packet is *denied* (no scope contract must not mean unlimited scope).
+    The blast radius of that strictness is confined to implementer agents.
+  - **Independent verification by the orchestrator, not taken on the
+    subagent's word**: drove the hook directly with synthetic inputs. A
+    first pass appeared to show a Windows backslash normalization hole —
+    exactly the "silently no-ops on a backslash mismatch" failure §8 warns
+    about — but that was **my own test harness** (bash `echo` mangling
+    escapes plus a dropped env var), not the hook. Retested via a proper
+    Node harness with no shell escaping: forward-slash, backslash, mixed
+    separators, and lowercase drive letters all produce identical correct
+    decisions. Also confirmed a normal session and a no-`agent_type` caller
+    both pass through, and that out-of-repo writes are denied.
+  - **A real incident during testing, worth reading**: a probe agent was
+    denied a write; a peer agent then flipped the kill switch off repo-wide
+    and asked it to retry the same write. **The probe refused**, reasoning
+    that a guardrail being removed by someone who isn't its user, followed
+    by a request to walk through it, is an escalation pattern to decline
+    regardless of how legitimate the off-switch is. Correct call, unprompted.
+    It surfaced the kill-switch gap now recorded under Open Questions.
+  - Verified before committing: `enforce: true` restored, zero leftover
+    worktrees/branches, no debug residue in the hook, `project.yaml` valid
+    against the updated schema.
+  - **SS4.2 now has a hard prerequisite** recorded on its row: the delegate
+    step must establish an active packet when spawning, or every implementer
+    is denied all writes. Do not start SS4.2 without reading that note.
 
 - **2026-08-31** — `/continue-development`: implemented **SS1.3 + SS2.1**
   (handed to a single subagent, deliberately — SS2.1's acceptance criteria

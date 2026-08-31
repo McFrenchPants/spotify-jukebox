@@ -4,7 +4,7 @@
   "title": "sdlc-supervisor project.yaml",
   "description": "Project policy for the sdlc-supervisor framework: framework/schema version, run budgets (design-spec.md §7), verification-profile floor (design-spec.md §6), and the bootstrap owned-files list. Authored as YAML on disk (.sdlc/project.yaml); this schema describes its parsed (JSON-equivalent) shape.",
   "type": "object",
-  "required": ["framework_version", "schema_version", "budgets", "verification_profile", "owned_files"],
+  "required": ["framework_version", "schema_version", "path_enforcement", "budgets", "verification_profile", "owned_files"],
   "additionalProperties": false,
   "properties": {
     "framework_version": {
@@ -16,6 +16,18 @@
       "type": "string",
       "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
       "description": "Version of THIS schema's shape (semver) -- should track docs/sdlc/schemas/project.schema.json, and does not need to move in lockstep with state.schema.json's schema_version."
+    },
+    "path_enforcement": {
+      "type": "object",
+      "description": "Kill switch for the PreToolUse path-enforcement hook (.claude/hooks/sdlc-path-check.mjs, design-spec.md §8/§8a), which denies an implementer's Edit/Write outside its active task packet's write_paths. The toggle lives in this file -- read by the hook script at runtime -- specifically so that disabling enforcement never routes through the Edit/Write tools the hook itself gates; §8a finding 2 records a real self-lock where a path hook blocked its own author's attempt to turn it off. Flip it with Bash (sed/python), never with Edit/Write.",
+      "required": ["enforce"],
+      "additionalProperties": false,
+      "properties": {
+        "enforce": {
+          "type": "boolean",
+          "description": "true = the hook denies out-of-scope writes by implementer agents; false = the hook exits without an opinion on every call. Default when this file or this key is missing is `true` -- enforcement can only be switched off explicitly, never by an absent/typo'd key. Note the hook is scoped to callers whose PreToolUse input reports agent_type 'implementer', so `true` does not restrict ordinary interactive sessions in this repo."
+        }
+      }
     },
     "budgets": {
       "type": "object",

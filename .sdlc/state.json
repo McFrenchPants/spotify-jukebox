@@ -27,8 +27,14 @@
           "title": "State-transition validator",
           "status": "done",
           "lifecycle_state": "released",
-          "dependencies": ["SS0.1"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS0.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -38,8 +44,14 @@
           "title": "Task-packet + completion-report templates/generator",
           "status": "done",
           "lifecycle_state": "released",
-          "dependencies": ["SS0.1"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS0.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -49,8 +61,14 @@
           "title": "implementer agent",
           "status": "done",
           "lifecycle_state": "released",
-          "dependencies": ["SS0.3"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS0.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -60,8 +78,14 @@
           "title": "verifier agent",
           "status": "done",
           "lifecycle_state": "released",
-          "dependencies": ["SS0.3"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS0.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -71,8 +95,14 @@
           "title": "Reframe supervisor.md as release operator",
           "status": "done",
           "lifecycle_state": "released",
-          "dependencies": ["SS1.1"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS1.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -82,8 +112,14 @@
           "title": "Approval-record format",
           "status": "done",
           "lifecycle_state": "released",
-          "dependencies": ["SS1.3"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS1.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -93,8 +129,14 @@
           "title": "Update CLAUDE.md override language",
           "status": "todo",
           "lifecycle_state": null,
-          "dependencies": ["SS2.1"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS2.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -102,21 +144,34 @@
         {
           "id": "SS3.1",
           "title": "PreToolUse path-enforcement hook",
-          "status": "todo",
-          "lifecycle_state": null,
-          "dependencies": ["SS1.1", "SS0.3"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS1.1",
+            "SS0.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
-          "notes": "Core mechanism confirmed live via spike 2026-08-31 (design-spec §8a) -- denial, path-matching, toggle all work; two real gaps found (Bash bypasses an Edit|Write matcher; a path hook can self-lock) folded into acceptance criteria."
+          "notes": "Real implementation replaces the spike. Hook input carries agent_type, so enforcement is scoped to implementer agents only; ordinary sessions pass through. Windows path normalization independently re-verified. Known gaps by design: Bash-origin writes are not caught (verifier is the backstop), and the kill switch is repo-wide/persistent."
         },
         {
           "id": "SS4.1",
           "title": "Orchestrator full-context-once rewrite",
           "status": "todo",
           "lifecycle_state": null,
-          "dependencies": ["SS0.1"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS0.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -126,8 +181,15 @@
           "title": "Delegate rewrite (task packets, implementer agent)",
           "status": "todo",
           "lifecycle_state": null,
-          "dependencies": ["SS1.1", "SS0.3"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS1.1",
+            "SS0.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -137,8 +199,14 @@
           "title": "Verify rewrite (verifier routing)",
           "status": "todo",
           "lifecycle_state": null,
-          "dependencies": ["SS1.2"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS1.2"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -148,8 +216,14 @@
           "title": "Run-budget stopping conditions",
           "status": "todo",
           "lifecycle_state": null,
-          "dependencies": ["SS0.1"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS0.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -159,8 +233,15 @@
           "title": "sdlc-doctor command",
           "status": "todo",
           "lifecycle_state": null,
-          "dependencies": ["SS0.1", "SS0.2"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS0.1",
+            "SS0.2"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
@@ -171,14 +252,26 @@
           "status": "todo",
           "lifecycle_state": null,
           "dependencies": [
-            "SS0.1", "SS0.2", "SS0.3",
-            "SS1.1", "SS1.2", "SS1.3",
-            "SS2.1", "SS2.2",
+            "SS0.1",
+            "SS0.2",
+            "SS0.3",
+            "SS1.1",
+            "SS1.2",
+            "SS1.3",
+            "SS2.1",
+            "SS2.2",
             "SS3.1",
-            "SS4.1", "SS4.2", "SS4.3", "SS4.4",
+            "SS4.1",
+            "SS4.2",
+            "SS4.3",
+            "SS4.4",
             "SS5.1"
           ],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": "Depends on all of SS0-SS5."
@@ -188,8 +281,14 @@
           "title": "Write up dogfood findings",
           "status": "todo",
           "lifecycle_state": null,
-          "dependencies": ["SS6.1"],
-          "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
+          "dependencies": [
+            "SS6.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
           "task_packet_path": null,
           "report_path": null,
           "notes": ""
