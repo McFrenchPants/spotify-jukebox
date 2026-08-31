@@ -22,7 +22,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | ID | Task | Status | Notes |
 |---|---|---|---|
 | SS0.1 | `.sdlc/state.json` + `project.yaml` schema | done | Schemas at `docs/sdlc/schemas/{state,project}.schema.json`; example `.sdlc/state.json`/`project.yaml` for this repo's real in-flight state, validated against both (`jsonschema`, re-verified independently). Introduced a deliberate `status`/`lifecycle_state` split per task (coarse todo/in-progress/blocked/done vs. the full evidence-gated `draft→…→released` enum, null until a task packet exists) — SS0.2 needs to decide which field(s) its transition validator actually checks. |
-| SS0.2 | State-transition validator | todo | depends on SS0.1 |
+| SS0.2 | State-transition validator | done | `scripts/sdlc/validate-state.mjs` (library API + CLI + `--self-test`, no external test dep). Evidence-gates both `ready_to_release` and `released` (not just `released`); allows same-state no-ops; documents the `<task-id>-*` evidence-file naming convention SS0.3's generator must follow. |
 | SS0.3 | Task-packet + completion-report templates/generator | todo | depends on SS0.1 |
 | SS1.1 | `implementer` agent | todo | depends on SS0.3 |
 | SS1.2 | `verifier` agent | todo | depends on SS0.3 |
