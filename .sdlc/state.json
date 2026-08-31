@@ -69,8 +69,8 @@
         {
           "id": "SS1.3",
           "title": "Reframe supervisor.md as release operator",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": ["SS1.1"],
           "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
           "task_packet_path": null,
@@ -80,8 +80,8 @@
         {
           "id": "SS2.1",
           "title": "Approval-record format",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": ["SS1.3"],
           "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
           "task_packet_path": null,

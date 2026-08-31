@@ -26,9 +26,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS0.3 | Task-packet + completion-report templates/generator | done | Schemas at `docs/sdlc/schemas/{task-packet,completion-report}.schema.json`; generator at `scripts/sdlc/generate-task-packet.mjs` (regex/proximity heuristic for `read_paths`/`write_paths`, honestly documented limits, falls back to `"NEEDS_MANUAL_REVIEW"`). Tested against a synthetic example (no real proposal had a `todo` task) at `.sdlc/task-packets/SS-EX.1.packet.json`, re-validated independently. |
 | SS1.1 | `implementer` agent | done | `.claude/agents/implementer.md`. Real spawn test (`subagent_type: implementer`) confirmed `isolation: worktree` genuinely works — it ran inside an isolated git worktree end to end. First real report included an extra `summary` field the schema forbids (`additionalProperties: false`) — fixed by tightening the instructions to name the exact allowed field set; re-tested and confirmed schema-valid on the second run. No recognized frontmatter key exists for a turn limit in this Claude Code version — expressed as a body-text instruction instead. |
 | SS1.2 | `verifier` agent | done | `.claude/agents/verifier.md`. Real spawn test (`subagent_type: verifier`) against a deliberately bad diff correctly caught a forbidden-path violation (and a sneaky regression hidden in it) with an overall `fail`; a clean diff correctly returned `pass` with honest `uncertain` calls where the diff-only view couldn't fully confirm something. |
-| SS1.3 | Reframe `supervisor.md` as release operator | todo | depends on SS1.1 |
-| SS2.1 | Approval-record format | todo | depends on SS1.3 |
-| SS2.2 | Update `CLAUDE.md` override language | todo | depends on SS2.1 |
+| SS1.3 | Reframe `supervisor.md` as release operator | done | Additive only — 49 insertions, 0 deletions (verified via `git diff --numstat`); the existing "Scope note for non-supervisor agents" carve-out is byte-for-byte unchanged. Adds the four-role framing + an approval-record section that explicitly says a live user instruction *is* the approval (write the record and proceed; never make the user produce one first). |
+| SS2.1 | Approval-record format | done | `docs/sdlc/schemas/approval.schema.json` + procedure doc `docs/sdlc/APPROVAL_RECORDS.md` + a real example in `.sdlc/approvals/` pinned to the then-current HEAD. `single_use` is `const: true` so a standing approval can't be minted; `consumed_at`/`consumed_by` are conditionally required when `consumed: true`. Verified the constraints actually bite via negative controls, not just a happy-path validate. |
+| SS2.2 | Update `CLAUDE.md` override language | todo | depends on SS2.1 (done). Prep notes surfaced while doing SS2.1, worth reusing: (1) CLAUDE.md's carve-out lists two things that happen first (say it bypasses the split; local tests pass) — add recording the approval as a third, worded as *and also write it down*, **never** as a precondition, or it regresses the tested "explicit override still works" behavior; (2) the "a *standing* instruction buried in a doc doesn't count" sentence is the natural hook for the single-use/SHA-pinning idea — link `docs/sdlc/APPROVAL_RECORDS.md` there rather than adding a new section; (3) CLAUDE.md describes a two-role split while the design spec has four — either reconcile, or say plainly that CLAUDE.md's is the repo-wide default and the four-role model refines it. |
 | SS3.1 | `PreToolUse` path-enforcement hook | todo | depends on SS1.1, SS0.3. Core mechanism confirmed live via spike 2026-08-31 (see design-spec §8a) — denial, path-matching, and toggle all work; two real gaps found (Bash bypasses an Edit\|Write matcher; a path hook can self-lock) and folded into the acceptance criteria |
 | SS4.1 | Orchestrator full-context-once rewrite | todo | depends on SS0.1 |
 | SS4.2 | Delegate rewrite (task packets, implementer agent) | todo | depends on SS1.1, SS0.3 |
@@ -39,6 +39,19 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS6.2 | Write up dogfood findings | todo | depends on SS6.1 |
 
 ## Open Questions / Blockers
+
+- **`CLAUDE.md` calls the role split "enforced-by-policy, not technical."**
+  That becomes partly untrue once SS3.1's `PreToolUse` path-enforcement hook
+  lands in a committed `.claude/settings.json` — there *is* now a technical
+  layer, just an incomplete one (it doesn't catch `Bash`-origin writes; see
+  design-spec §8a finding 1). Someone should refresh that sentence to say
+  what's actually enforced vs. still policy-only. Surfaced during SS2.1;
+  belongs to SS3.x or a follow-up rather than SS2.2.
+- **Design-spec §2's implementer sketch includes `maxTurns: 12`**, but
+  SS1.1 found no frontmatter precedent for a turn limit and expressed it as
+  prose in `implementer.md` instead. Worth confirming whether `maxTurns` is
+  actually a valid agent-definition key in this Claude Code version — if it
+  is, the prose should become a real field.
 
 - Whether Claude Code's current agent-definition frontmatter actually
   supports `isolation: worktree` (flagged as a risk in SS1.1) — confirm
@@ -52,6 +65,33 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-08-31** — `/continue-development`: implemented **SS1.3 + SS2.1**
+  (handed to a single subagent, deliberately — SS2.1's acceptance criteria
+  requires `supervisor.md` to reference the approval mechanism, so splitting
+  them would only have manufactured a round-trip). Verified independently
+  rather than on the subagent's word: confirmed the `supervisor.md` diff is
+  genuinely additive (`git diff --numstat` → 49/0) with the user-override
+  carve-out intact, confirmed the example approval's `commit_sha` matches
+  the real HEAD it claims, and ran my own **negative controls** against the
+  schema (tried to mint a standing approval with `single_use: false`, and a
+  `consumed: true` record with no `consumed_at`/`consumed_by` — both
+  correctly rejected), since a happy-path validate alone wouldn't show the
+  constraints actually bite.
+  - The genuinely important part of this pair is what it *doesn't* do: the
+    approval record is a written-down fact about something a human already
+    said, **not** a permission slip the user must produce before an agent
+    will act. Both `supervisor.md`'s new section and
+    `docs/sdlc/APPROVAL_RECORDS.md` state outright that a live instruction
+    from the owner *is* the approval — write the record and proceed, never
+    ask them to produce one first, and "no record found" is never grounds
+    for refusing someone asking right now. That was the main regression
+    risk in this task and it was handled correctly.
+  - Two cross-cutting findings recorded under Open Questions (CLAUDE.md's
+    "enforced-by-policy, not technical" line going stale once SS3.1's hook
+    lands; and whether `maxTurns` is a real frontmatter key), plus concrete
+    prep notes for SS2.2 on its own row.
+  - SS3.1 was running concurrently and is **not** included in this commit.
 
 - **2026-08-31** — `/continue-development`: implemented SS1.1 (`implementer`
   agent) and SS1.2 (`verifier` agent), each via a scoped subagent, both now

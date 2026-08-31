@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "merge_to_default_branch",
+  "work_item_id": "sdlc-supervisor-testbed",
+  "task_id": null,
+  "target_branch": "feature/sdlc-supervisor",
+  "commit_sha": "cb56550eded5c6e359141358989ed31694f8f6b0",
+  "approved_at": "2026-08-31T13:45:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Once SS1.x is done and the local checks pass, go ahead and merge feature/sdlc-supervisor into master.",
+  "single_use": true,
+  "consumed": false,
+  "consumed_at": null,
+  "consumed_by": null,
+  "notes": "Hand-written example record (SS2.1), illustrating the format documented in docs/sdlc/APPROVAL_RECORDS.md. Pinned to the SS1.1+SS1.2 commit; any commit landing on feature/sdlc-supervisor after cb56550 makes this record stale and requires a fresh approval rather than an edit to this one."
+}
