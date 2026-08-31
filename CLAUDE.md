@@ -1,5 +1,35 @@
 # Project instructions
 
+## Roles & boundaries: implementer vs. supervisor
+
+This repo splits agent work into two roles, because this project's mistakes
+so far have all been the same shape: something that only should have
+happened once, carefully, from a live system instead ended up happening
+repeatedly and quietly from a local session (see BACKLOG.md items 20/21).
+
+- **Implementer (the default for any task not explicitly about
+  merging/deploying/live-verifying)**: scoped entirely to this repo and
+  this machine. Edit files, run the local test/build commands in
+  [docs/TESTING.md](docs/TESTING.md), commit to a feature branch. **Never**
+  `git push`, merge into `master`, or run `ssh`/`hass-cli`/`adb`/any
+  request to the Home Assistant host or a physical device — including "just
+  to double check."
+- **Supervisor** (`.claude/agents/supervisor.md`): the only role that
+  merges to `master`, pushes to the remote, or reaches the Home Assistant
+  server or the Android Master Device. Use the `Agent` tool with
+  `subagent_type: supervisor` for that work, and see
+  [docs/SUPERVISOR_RUNBOOK.md](docs/SUPERVISOR_RUNBOOK.md) for the exact
+  commands and safety guardrails (minimize live checks, read-only by
+  default, never loop/poll a live system, never touch HA host-level
+  settings).
+
+Claude Code doesn't hard-sandbox this split at the tool level (both roles
+can technically call `Bash`) — this is an enforced-by-policy boundary, not
+a technical one, backed by the harness's own permission prompts for
+anything destructive/remote. Follow it anyway: it's the difference between
+one deliberate, logged live check and the kind of untracked repeated access
+that caused real incidents here.
+
 ## Always shut down dev servers you start
 
 This backend talks to a single, real Spotify account that also powers the
