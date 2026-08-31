@@ -2,6 +2,7 @@ import { dequeueBySpotifyTrackId } from "../db/queueEntries";
 import { insertPlayHistory } from "../db/playHistory";
 import { recordTrackPlay } from "../db/trackStats";
 import { emitEvent } from "../events/bus";
+import { evictPreviousTrackLyrics, getLyricsForTrack, type LyricsResult } from "../lyrics/lyricsService";
 import { getValidAccessToken } from "./client";
 import { listDevices } from "./device";
 import { getSetting } from "../db";
@@ -80,12 +81,24 @@ let lastDeviceOnline: boolean | null = null;
 /** Timestamp of the last device-presence check by *any* means (device field or fallback list call). */
 let lastDeviceCheckAt = 0;
 
+/**
+ * Latest resolved lyrics lookup, alongside the trackId it belongs to — set
+ * once the fire-and-forget lookup kicked off in pollNowPlaying() resolves.
+ * null trackId / null result means no lookup has completed yet for the
+ * currently playing track (either still in flight, or nothing is playing).
+ * See getLyricsSnapshot() below.
+ */
+let lastLyricsTrackId: string | null = null;
+let lastLyricsResult: LyricsResult | null = null;
+
 /** Resets the last-seen state — primarily useful for tests. */
 export function resetNowPlayingState(): void {
   lastState = NOTHING_PLAYING_STATE;
   lastDeviceOnline = null;
   lastDeviceCheckAt = 0;
   lastPolledAt = 0;
+  lastLyricsTrackId = null;
+  lastLyricsResult = null;
 }
 
 /** Returns the last-seen now-playing state (same data the SSE now-playing event carries). */
@@ -96,6 +109,22 @@ export function getNowPlayingState(): NowPlayingState {
 /** Timestamp (epoch ms) of the last poll that actually completed; 0 if none yet. */
 export function getLastPolledAt(): number {
   return lastPolledAt;
+}
+
+/**
+ * Returns the most recently resolved lyrics lookup for `trackId`, or null if
+ * that's not the currently-stored result — either because no lookup has
+ * completed yet for the current track (still in flight, or nothing is
+ * playing) or because `trackId` refers to a track that isn't the one this
+ * result belongs to (e.g. a stale request for a track that has since
+ * changed). Used by a later route (LY1.2) to serve lyrics on demand to a
+ * guest who connects after the lookup already happened.
+ */
+export function getLyricsSnapshot(trackId: string): LyricsResult | null {
+  if (lastLyricsTrackId !== trackId) {
+    return null;
+  }
+  return lastLyricsResult;
 }
 
 function shapeResponse(data: SpotifyCurrentlyPlayingResponse | null): NowPlayingState {
@@ -295,8 +324,51 @@ export async function pollNowPlaying(
   }
 
   if (hasChanged(lastState, nextState)) {
+    const previousTrackId = lastState.trackId;
+    const trackActuallyChanged = previousTrackId !== nextState.trackId;
     lastState = nextState;
     lastPolledAt = Date.now();
+
+    if (trackActuallyChanged) {
+      // The just-replaced track's lyrics are no longer needed (unless
+      // favorited) — evict regardless of whether a new track is starting or
+      // playback simply stopped (nextState.trackId === null).
+      evictPreviousTrackLyrics(previousTrackId);
+
+      if (nextState.trackId) {
+        // Fire-and-forget: kick off the lyrics lookup as a separate async
+        // operation rather than awaiting it here, so a slow LRCLIB response
+        // never delays the now-playing emit below (which must stay
+        // synchronous/immediate). lyrics-update is emitted whenever the
+        // lookup happens to resolve; a rejection is caught and logged, never
+        // rethrown or turned into an event (the frontend's "still loading"
+        // state just persists longer instead).
+        const trackId = nextState.trackId;
+        getLyricsForTrack(trackId, {
+          trackName: nextState.name ?? "Unknown track",
+          artistName: nextState.artist ?? "Unknown artist",
+          durationMs: nextState.durationMs,
+        })
+          .then((result) => {
+            lastLyricsTrackId = trackId;
+            lastLyricsResult = result;
+            emitEvent("lyrics-update", {
+              trackId,
+              syncedLyrics: result.syncedLyrics,
+              plainLyrics: result.plainLyrics,
+              found: result.found,
+            });
+          })
+          .catch((err) => {
+            const message = err instanceof Error ? err.message : String(err);
+            logError("nowPlaying", `Lyrics lookup failed for track ${trackId}: ${message}`, err);
+          });
+      } else {
+        lastLyricsTrackId = null;
+        lastLyricsResult = null;
+      }
+    }
+
     if (nextState.trackId) {
       // The track that just started playing is no longer "pending," so drop
       // it from the local queue mirror — and use the matched row's

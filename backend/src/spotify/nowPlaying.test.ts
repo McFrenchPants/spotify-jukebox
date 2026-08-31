@@ -8,13 +8,20 @@ vi.mock("./device", () => ({
   listDevices: vi.fn(),
 }));
 
+vi.mock("../lyrics/lyricsService", () => ({
+  getLyricsForTrack: vi.fn(),
+  evictPreviousTrackLyrics: vi.fn(),
+}));
+
 import { emitEvent } from "../events/bus";
 import { db, runMigrations, setSetting, deleteSetting } from "../db";
 import { listQueueEntries } from "../db/queueEntries";
 import { listDevices } from "./device";
+import { evictPreviousTrackLyrics, getLyricsForTrack } from "../lyrics/lyricsService";
 import {
   DEFAULT_POLL_INTERVAL_MS,
   getLastPolledAt,
+  getLyricsSnapshot,
   pollNowPlaying,
   resetNowPlayingState,
   startNowPlayingPoller,
@@ -104,6 +111,12 @@ describe("pollNowPlaying", () => {
     resetRateLimitForTests();
     vi.clearAllMocks();
     vi.mocked(listDevices).mockResolvedValue([]);
+    vi.mocked(getLyricsForTrack).mockResolvedValue({
+      syncedLyrics: null,
+      plainLyrics: null,
+      found: false,
+    });
+    vi.mocked(evictPreviousTrackLyrics).mockReset();
   });
 
   it("dequeues the local queue mirror entry for a track that just started playing, but not on an unchanged poll", async () => {
@@ -260,7 +273,12 @@ describe("pollNowPlaying", () => {
     await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_B)), getTokenFn);
 
     expect(nowPlayingEmitCount()).toBe(2);
-    expect(emitEvent).toHaveBeenLastCalledWith(
+    // Use toHaveBeenCalledWith rather than toHaveBeenLastCalledWith here:
+    // the fire-and-forget lyrics lookup's default mock resolves as a
+    // microtask that can flush before this assertion runs, so a
+    // "lyrics-update" call may legitimately land after this "now-playing"
+    // call in the mock's call history.
+    expect(emitEvent).toHaveBeenCalledWith(
       "now-playing",
       expect.objectContaining({ trackId: "track-b" })
     );
@@ -495,6 +513,131 @@ describe("pollNowPlaying", () => {
       expect(fetchFn).toHaveBeenCalled();
 
       vi.useRealTimers();
+    });
+  });
+
+  describe("lyrics lookup on track change (LY1.1)", () => {
+    it("emits lyrics-update once the lookup resolves for a new track", async () => {
+      vi.mocked(getLyricsForTrack).mockResolvedValue({
+        syncedLyrics: "[00:01.00] la la",
+        plainLyrics: "la la",
+        found: true,
+      });
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+
+      expect(getLyricsForTrack).toHaveBeenCalledWith("track-a", {
+        trackName: "Song A",
+        artistName: "Artist A",
+        durationMs: 200000,
+      });
+      expect(emitEvent).toHaveBeenCalledWith("lyrics-update", {
+        trackId: "track-a",
+        syncedLyrics: "[00:01.00] la la",
+        plainLyrics: "la la",
+        found: true,
+      });
+    });
+
+    it("does not delay the now-playing emit while the lyrics lookup is still pending", async () => {
+      let resolveLyrics: (v: { syncedLyrics: string | null; plainLyrics: string | null; found: boolean }) => void;
+      const pending = new Promise<{ syncedLyrics: string | null; plainLyrics: string | null; found: boolean }>(
+        (resolve) => {
+          resolveLyrics = resolve;
+        }
+      );
+      vi.mocked(getLyricsForTrack).mockReturnValue(pending);
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+
+      // now-playing already fired even though the lyrics lookup hasn't
+      // resolved yet — pollNowPlaying's own promise resolved without
+      // awaiting it.
+      expect(emitEvent).toHaveBeenCalledWith(
+        "now-playing",
+        expect.objectContaining({ trackId: "track-a" })
+      );
+      expect(emitEvent).not.toHaveBeenCalledWith("lyrics-update", expect.anything());
+
+      resolveLyrics!({ syncedLyrics: null, plainLyrics: "la", found: true });
+      await new Promise((r) => setImmediate(r));
+
+      expect(emitEvent).toHaveBeenCalledWith(
+        "lyrics-update",
+        expect.objectContaining({ trackId: "track-a" })
+      );
+    });
+
+    it("catches a lyrics lookup rejection, logs it, and does not emit lyrics-update or throw", async () => {
+      vi.mocked(getLyricsForTrack).mockRejectedValue(new Error("LRCLIB unreachable"));
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await expect(
+        pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn)
+      ).resolves.toBeUndefined();
+
+      // Let the rejected lookup's .catch() handler run.
+      await new Promise((r) => setImmediate(r));
+
+      expect(emitEvent).not.toHaveBeenCalledWith("lyrics-update", expect.anything());
+    });
+
+    it("does not trigger a lyrics lookup or eviction on a play/pause toggle of the same track", async () => {
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+      vi.mocked(getLyricsForTrack).mockClear();
+      vi.mocked(evictPreviousTrackLyrics).mockClear();
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A_PAUSED)), getTokenFn);
+
+      expect(getLyricsForTrack).not.toHaveBeenCalled();
+      expect(evictPreviousTrackLyrics).not.toHaveBeenCalled();
+    });
+
+    it("evicts the previous track's lyrics when the track actually changes", async () => {
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+      vi.mocked(evictPreviousTrackLyrics).mockClear();
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_B)), getTokenFn);
+
+      expect(evictPreviousTrackLyrics).toHaveBeenCalledWith("track-a");
+    });
+
+    it("evicts the previous track's lyrics (but doesn't look up new lyrics) when playback stops", async () => {
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+      vi.mocked(getLyricsForTrack).mockClear();
+      vi.mocked(evictPreviousTrackLyrics).mockClear();
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(noContentResponse()), getTokenFn);
+
+      expect(evictPreviousTrackLyrics).toHaveBeenCalledWith("track-a");
+      expect(getLyricsForTrack).not.toHaveBeenCalled();
+    });
+
+    it("getLyricsSnapshot returns the resolved result for the current track, and null for a mismatched trackId", async () => {
+      vi.mocked(getLyricsForTrack).mockResolvedValue({
+        syncedLyrics: "[00:01.00] la la",
+        plainLyrics: "la la",
+        found: true,
+      });
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(jsonResponse(TRACK_A)), getTokenFn);
+      await new Promise((r) => setImmediate(r));
+
+      expect(getLyricsSnapshot("track-a")).toEqual({
+        syncedLyrics: "[00:01.00] la la",
+        plainLyrics: "la la",
+        found: true,
+      });
+      expect(getLyricsSnapshot("track-b")).toBeNull();
     });
   });
 
