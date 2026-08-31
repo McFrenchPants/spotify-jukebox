@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Phase SS0 (machine state foundation) done. Next: SS1.1.
+## Status: Phase SS0 done. SS1.1/SS1.2 done, SS1.3 next (agent roles nearly complete).
 
 ## Task Table
 
@@ -24,8 +24,8 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS0.1 | `.sdlc/state.json` + `project.yaml` schema | done | Schemas at `docs/sdlc/schemas/{state,project}.schema.json`; example `.sdlc/state.json`/`project.yaml` for this repo's real in-flight state, validated against both (`jsonschema`, re-verified independently). Introduced a deliberate `status`/`lifecycle_state` split per task (coarse todo/in-progress/blocked/done vs. the full evidence-gated `draft→…→released` enum, null until a task packet exists) — SS0.2 needs to decide which field(s) its transition validator actually checks. |
 | SS0.2 | State-transition validator | done | `scripts/sdlc/validate-state.mjs` (library API + CLI + `--self-test`, no external test dep). Evidence-gates both `ready_to_release` and `released` (not just `released`); allows same-state no-ops; documents the `<task-id>-*` evidence-file naming convention SS0.3's generator must follow. |
 | SS0.3 | Task-packet + completion-report templates/generator | done | Schemas at `docs/sdlc/schemas/{task-packet,completion-report}.schema.json`; generator at `scripts/sdlc/generate-task-packet.mjs` (regex/proximity heuristic for `read_paths`/`write_paths`, honestly documented limits, falls back to `"NEEDS_MANUAL_REVIEW"`). Tested against a synthetic example (no real proposal had a `todo` task) at `.sdlc/task-packets/SS-EX.1.packet.json`, re-validated independently. |
-| SS1.1 | `implementer` agent | todo | depends on SS0.3 |
-| SS1.2 | `verifier` agent | todo | depends on SS0.3 |
+| SS1.1 | `implementer` agent | done | `.claude/agents/implementer.md`. Real spawn test (`subagent_type: implementer`) confirmed `isolation: worktree` genuinely works — it ran inside an isolated git worktree end to end. First real report included an extra `summary` field the schema forbids (`additionalProperties: false`) — fixed by tightening the instructions to name the exact allowed field set; re-tested and confirmed schema-valid on the second run. No recognized frontmatter key exists for a turn limit in this Claude Code version — expressed as a body-text instruction instead. |
+| SS1.2 | `verifier` agent | done | `.claude/agents/verifier.md`. Real spawn test (`subagent_type: verifier`) against a deliberately bad diff correctly caught a forbidden-path violation (and a sneaky regression hidden in it) with an overall `fail`; a clean diff correctly returned `pass` with honest `uncertain` calls where the diff-only view couldn't fully confirm something. |
 | SS1.3 | Reframe `supervisor.md` as release operator | todo | depends on SS1.1 |
 | SS2.1 | Approval-record format | todo | depends on SS1.3 |
 | SS2.2 | Update `CLAUDE.md` override language | todo | depends on SS2.1 |
@@ -53,6 +53,45 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-31** — `/continue-development`: implemented SS1.1 (`implementer`
+  agent) and SS1.2 (`verifier` agent), each via a scoped subagent, both now
+  **actually spawn-tested for real** as `subagent_type: implementer`/
+  `verifier` — not just roleplayed by a substitute `general-purpose` agent
+  the way the initial builder subagents had to (the harness's agent-type
+  registry doesn't pick up a freshly-created `.claude/agents/*.md` file
+  mid-session; it became spawnable once the orchestrator's own next turn
+  picked up the new registration).
+  - **SS1.1 real test found and fixed a genuine bug**: the implementer's
+    first real completion report included a `summary` field the
+    `completion-report.schema.json` doesn't allow
+    (`additionalProperties: false`), so it failed strict schema
+    validation — independently confirmed via `jsonschema.validate()`, not
+    just asserted. Fixed directly (small, precise correction, not a
+    subagent redelegation) by tightening `implementer.md`'s instructions
+    to name the exact allowed field set and warn against adding a
+    narrative/summary field; re-spawned the same test and confirmed the
+    second report validates cleanly. Also confirmed `isolation: worktree`
+    genuinely works end-to-end (both real implementer runs executed inside
+    an isolated `.claude/worktrees/agent-<id>` git worktree on their own
+    branch) — cleaned up both test worktrees (`git worktree remove
+    --force` + `git branch -D`) afterward so no stray worktrees/branches
+    were left behind.
+  - **SS1.2 real test** against a deliberately bad diff (touches a
+    `forbidden_paths` entry, `.sdlc/state.json`, while also sneaking in an
+    unrelated regression of another task's status) correctly returned
+    `fail` with the exact violating path/entry named; a clean diff
+    correctly returned `pass`, with honest `uncertain` calls where a
+    diff-only view genuinely couldn't confirm something (e.g. whether an
+    empty-queue test was really exercising empty state without seeing full
+    file setup/teardown).
+  - No recognized frontmatter key exists in this Claude Code version for a
+    turn-limit on an agent definition (checked against `supervisor.md` and
+    the new sibling files, no precedent) — `implementer.md` expresses this
+    as a body-text instruction instead of a structured field; worth
+    revisiting if a real key turns up later.
+  - Phase-ish boundary reached (agent roles now real and spawn-tested,
+    next task reframes `supervisor.md`'s relationship to them) — stopping
+    here for review before SS1.3. Committed on this branch; not merged.
 - **2026-08-31** — `/continue-development`: implemented SS0.2 and SS0.3 in
   parallel (both depend only on SS0.1, independent of each other), each via
   a scoped subagent, each independently re-verified (diff review + rerunning

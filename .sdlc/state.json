@@ -25,8 +25,8 @@
         {
           "id": "SS0.2",
           "title": "State-transition validator",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": ["SS0.1"],
           "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
           "task_packet_path": null,
@@ -36,8 +36,8 @@
         {
           "id": "SS0.3",
           "title": "Task-packet + completion-report templates/generator",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": ["SS0.1"],
           "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
           "task_packet_path": null,
@@ -47,8 +47,8 @@
         {
           "id": "SS1.1",
           "title": "implementer agent",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": ["SS0.3"],
           "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
           "task_packet_path": null,
@@ -58,8 +58,8 @@
         {
           "id": "SS1.2",
           "title": "verifier agent",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": ["SS0.3"],
           "lease": { "assigned_agent": null, "run_id": null, "attempt_count": 0 },
           "task_packet_path": null,
