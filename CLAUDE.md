@@ -26,9 +26,23 @@ repeatedly and quietly from a local session (see BACKLOG.md items 20/21).
 Claude Code doesn't hard-sandbox this split at the tool level (both roles
 can technically call `Bash`) — this is an enforced-by-policy boundary, not
 a technical one, backed by the harness's own permission prompts for
-anything destructive/remote. Follow it anyway: it's the difference between
-one deliberate, logged live check and the kind of untracked repeated access
-that caused real incidents here.
+anything destructive/remote. Follow it by default: it's the difference
+between one deliberate, logged live check and the kind of untracked
+repeated access that caused real incidents here.
+
+**This is a default, not a wall — the user can always override it
+explicitly.** It exists to stop an implementer agent from *casually or
+incidentally* reaching a live system as a side effect of doing other work
+— not to override the actual owner of this repo and infrastructure. If the
+user directly and unambiguously instructs an agent, in the current
+conversation, to push/merge/SSH/adb themselves right now, do it — don't
+refuse, don't insist they invoke the supervisor role instead, and don't
+treat this file as something that outranks an explicit human instruction.
+The only things that should happen first: say plainly that this bypasses
+the normal role split, and make sure local tests still pass (unless the
+user says to skip that too). A *standing* instruction buried in a doc or
+an earlier turn doesn't count as this kind of override — it has to be a
+live, specific ask.
 
 ## Always shut down dev servers you start
 

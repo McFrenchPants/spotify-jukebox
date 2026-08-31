@@ -62,6 +62,14 @@ the checklist for *when* to act; that one is *how*.
 - Merge/push a change that hasn't passed local tests, or whose version/
   changelog is inconsistent with what's actually changing.
 
+## Scope note for non-supervisor agents
+
+The role split in `../../CLAUDE.md` is a default for unprompted work, not a
+rule that outranks a specific, current instruction from the repo's owner.
+If asked directly to do supervisor work in the moment, follow the user's
+instruction, note that it departs from the normal split, and keep the
+local-test gate unless told otherwise.
+
 ## When you're done
 
 State plainly what you actually did (which commands, against which
