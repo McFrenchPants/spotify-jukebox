@@ -17,8 +17,8 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 
 | ID | Task | Status | Notes |
 |---|---|---|---|
-| LY0.1 | Lyrics DB table + LRCLIB client | todo | |
-| LY0.2 | Lyrics lookup + cache orchestration | todo | Depends on LY0.1 |
+| LY0.1 | Lyrics DB table + LRCLIB client | done | `backend/src/db/lyrics.ts` (get/save-upsert/evict-if-not-favorited) + `backend/src/lyrics/lrclib.ts` (get→search fallback→null/throw); new `lyrics` table in `db/index.ts`'s migration block |
+| LY0.2 | Lyrics lookup + cache orchestration | todo | Depends on LY0.1 (done) |
 | LY1.1 | Trigger lookup on track change, emit SSE event | todo | Depends on LY0.2 |
 | LY1.2 | `GET /api/lyrics` route | todo | Depends on LY1.1. **Phase LY0+LY1 (backend) complete once done.** |
 | LY2.1 | API client + types | todo | Depends on LY1.2 |
@@ -36,6 +36,16 @@ enough to resolve during implementation, per the spec itself)*
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-30** — LY0.1 done via a subagent (backend-only, no dependencies).
+  Diff verified directly against the plan before accepting — table columns,
+  upsert semantics, and the `NOT EXISTS`-guarded eviction delete all match.
+  Re-ran the full backend suite myself (not just on the subagent's word):
+  hit the project's known pre-existing `queue.test.ts`/`server.close`
+  test-isolation flake on the first full-suite run (25 failures), confirmed
+  unrelated by running `queue.test.ts` alone (10/10 passing) and a second
+  full-suite run (43 files/368 tests, all green) — matches the flake class
+  already documented in the root PROGRESS.md. `tsc --noEmit` clean.
+  Committed (`06a6b22`). LY0.2 is next, no blockers.
 - **2026-08-30** — Plan created (`IMPLEMENTATION_PLAN.md`) and this tracker
   initialized via `/continue-development`, picking up BACKLOG.md item 1.
   Design spec was reviewed and approved by the user before this. No
