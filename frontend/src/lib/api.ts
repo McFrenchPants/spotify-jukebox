@@ -94,6 +94,22 @@ export interface NowPlayingState {
   rateLimited?: boolean
 }
 
+/** Shape returned by GET /api/lyrics. */
+export interface LyricsSnapshot {
+  trackId: string | null
+  syncedLyrics: string | null
+  plainLyrics: string | null
+  found: boolean
+  /**
+   * Present and `true` only while a track is playing but its lyrics lookup
+   * hasn't resolved yet; omitted entirely otherwise (nothing playing, or
+   * lyrics have resolved — found or genuinely not found). Never sent as
+   * `false`, so check `snapshot.loading === true` rather than treating a
+   * missing value as falsy-but-meaningful.
+   */
+  loading?: boolean
+}
+
 /** One entry in the pending-queue mirror returned by GET /api/queue. */
 export interface QueueEntry {
   id: number
@@ -134,6 +150,22 @@ export async function getNowPlaying(): Promise<NowPlayingState> {
   }
 
   return (await res.json()) as NowPlayingState
+}
+
+/**
+ * GET /api/lyrics — no guest token required (open read). Snapshot of the
+ * lyrics lookup for whatever's currently playing (see `LyricsSnapshot` for
+ * the `loading` convention).
+ */
+export async function getLyrics(): Promise<LyricsSnapshot> {
+  const res = await fetch(apiUrl('/api/lyrics'))
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load lyrics: ${res.status}`)
+  }
+
+  return (await res.json()) as LyricsSnapshot
 }
 
 /**

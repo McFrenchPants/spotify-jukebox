@@ -28,6 +28,8 @@ design work before implementation — mirrors the process the original MVP used
 
 ## Active / past proposals
 
+- [lyrics-integration](lyrics-integration/DESIGN_SPEC.md) — synced lyrics
+  (via LRCLIB) on the Now Playing screen.
 - [master-device-mode](master-device-mode/DESIGN_SPEC.md) — Android native
   build (via Capacitor) for the bridge device, with local system-volume
   control to work around Spotify's `supports_volume: false` limitation for

@@ -69,14 +69,22 @@ where ambiguity gets surfaced and questioned, not resolved by assumption.
 ---
 
 ## 1. Lyrics integration
-**Status:** needs research
+**Status:** done
 **Type:** enhancement
-**Analysis:** analysis/01-lyrics-integration.md (not yet written)
+**Analysis:** [analysis/01-lyrics-integration.md](analysis/01-lyrics-integration.md)
 
-Show lyrics for the currently playing track. Needs research into providers —
-whether there's a usable free API (e.g. lrclib, Musixmatch's unofficial API)
-or whether a paid API (Musixmatch, Genius) is the more reliable route.
-Licensing/ToS should be checked before committing to a provider.
+Shipped: a "Lyrics" button on the Now Playing card reveals synced lyrics
+(via [LRCLIB](https://lrclib.net/), free/open, no ToS risk) that
+auto-scroll in time with playback, with a tap-to-expand for free scrolling.
+Backend fetches lyrics once per track change and fans out over the existing
+SSE bus (same poll-once/fan-out pattern as now-playing state); non-favorited
+tracks' cache entries are evicted when the track changes, favorited tracks'
+lyrics persist indefinitely. A track with no LRCLIB match shows a plain
+empty state; unsynced-only lyrics render as static text. Full
+design/implementation history in
+`docs/proposals/lyrics-integration/` (DESIGN_SPEC.md, IMPLEMENTATION_PLAN.md,
+PROGRESS.md). Implemented on `feature/lyrics-integration`, not yet merged
+to `master` (pending user go-ahead).
 
 ## 2. Landscape layout for the bridge device
 **Status:** done

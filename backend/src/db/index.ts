@@ -100,6 +100,14 @@ export function runMigrations(): void {
       UNIQUE(guest_session_id, spotify_track_id)
     );
 
+    CREATE TABLE IF NOT EXISTS lyrics (
+      spotify_track_id TEXT PRIMARY KEY,
+      synced_lyrics TEXT,
+      plain_lyrics TEXT,
+      found INTEGER NOT NULL,
+      fetched_at TEXT NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history(played_at);
     CREATE INDEX IF NOT EXISTS idx_play_history_guest_session_id ON play_history(guest_session_id);
     CREATE INDEX IF NOT EXISTS idx_queue_entries_spotify_track_id ON queue_entries(spotify_track_id);
