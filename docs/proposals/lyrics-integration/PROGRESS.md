@@ -9,7 +9,7 @@ frozen in [DESIGN_SPEC.md](DESIGN_SPEC.md) (approved by the user 2026-08-30).
 All work happens on `feature/lyrics-integration` — confirm you're on that
 branch before making any changes.
 
-## Status: Backend (LY0+LY1) fully done. Starting frontend (LY2).
+## Status: Backend (LY0+LY1) and frontend (LY2) fully done. Starting LY3 (verification/close-out).
 
 ## Task Table
 
@@ -23,9 +23,9 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | LY1.2 | `GET /api/lyrics` route | done | `routes/lyrics.ts` + registration in `app.ts`. `loading: true` present only while a track is playing but its lookup hasn't resolved yet; omitted otherwise. **Phase LY0+LY1 (backend) now fully done.** |
 | LY2.1 | API client + types | done | `getLyrics()`/`LyricsSnapshot` in `frontend/src/lib/api.ts`, mirrors `getNowPlaying()` |
 | LY2.2 | LRC parsing + auto-scroll hook | done | `frontend/src/lib/lrc.ts` (`parseLrc`) + `frontend/src/hooks/useSyncedLyrics.ts`; no frontend test runner exists in this project, verified manually (documented in session log) |
-| LY2.3 | `LyricsPanel` + wiring into `NowPlaying.tsx` | todo | Depends on LY2.1 (done), LY2.2 (done) |
-| LY3.1 | Cross-cutting regression pass | todo | Depends on LY2.3 |
-| LY3.2 | Close out (backlog, PROGRESS.md, merge) | todo | Depends on LY3.1. Needs explicit user go-ahead to merge |
+| LY2.3 | `LyricsPanel` + wiring into `NowPlaying.tsx` | done | New `LyricsPanel.tsx` + `NowPlaying.tsx` wiring + `NAMED_EVENTS` addition. Two issues found and fixed directly before accepting: a wide-screen layout squeeze against the artist-detail split, and an auto-scroll/manual-scroll detection bug. Live-verified via a temporary reverted debug fixture (no real Spotify session in this dev environment). **Phase LY2 (frontend) now fully done.** |
+| LY3.1 | Cross-cutting regression pass | done | Backend: 45 files/387 tests green, `tsc --noEmit` clean. Frontend: `tsc -b`/`npm run build` clean. Real LRCLIB spot-check (throwaway script, deleted after) against live data: a mainstream track ("Bohemian Rhapsody") returned synced+plain lyrics, a nonsense track correctly returned not-found. Full Spotify-session smoke test not possible in this dev environment (no working credentials, documented recurring gap in this project — see session log) |
+| LY3.2 | Close out (backlog, PROGRESS.md, merge) | todo | Depends on LY3.1 (done). Needs explicit user go-ahead to merge |
 
 ## Open Questions / Blockers
 
@@ -36,6 +36,52 @@ enough to resolve during implementation, per the spec itself)*
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
 
+- **2026-08-30** — LY2.3 done via a subagent, then LY3.1 done directly.
+  LY2.3's diff was reviewed carefully (this is the most user-visible piece
+  of the whole proposal) and two real issues were found and fixed before
+  accepting, not just cosmetic nits: (1) the new `<LyricsPanel>` was nested
+  as a third child inside the existing `lg:flex` wrapper that splits
+  art/track-info and artist/genre 50/50 once the artist-detail section is
+  open — opening both the Lyrics panel and the artist-info expand at once
+  on a wide screen would have squeezed the lyrics panel between those two
+  columns instead of sitting as its own full-width block below them;
+  fixed by moving it outside that wrapper, still inside the same `Card`
+  and still below all the existing song-info content, per the design
+  spec's actual requirement. (2) The `onScroll` handler that arms the
+  "guest is manually scrolling, pause auto-scroll" window was also firing
+  on the scroll events `scrollIntoView({behavior:'smooth'})` itself
+  generates — meaning every auto-scroll would immediately look like a
+  manual scroll and re-arm its own pause, so auto-scroll would have
+  effectively stopped working after the very first line change once
+  expanded. Fixed with an `isAutoScrollingRef` flag set around each
+  programmatic scroll. Both fixes verified: `tsc -b`/`npm run build`/
+  `npm run lint` clean (same baseline), and — since this dev environment
+  has no working Spotify session (a documented recurring gap across this
+  project's past proposals) — via a temporary debug fixture (hardcoded
+  `getNowPlaying()`/`getLyrics()` responses and a `NowPlayingState` seed in
+  `NowPlaying.tsx`, all fully reverted before committing, confirmed via
+  `git diff` showing no residual debug code) run against a real dev
+  server: confirmed the "Lyrics" button renders and toggles the panel
+  without also toggling the card's own artist-info expand state, the
+  synced-lyrics view renders all lines and correctly highlights the line
+  matching the ticking `progressMs`, and the panel's own expand toggle
+  works independently and applies the wider max-height class. Dev servers
+  (frontend 5173, `npm run dev` backend 8085) were both stopped and
+  `netstat` confirmed neither port still listening, per this project's
+  standing rule. Committed (`181bf4c`).
+  LY3.1 (regression pass) done directly: full backend suite (45 files/387
+  tests) and `tsc --noEmit` clean, frontend `tsc -b`/`npm run build`
+  clean. Also ran a real (non-mocked) spot-check of `fetchLyricsFromLrclib`
+  against LRCLIB's live API via a throwaway script (deleted after use, not
+  committed) — a mainstream track ("Bohemian Rhapsody" / Queen) correctly
+  returned both synced and plain lyrics, and a deliberately-nonsense
+  track/artist pair correctly returned not-found. A full live smoke test
+  through an actual Spotify now-playing session was NOT possible in this
+  dev environment (no working refresh token configured for local dev,
+  same recurring limitation documented across the Favorites and
+  landscape-layout proposals) — flagged as a real, known gap rather than
+  silently skipped. LY3.2 (close-out) is next — **requires the user's
+  explicit go-ahead before merging to `master`**.
 - **2026-08-30** — LY2.1 and LY2.2 done via two parallel subagents (disjoint
   files — `lib/api.ts` vs. new `lib/lrc.ts`/`hooks/useSyncedLyrics.ts` — no
   conflict). Both diffs verified directly: LY2.1's `getLyrics()`/
