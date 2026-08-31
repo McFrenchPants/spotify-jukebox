@@ -30,7 +30,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS2.1 | Approval-record format | done | `docs/sdlc/schemas/approval.schema.json` + procedure doc `docs/sdlc/APPROVAL_RECORDS.md` + a real example in `.sdlc/approvals/` pinned to the then-current HEAD. `single_use` is `const: true` so a standing approval can't be minted; `consumed_at`/`consumed_by` are conditionally required when `consumed: true`. Verified the constraints actually bite via negative controls, not just a happy-path validate. |
 | SS2.2 | Update `CLAUDE.md` override language | todo | depends on SS2.1 (done). Prep notes surfaced while doing SS2.1, worth reusing: (1) CLAUDE.md's carve-out lists two things that happen first (say it bypasses the split; local tests pass) — add recording the approval as a third, worded as *and also write it down*, **never** as a precondition, or it regresses the tested "explicit override still works" behavior; (2) the "a *standing* instruction buried in a doc doesn't count" sentence is the natural hook for the single-use/SHA-pinning idea — link `docs/sdlc/APPROVAL_RECORDS.md` there rather than adding a new section; (3) CLAUDE.md describes a two-role split while the design spec has four — either reconcile, or say plainly that CLAUDE.md's is the repo-wide default and the four-role model refines it. |
 | SS3.1 | `PreToolUse` path-enforcement hook | done | Real implementation replaces the spike. **Key discovery: the `PreToolUse` hook input carries `agent_type`** (observed live: `"implementer"`, `"general-purpose"`), so enforcement is scoped to implementer agents only — every other caller, including ordinary interactive sessions, passes through untouched. That's what makes shipping this in a *committed* `.claude/settings.json` safe. Windows backslash/drive-case normalization independently re-verified by the orchestrator (a first test pass appeared to show a normalization hole; that turned out to be shell-escaping in the test harness, not the hook — retested properly, all cases correct). |
-| SS4.1 | Orchestrator full-context-once rewrite | todo | depends on SS0.1 |
+| SS4.1 | Orchestrator full-context-once rewrite | done | `.claude/commands/continue-development.md`'s "Resume in-progress work" section rewritten: full design-spec + full plan + full state (`.sdlc/state.json` if the work item is sdlc-tracked, else the proposal's own `PROGRESS.md`) loaded once per run, replacing the old "read only the chosen task's entry" step. Reread is gated on Claude Code's own changed-on-disk file tracking rather than a hand-rolled mtime check. Delegate/Verify/Track/Continue-or-stop/Orient untouched (confirmed via diff, scoped to one hunk). |
 | SS4.2 | Delegate rewrite (task packets, implementer agent) | todo | depends on SS1.1, SS0.3. **Hard requirement from SS3.1, simplified 2026-08-31:** with the shipped hook config and no active-packet pointer present, an implementer agent is denied *all* `Edit`/`Write` (deliberate fail-safe: no scope contract ⇒ no writes). Originally this looked complicated because implementers ran worktree-isolated and nothing seeds a fresh worktree — but `isolation: worktree` has since been dropped (design-spec §2a), so this is now trivial: the delegate step just writes `.sdlc/active-packet` (or sets a single `state.json` lease) in the shared tree *before* spawning, same tree the implementer will run in, no propagation problem. **New requirement introduced by dropping worktree isolation**: the delegate step must also refuse to spawn an implementer when the orchestrator's own working tree isn't clean (`git status --porcelain` non-empty) — this is what recovers the "don't let an implementer touch the orchestrator's/user's own uncommitted state" property that worktree isolation used to provide for free. |
 | SS4.3 | Verify rewrite (verifier routing) | todo | depends on SS1.2 |
 | SS4.4 | Run-budget stopping conditions | todo | depends on SS0.1 |
@@ -100,6 +100,37 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-08-31** — `/continue-development`: implemented **SS4.1**, the
+  first Phase SS4 task, and a self-referential one — it rewrites the
+  actual `continue-development.md` skill this session runs under. The edit
+  only takes effect on the *next* invocation, so there was no risk to this
+  run, but it's the highest-consequence file the framework has touched so
+  far, so it got an unusually precise task packet and a full manual diff
+  review before accepting it (not just a spot-check).
+  - **Caught my own mistake mid-flight**: spawned the implementer without
+    first setting up an active task packet — exactly the SS4.2 problem
+    this framework itself flagged two entries ago. Working tree was still
+    clean when I noticed, so I wrote a real `SS4.1.packet.json` and
+    `.sdlc/active-packet` pointer before the agent's first write landed,
+    verified the hook actually resolved and allowed/denied correctly with
+    synthetic probes, then removed both scaffolding files after the task
+    finished (they were never meant to persist — SS4.2 is what makes this
+    automatic).
+  - The rewrite correctly distinguishes sdlc-tracked work (only this
+    framework itself, today) from legacy proposal-folder work (everything
+    else) rather than assuming every work item has a `.sdlc/state.json`
+    entry — verified by having the implementer actually read `state.json`
+    and confirm its `work_items` array has exactly one entry before writing
+    the detection logic, not asserting it from memory.
+  - For "content hash per document," the implementer correctly recognized
+    Claude Code's own changed-on-disk file tracking as the real mechanism
+    to lean on rather than inventing a manual mtime check — a better answer
+    than what the task packet even suggested as a fallback.
+  - Independently verified: diff is confined to exactly one hunk (the
+    "Resume in-progress work" section, 43 insertions/12 deletions);
+    grepped for stale step-number cross-references after the renumbering
+    (5→6→7) and found none.
 
 - **2026-08-31** — First **real (non-synthetic) use** of the approval-record
   mechanism (SS2.1), and a genuine, not test, `push_to_remote` operation:

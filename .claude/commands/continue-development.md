@@ -64,26 +64,57 @@ If there's genuinely nothing in flight, move to "Pick new work" below.
 ## Resume in-progress work
 
 This mirrors what a proposal-specific supervisor command already does —
-apply the same loop generically:
+apply the same loop generically.
+
+**Load full context once.** Unlike the subagents you delegate to (see
+"Delegate" below, which deliberately get only a narrow task packet), *you*
+— the orchestrator — need the whole picture: cross-task drift, a change
+that's locally correct for one task but globally wrong for the plan, an
+acceptance criterion elsewhere in the plan that a single task's own Notes
+don't mention. Reading only a task's own narrow slice (the old approach)
+was the wrong economy for this role — narrow-context discipline belongs to
+what you hand a subagent, not to what you read yourself.
 
 1. Checkout the branch if you're not already on it (if the branch doesn't
    exist despite tracking docs referencing it, stop and ask the user — do
    not create it yourself in this situation, something is inconsistent).
-2. Read that work's `PROGRESS.md` (proposal-specific, or the root one's
-   relevant section) — its task table and session log are the source of
-   truth for status.
-3. Pick the task: the one `$ARGUMENTS` named, or the first `todo` task in
-   the table, respecting phase order and each row's `Notes` dependency.
-4. From that work's `IMPLEMENTATION_PLAN.md`, read **only** the entry for
-   the chosen task ID (Grep for it, then read just that section) — not the
-   whole file. If it references a `DESIGN_SPEC.md` section, read **only**
-   that section too.
-5. If the task's Notes flag a dependency that isn't `done`, or something
+2. Determine which tracking convention this work uses: does
+   `.sdlc/state.json` contain a `work_items[].id` matching it? If so, this
+   is **sdlc-tracked** work. If not — true for most work today, e.g.
+   anything under `docs/proposals/<slug>/` — this is a **legacy
+   proposal-folder** work item, tracked entirely via its own
+   `DESIGN_SPEC.md`/`IMPLEMENTATION_PLAN.md`/`PROGRESS.md`, with no
+   corresponding `.sdlc/state.json` entry. Don't add one just to unify
+   this — migrating every proposal folder onto `.sdlc/state.json` is a
+   separate, not-yet-decided piece of work and out of scope here.
+3. Read, in full, once for this run:
+   - **sdlc-tracked**: the complete `docs/sdlc/design-spec.md`, the
+     complete `docs/sdlc/IMPLEMENTATION_PLAN.md`, and the complete
+     `.sdlc/state.json`.
+   - **legacy proposal-folder**: the complete
+     `docs/proposals/<slug>/DESIGN_SPEC.md`, the complete
+     `docs/proposals/<slug>/IMPLEMENTATION_PLAN.md`, and the complete
+     `docs/proposals/<slug>/PROGRESS.md` — this convention's task table and
+     session log already are the state; there is no separate state file to
+     additionally read.
+4. Don't re-read these documents before every task you pick within this
+   same run — that's the redundant-reread failure mode this replaces the
+   old narrow-read instruction with. Rely on Claude Code's own
+   changed-on-disk tracking: it will tell you when a file you've already
+   read has since changed on disk, and that notice — or a subagent's report
+   saying it touched one of these docs, or any other concrete signal — is
+   your cue to re-read that specific document, and only that one. Absent
+   such a signal, treat the copy you loaded in step 3 as still current;
+   don't re-open it "just in case" before picking the next task.
+5. Pick the task: the one `$ARGUMENTS` named, or the first `todo` task in
+   the table you already loaded, respecting phase order and each row's
+   `Notes` dependency.
+6. If the task's Notes flag a dependency that isn't `done`, or something
    only the user can decide (a visual taste call not already settled by the
    design spec, access to real hardware, credentials, an ambiguous product
    decision), stop and ask the user rather than guessing or stubbing around
    it.
-6. Delegate, verify, track, and continue/stop exactly per the **"Delegate →
+7. Delegate, verify, track, and continue/stop exactly per the **"Delegate →
    Verify → Track → Continue-or-stop" loop** below.
 
 ---

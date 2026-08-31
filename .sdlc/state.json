@@ -162,8 +162,8 @@
         {
           "id": "SS4.1",
           "title": "Orchestrator full-context-once rewrite",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [
             "SS0.1"
           ],
@@ -174,7 +174,7 @@
           },
           "task_packet_path": null,
           "report_path": null,
-          "notes": ""
+          "notes": "continue-development.md's Resume section rewritten: full design-spec + plan + state loaded once per run (sdlc-tracked vs legacy proposal-folder detection), reread gated on Claude Code's own changed-on-disk tracking. Diff confirmed confined to one hunk."
         },
         {
           "id": "SS4.2",
