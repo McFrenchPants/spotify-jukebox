@@ -24,14 +24,14 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS0.1 | `.sdlc/state.json` + `project.yaml` schema | done | Schemas at `docs/sdlc/schemas/{state,project}.schema.json`; example `.sdlc/state.json`/`project.yaml` for this repo's real in-flight state, validated against both (`jsonschema`, re-verified independently). Introduced a deliberate `status`/`lifecycle_state` split per task (coarse todo/in-progress/blocked/done vs. the full evidence-gated `draft→…→released` enum, null until a task packet exists) — SS0.2 needs to decide which field(s) its transition validator actually checks. |
 | SS0.2 | State-transition validator | done | `scripts/sdlc/validate-state.mjs` (library API + CLI + `--self-test`, no external test dep). Evidence-gates both `ready_to_release` and `released` (not just `released`); allows same-state no-ops; documents the `<task-id>-*` evidence-file naming convention SS0.3's generator must follow. |
 | SS0.3 | Task-packet + completion-report templates/generator | done | Schemas at `docs/sdlc/schemas/{task-packet,completion-report}.schema.json`; generator at `scripts/sdlc/generate-task-packet.mjs` (regex/proximity heuristic for `read_paths`/`write_paths`, honestly documented limits, falls back to `"NEEDS_MANUAL_REVIEW"`). Tested against a synthetic example (no real proposal had a `todo` task) at `.sdlc/task-packets/SS-EX.1.packet.json`, re-validated independently. |
-| SS1.1 | `implementer` agent | done | `.claude/agents/implementer.md`. Real spawn test (`subagent_type: implementer`) confirmed `isolation: worktree` genuinely works — it ran inside an isolated git worktree end to end. First real report included an extra `summary` field the schema forbids (`additionalProperties: false`) — fixed by tightening the instructions to name the exact allowed field set; re-tested and confirmed schema-valid on the second run. No recognized frontmatter key exists for a turn limit in this Claude Code version — expressed as a body-text instruction instead. |
+| SS1.1 | `implementer` agent | done | `.claude/agents/implementer.md`. Real spawn test (`subagent_type: implementer`) confirmed `isolation: worktree` genuinely worked when it was in use — it ran inside an isolated git worktree end to end. **Since removed** (see SS4.2 row and design-spec §2a) — the implementer now runs in the shared working tree. First real report included an extra `summary` field the schema forbids (`additionalProperties: false`) — fixed by tightening the instructions to name the exact allowed field set; re-tested and confirmed schema-valid on the second run. No recognized frontmatter key exists for a turn limit in this Claude Code version — expressed as a body-text instruction instead. |
 | SS1.2 | `verifier` agent | done | `.claude/agents/verifier.md`. Real spawn test (`subagent_type: verifier`) against a deliberately bad diff correctly caught a forbidden-path violation (and a sneaky regression hidden in it) with an overall `fail`; a clean diff correctly returned `pass` with honest `uncertain` calls where the diff-only view couldn't fully confirm something. |
 | SS1.3 | Reframe `supervisor.md` as release operator | done | Additive only — 49 insertions, 0 deletions (verified via `git diff --numstat`); the existing "Scope note for non-supervisor agents" carve-out is byte-for-byte unchanged. Adds the four-role framing + an approval-record section that explicitly says a live user instruction *is* the approval (write the record and proceed; never make the user produce one first). |
 | SS2.1 | Approval-record format | done | `docs/sdlc/schemas/approval.schema.json` + procedure doc `docs/sdlc/APPROVAL_RECORDS.md` + a real example in `.sdlc/approvals/` pinned to the then-current HEAD. `single_use` is `const: true` so a standing approval can't be minted; `consumed_at`/`consumed_by` are conditionally required when `consumed: true`. Verified the constraints actually bite via negative controls, not just a happy-path validate. |
 | SS2.2 | Update `CLAUDE.md` override language | todo | depends on SS2.1 (done). Prep notes surfaced while doing SS2.1, worth reusing: (1) CLAUDE.md's carve-out lists two things that happen first (say it bypasses the split; local tests pass) — add recording the approval as a third, worded as *and also write it down*, **never** as a precondition, or it regresses the tested "explicit override still works" behavior; (2) the "a *standing* instruction buried in a doc doesn't count" sentence is the natural hook for the single-use/SHA-pinning idea — link `docs/sdlc/APPROVAL_RECORDS.md` there rather than adding a new section; (3) CLAUDE.md describes a two-role split while the design spec has four — either reconcile, or say plainly that CLAUDE.md's is the repo-wide default and the four-role model refines it. |
 | SS3.1 | `PreToolUse` path-enforcement hook | done | Real implementation replaces the spike. **Key discovery: the `PreToolUse` hook input carries `agent_type`** (observed live: `"implementer"`, `"general-purpose"`), so enforcement is scoped to implementer agents only — every other caller, including ordinary interactive sessions, passes through untouched. That's what makes shipping this in a *committed* `.claude/settings.json` safe. Windows backslash/drive-case normalization independently re-verified by the orchestrator (a first test pass appeared to show a normalization hole; that turned out to be shell-escaping in the test harness, not the hook — retested properly, all cases correct). |
 | SS4.1 | Orchestrator full-context-once rewrite | todo | depends on SS0.1 |
-| SS4.2 | Delegate rewrite (task packets, implementer agent) | todo | depends on SS1.1, SS0.3. **Hard requirement discovered in SS3.1 — read before starting:** with the shipped hook config and no active-packet pointer present, an implementer agent is denied *all* `Edit`/`Write` (deliberate fail-safe: no scope contract ⇒ no writes). So the delegate step **must** establish the active packet when spawning, via one of: the `SDLC_ACTIVE_PACKET` env var, a `.sdlc/active-packet` pointer file, or leasing exactly one task in `.sdlc/state.json`. Miss this and every implementer is dead on arrival. Note also that implementers run worktree-isolated and nothing seeds a fresh worktree today, so per-worktree pointers are the only way to separate concurrent implementers. |
+| SS4.2 | Delegate rewrite (task packets, implementer agent) | todo | depends on SS1.1, SS0.3. **Hard requirement from SS3.1, simplified 2026-08-31:** with the shipped hook config and no active-packet pointer present, an implementer agent is denied *all* `Edit`/`Write` (deliberate fail-safe: no scope contract ⇒ no writes). Originally this looked complicated because implementers ran worktree-isolated and nothing seeds a fresh worktree — but `isolation: worktree` has since been dropped (design-spec §2a), so this is now trivial: the delegate step just writes `.sdlc/active-packet` (or sets a single `state.json` lease) in the shared tree *before* spawning, same tree the implementer will run in, no propagation problem. **New requirement introduced by dropping worktree isolation**: the delegate step must also refuse to spawn an implementer when the orchestrator's own working tree isn't clean (`git status --porcelain` non-empty) — this is what recovers the "don't let an implementer touch the orchestrator's/user's own uncommitted state" property that worktree isolation used to provide for free. |
 | SS4.3 | Verify rewrite (verifier routing) | todo | depends on SS1.2 |
 | SS4.4 | Run-budget stopping conditions | todo | depends on SS0.1 |
 | SS5.1 | `sdlc-doctor` command | todo | depends on SS0.1, SS0.2 |
@@ -86,18 +86,64 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
   actually a valid agent-definition key in this Claude Code version — if it
   is, the prose should become a real field.
 
-- Whether Claude Code's current agent-definition frontmatter actually
-  supports `isolation: worktree` (flagged as a risk in SS1.1) — confirm
-  during implementation rather than assuming the reviewer's sketch is
-  literally installable as written.
-- Whether this Claude Code version's hook configuration actually supports
-  denying a tool call pre-execution the way SS3.1 needs — same caution.
+- ~~Whether Claude Code's current agent-definition frontmatter actually
+  supports `isolation: worktree`~~ — **resolved**: it does, confirmed live
+  during SS1.1. (Then deliberately turned back off during SS4.2 scoping —
+  see design-spec §2a. Different question, already answered here: the
+  capability is real, we're just not using it right now.)
+- ~~Whether this Claude Code version's hook configuration actually supports
+  denying a tool call pre-execution~~ — **resolved**: confirmed live during
+  the SS3.1 spike and again in SS3.1's real implementation.
   If either capability doesn't exist as documented, that's real signal for
   the design spec, not something to route around silently.
 
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-08-31** — `/continue-development`: while scoping SS4.2, the user
+  asked whether `isolation: worktree` was actually earning its keep given
+  `max_concurrent_implementers: 1` — a genuine design question, worked
+  through in conversation rather than delegated, since it required judgment
+  about tradeoffs, not implementation.
+  - Separated what worktree isolation was actually doing into two different
+    properties: concurrency safety (moot at N=1) and isolation from the
+    orchestrator's/user's own live workspace (still real at any N). Named
+    concrete costs too: a measured `npm install` per worktree (~241
+    packages, every implementer run so far), and that it was the direct
+    cause of the active-packet-propagation problem on SS4.2's row — a
+    shared workspace has no such problem, since the pointer file the
+    orchestrator writes is already in the one tree the implementer uses.
+  - **The deciding fact came from reading the `Agent` tool's own parameter
+    schema directly** rather than guessing or spawning a test agent: it has
+    exactly six parameters (`description`, `isolation`, `model`, `prompt`,
+    `run_in_background`, `subagent_type`) and no environment-variable
+    channel at all. That closes off "seed a fresh worktree via
+    `SDLC_ACTIVE_PACKET`" as an option definitively, not empirically — there
+    is no code path by which it could ever have worked. The remaining
+    alternative (implementer self-bootstraps its own pointer file) hit a
+    real chicken-and-egg problem: that very write isn't in any task
+    packet's `write_paths`, so the SS3.1 hook would deny it too.
+  - **Decision: drop `isolation: worktree` for now.** Removed from
+    `implementer.md`'s frontmatter, with a new section explaining why and
+    telling the implementer to be more careful about narrow git operations
+    now that there's no filesystem isolation backing it up. Documented as a
+    dated addendum in `design-spec.md` §2a (not a silent rewrite of the
+    approved v2 decision) with the full reasoning, and reversed the
+    Implementer row's "worktree-isolated" claim in §2's role table.
+    `IMPLEMENTATION_PLAN.md`'s SS1.1 notes and this file's SS1.1/SS4.2 rows
+    updated to point at the reversal rather than read as contradicting it.
+    Two now-stale Open Questions (whether `isolation: worktree` and
+    pre-execution hook denial are even supported) marked resolved — both
+    were confirmed working during SS1.1/SS3.1, this reversal is a separate,
+    later decision layered on top of an already-answered question.
+  - Real consequence for SS4.2, now on its row: the delegate step must
+    refuse to spawn an implementer when the orchestrator's own working tree
+    isn't clean (`git status --porcelain` non-empty) — that's what recovers
+    the live-workspace protection worktree isolation used to provide for
+    free. `sdlc-path-check.mjs`'s worktree-detection logic is left in place,
+    unused for now, not deleted — it becomes load-bearing again if isolation
+    is ever re-enabled.
 
 - **2026-08-31** — `/continue-development`: implemented **SS3.1**, the real
   `PreToolUse` path-enforcement hook (replacing the committed spike). This

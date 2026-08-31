@@ -67,7 +67,7 @@ surface for the dangerous operations. Four roles, not two:
 | Role | What it is | Reads | Tools | Can it merge/push/deploy? |
 |---|---|---|---|---|
 | **Orchestrator** | The main session, running the `continue-development` skill | Full approved design, full implementation plan, full current state (`.sdlc/state.json`), architectural instructions — loaded once, refreshed only when a content hash changes (§7) | Everything the main session has | No — hands off to Release operator |
-| **Implementer** | Plugin-provided subagent, one per task packet | Only its task packet (§5) — never the plan or design docs directly | `Read, Grep, Glob, Edit, Write, Bash`; `Agent, WebFetch, WebSearch` denied; worktree-isolated | No |
+| **Implementer** | Plugin-provided subagent, one per task packet | Only its task packet (§5) — never the plan or design docs directly | `Read, Grep, Glob, Edit, Write, Bash`; `Agent, WebFetch, WebSearch` denied; worktree isolation deferred (§2a) — runs in the shared working tree | No |
 | **Verifier** | Plugin-provided subagent, read-only, spawned for the "strong verification" tier (§6) | Task packet + diff + test output — never the implementer's reasoning/scratch | `Read, Grep, Glob, Bash` (for running checks only); no `Edit`/`Write` | No |
 | **Release operator** | This project's existing `.claude/agents/supervisor.md` pattern, kept — not retired | `docs/SUPERVISOR_RUNBOOK.md`-equivalent project policy, the specific approval record for this action (§4) | `Bash, Read, Grep, Glob, Edit, Write`, scoped to remote/production commands only | Yes — the only role that does |
 
@@ -99,6 +99,52 @@ has to be generated as project-local hook config by `init-sdlc`/`doctor`
 (§9), not shipped as something the portable agent definition alone
 guarantees. Document this limitation plainly in the plugin's own docs
 rather than implying stronger portable enforcement than actually exists.
+
+### 2a. `isolation: worktree` deferred (revised 2026-08-31, during SS4.2)
+
+The sketch above shipped with `isolation: worktree` in SS1.1 and it was
+confirmed to genuinely work (a real spawn ran the implementer inside an
+isolated git worktree end to end). Revisiting it while scoping SS4.2
+surfaced that it was solving less than it appeared to, and costing more:
+
+- **The concurrency case it exists for isn't live yet.** `project.yaml`'s
+  `budgets.max_concurrent_implementers` is `1` (§7), so there is currently
+  no scenario where two implementers could collide in a shared working
+  tree — the property worktree isolation is usually chosen for.
+- **There is no supported way to seed a fresh worktree with which task
+  packet is active.** The `Agent` tool's own parameter schema (confirmed by
+  reading it directly: `description`, `isolation`, `model`, `prompt`,
+  `run_in_background`, `subagent_type`) has no environment-variable
+  channel, so `SDLC_ACTIVE_PACKET` can never reach a spawned agent. The
+  only alternative — the implementer writing its own
+  `.sdlc/active-packet` pointer as a first bootstrapping action — runs into
+  a genuine chicken-and-egg problem: that write is itself subject to the
+  SS3.1 hook, and `.sdlc/active-packet` is never in a task packet's own
+  `write_paths`, so the hook would have needed a special-cased exception
+  for that one path.
+- **Measured overhead, not hypothetical**: every worktree-isolated
+  implementer run needed a fresh `npm install` (~241 packages) because
+  `node_modules` isn't inherited by a new worktree — real cost, paid every
+  task, for a safety property not currently in use.
+- **Untested surface area it was quietly deferring**: an implementer's
+  commits land on a disposable `worktree-agent-<id>` branch, which needs an
+  explicit merge/cherry-pick step to fold back into the task branch. Every
+  test run so far ended by *discarding* the worktree, never folding one
+  back in — that path was never actually exercised.
+
+**Decision**: the implementer runs directly in the shared repository
+working tree for now (see `implementer.md`'s own note on this). The
+mitigation for the property worktree isolation was providing — protection
+from the orchestrator's/user's own uncommitted state — is that the
+delegate step (SS4.2) must refuse to spawn an implementer when the
+orchestrator's own working tree isn't clean (`git status --porcelain`
+non-empty), rather than relying on filesystem isolation. Revisit
+`isolation: worktree` if/when SS4.4's budget work ever raises
+`max_concurrent_implementers` above `1` — at that point concurrency safety
+becomes a real requirement again and re-justifies the overhead. The
+`sdlc-path-check.mjs` hook's worktree-detection logic (§8a) is left in
+place rather than ripped out — it's inert but harmless with no worktrees in
+play, and becomes load-bearing again the moment isolation is re-enabled.
 
 ## 3. Orchestrator context policy (replaces v1's "read only the task entry")
 
