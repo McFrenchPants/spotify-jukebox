@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Phase SS0 done. SS1.1/SS1.2 done, SS1.3 next (agent roles nearly complete).
+## Status: Phases SS0-SS3 done. SS4.1/SS2.x done; SS4.2 next (Delegate rewrite).
 
 ## Task Table
 
@@ -28,7 +28,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS1.2 | `verifier` agent | done | `.claude/agents/verifier.md`. Real spawn test (`subagent_type: verifier`) against a deliberately bad diff correctly caught a forbidden-path violation (and a sneaky regression hidden in it) with an overall `fail`; a clean diff correctly returned `pass` with honest `uncertain` calls where the diff-only view couldn't fully confirm something. |
 | SS1.3 | Reframe `supervisor.md` as release operator | done | Additive only — 49 insertions, 0 deletions (verified via `git diff --numstat`); the existing "Scope note for non-supervisor agents" carve-out is byte-for-byte unchanged. Adds the four-role framing + an approval-record section that explicitly says a live user instruction *is* the approval (write the record and proceed; never make the user produce one first). |
 | SS2.1 | Approval-record format | done | `docs/sdlc/schemas/approval.schema.json` + procedure doc `docs/sdlc/APPROVAL_RECORDS.md` + a real example in `.sdlc/approvals/` pinned to the then-current HEAD. `single_use` is `const: true` so a standing approval can't be minted; `consumed_at`/`consumed_by` are conditionally required when `consumed: true`. Verified the constraints actually bite via negative controls, not just a happy-path validate. |
-| SS2.2 | Update `CLAUDE.md` override language | todo | depends on SS2.1 (done). Prep notes surfaced while doing SS2.1, worth reusing: (1) CLAUDE.md's carve-out lists two things that happen first (say it bypasses the split; local tests pass) — add recording the approval as a third, worded as *and also write it down*, **never** as a precondition, or it regresses the tested "explicit override still works" behavior; (2) the "a *standing* instruction buried in a doc doesn't count" sentence is the natural hook for the single-use/SHA-pinning idea — link `docs/sdlc/APPROVAL_RECORDS.md` there rather than adding a new section; (3) CLAUDE.md describes a two-role split while the design spec has four — either reconcile, or say plainly that CLAUDE.md's is the repo-wide default and the four-role model refines it. |
+| SS2.2 | Update `CLAUDE.md` override language | done | Added a new paragraph right after the override carve-out, exactly per the SS2.1 prep notes: the live instruction now explicitly authorizes the release operator to record+consume a SHA-pinned, single-use approval as part of honoring it (never a precondition), linking `docs/sdlc/APPROVAL_RECORDS.md`/`docs/sdlc/schemas/approval.schema.json`/`.sdlc/approvals/`; the "standing instruction buried in a doc doesn't count" sentence is preserved verbatim inside it. The two-vs-four-role reconciliation (prep note 3) was left alone — out of this task's acceptance criteria, worth a future task if it matters. First task run through the real packet+implementer mechanism (not `general-purpose`); surfaced a genuine SS4.2 gap, see session log. |
 | SS3.1 | `PreToolUse` path-enforcement hook | done | Real implementation replaces the spike. **Key discovery: the `PreToolUse` hook input carries `agent_type`** (observed live: `"implementer"`, `"general-purpose"`), so enforcement is scoped to implementer agents only — every other caller, including ordinary interactive sessions, passes through untouched. That's what makes shipping this in a *committed* `.claude/settings.json` safe. Windows backslash/drive-case normalization independently re-verified by the orchestrator (a first test pass appeared to show a normalization hole; that turned out to be shell-escaping in the test harness, not the hook — retested properly, all cases correct). |
 | SS4.1 | Orchestrator full-context-once rewrite | done | `.claude/commands/continue-development.md`'s "Resume in-progress work" section rewritten: full design-spec + full plan + full state (`.sdlc/state.json` if the work item is sdlc-tracked, else the proposal's own `PROGRESS.md`) loaded once per run, replacing the old "read only the chosen task's entry" step. Reread is gated on Claude Code's own changed-on-disk file tracking rather than a hand-rolled mtime check. Delegate/Verify/Track/Continue-or-stop/Orient untouched (confirmed via diff, scoped to one hunk). |
 | SS4.2 | Delegate rewrite (task packets, implementer agent) | todo | depends on SS1.1, SS0.3. **Hard requirement from SS3.1, simplified 2026-08-31:** with the shipped hook config and no active-packet pointer present, an implementer agent is denied *all* `Edit`/`Write` (deliberate fail-safe: no scope contract ⇒ no writes). Originally this looked complicated because implementers ran worktree-isolated and nothing seeds a fresh worktree — but `isolation: worktree` has since been dropped (design-spec §2a), so this is now trivial: the delegate step just writes `.sdlc/active-packet` (or sets a single `state.json` lease) in the shared tree *before* spawning, same tree the implementer will run in, no propagation problem. **New requirement introduced by dropping worktree isolation**: the delegate step must also refuse to spawn an implementer when the orchestrator's own working tree isn't clean (`git status --porcelain` non-empty) — this is what recovers the "don't let an implementer touch the orchestrator's/user's own uncommitted state" property that worktree isolation used to provide for free. |
@@ -100,6 +100,46 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-09-01** — `/continue-development`: implemented **SS2.2**. First
+  task in this project run through the real packet+implementer mechanism
+  end to end (generator → hand-fixed packet → `subagent_type: implementer`),
+  rather than a `general-purpose` subagent standing in for it.
+  - The generator's heuristic output needed real hand-fixing before it was
+    usable: it mis-parsed a fragment of my design-excerpt text into a bogus
+    `.3/SS2.1` read-path entry, dropped a leading `.` on
+    `.claude/agents/supervisor.md`, and — because my excerpt happened to
+    describe `design-spec.md`'s own content — inferred `design-spec.md`
+    itself as a `write_paths` target, which was never the intent. Fixed by
+    hand before spawning rather than trusting the raw output; also added
+    `forbidden_paths` entries and concrete `acceptance_criteria`/
+    `verification_commands` the generator left empty (it doesn't invent
+    text it can't ground in input, correctly).
+  - **Hit the exact gap SS4.2's row already predicted**, for real rather
+    than hypothetically: spawned the implementer with a valid packet on
+    disk but no `.sdlc/active-packet` pointer, and the SS3.1 hook correctly
+    denied the write (no resolvable packet ⇒ no writes, working exactly as
+    designed). The implementer did the right thing — reported `blocked`
+    with a clear explanation instead of working around it. Fixed by writing
+    `.sdlc/active-packet` (single line, `SS2.2`) myself before resuming the
+    same agent, then removed it after the task finished. This is real
+    confirmation that SS4.2 needs to do this automatically as its first
+    action before every spawn, not optional polish.
+  - **Also hit a mechanical mistake worth recording**: my first "resume"
+    attempt used the `Agent` tool again instead of `SendMessage`, which
+    spawned a brand-new agent with no memory of the blocked run instead of
+    continuing it — it correctly refused to act on a claimed prior context
+    it didn't actually have (treated the unfamiliar continuity claim as
+    exactly the kind of thing it's supposed to distrust). Correct fix:
+    `SendMessage` to the original agent's ID, not a fresh `Agent` call, to
+    actually resume a specific in-flight subagent.
+  - Diff spot-checked directly (`git diff -- CLAUDE.md`, docs-only change,
+    well below the strong-verification floor — no verifier agent needed):
+    all four acceptance criteria hold, original wording preserved verbatim
+    inside the addition, no other file touched.
+  - Phase SS4 is next; SS4.2 in particular should treat this session's two
+    gaps (active-packet bootstrapping, resuming an agent by ID rather than
+    respawning) as settled requirements, not open questions.
 
 - **2026-08-31** — `/continue-development`: implemented **SS4.1**, the
   first Phase SS4 task, and a self-referential one — it rewrites the

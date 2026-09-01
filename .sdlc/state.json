@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "updated_at": "2026-08-31T00:00:00Z",
+  "updated_at": "2026-09-01T02:10:00Z",
   "work_items": [
     {
       "id": "sdlc-supervisor-testbed",
@@ -127,8 +127,8 @@
         {
           "id": "SS2.2",
           "title": "Update CLAUDE.md override language",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [
             "SS2.1"
           ],
@@ -137,9 +137,9 @@
             "run_id": null,
             "attempt_count": 0
           },
-          "task_packet_path": null,
+          "task_packet_path": ".sdlc/task-packets/SS2.2.packet.json",
           "report_path": null,
-          "notes": ""
+          "notes": "CLAUDE.md's override paragraph now points at the approval-record mechanism (SS2.1): a live in-conversation override authorizes the release operator to record+consume a SHA-pinned, single-use approval, not a standing license. Original carve-out language preserved verbatim inside the addition. Dispatched via a real implementer subagent + generated task packet (first SS2.x+ task run through the actual packet/implementer mechanism rather than a general-purpose subagent) -- surfaced a real SS4.2 gap: the orchestrator must write .sdlc/active-packet before spawning, or the SS3.1 hook denies all writes (deny-by-default, no resolvable packet). Hit it, fixed it by hand this run, removed the pointer after. See PROGRESS.md session log."
         },
         {
           "id": "SS3.1",
