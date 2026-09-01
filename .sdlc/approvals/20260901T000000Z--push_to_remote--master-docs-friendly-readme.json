@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "push_to_remote",
+  "work_item_id": "sdlc-supervisor-testbed",
+  "task_id": null,
+  "target_branch": "master",
+  "commit_sha": "332e956ff01a7e3a2e9cfcdbb2e0f41263c61a79",
+  "approved_at": "2026-09-01T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Same live instruction as the accompanying merge_to_default_branch record: \"merge into master and push, no changelog or version bump required,\" for docs/friendly-readme (README.md docs-only rewrite). Push only -- nothing here needs deploying to the live add-on (no version bump means HA won't even offer it as an update), and the user separately noted the live add-on is being kept stopped for an unrelated Spotify rate-limit issue, so no deploy/restart/SSH was requested or performed.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-01T00:06:00Z",
+  "consumed_by": "supervisor-session-20260901-merge-docs-friendly-readme",
+  "notes": "Follows a clean --no-ff merge of docs/friendly-readme into master (332e956), no conflicts. Action taken: `git push origin master` -> `44380c9..332e956  master -> master`, a clean fast-forward push, no force needed. origin/master now at 332e956ff01a7e3a2e9cfcdbb2e0f41263c61a79, matching this record's commit_sha. No live HA/add-on/adb action taken."
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "merge_to_default_branch",
+  "work_item_id": "sdlc-supervisor-testbed",
+  "task_id": null,
+  "target_branch": "docs/friendly-readme",
+  "commit_sha": "84bf6aa107d477c101b5950d422009a14e141edb",
+  "approved_at": "2026-09-01T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Repo owner, live in this conversation, said: \"merge into master and push, no changelog or version bump required,\" referring to docs/friendly-readme, a docs-only rewrite of README.md (adds a friendly non-developer intro + HA Add-on setup walkthrough above the existing developer/architecture content, which is preserved under a \"For developers and self-hosters\" heading). No application code touched, so the usual local-test-suite gate does not apply, and the owner explicitly waived the version-bump/CHANGELOG step since this has no effect on the deployed add-on's behavior.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-01T00:05:00Z",
+  "consumed_by": "supervisor-session-20260901-merge-docs-friendly-readme",
+  "notes": "Preflight: docs-only change, no backend/frontend code touched, so no tsc/vitest/build gate applies (confirmed via git diff scope: README.md only). Sanity-read README.md end to end -- headings, links, and structure all render sensibly, no broken markdown, developer content preserved intact under 'For developers and self-hosters'. No config.yaml version bump / CHANGELOG.md entry made, per explicit owner instruction (pure docs change, HA Supervisor won't offer this as an update regardless since version is unchanged). Action taken: `git checkout master` (was at 44380c9, matching origin/master); `git merge --no-ff docs/friendly-readme` -> clean merge (ort strategy, no conflicts), producing 332e956ff01a7e3a2e9cfcdbb2e0f41263c61a79."
+}
