@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Phases SS0-SS3 done. SS4.1/SS2.x done; SS4.2 next (Delegate rewrite).
+## Status: Phases SS0-SS3 done. SS4.1/SS4.2/SS2.x done; SS4.3 next (Verify rewrite).
 
 ## Task Table
 
@@ -31,7 +31,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS2.2 | Update `CLAUDE.md` override language | done | Added a new paragraph right after the override carve-out, exactly per the SS2.1 prep notes: the live instruction now explicitly authorizes the release operator to record+consume a SHA-pinned, single-use approval as part of honoring it (never a precondition), linking `docs/sdlc/APPROVAL_RECORDS.md`/`docs/sdlc/schemas/approval.schema.json`/`.sdlc/approvals/`; the "standing instruction buried in a doc doesn't count" sentence is preserved verbatim inside it. The two-vs-four-role reconciliation (prep note 3) was left alone — out of this task's acceptance criteria, worth a future task if it matters. First task run through the real packet+implementer mechanism (not `general-purpose`); surfaced a genuine SS4.2 gap, see session log. |
 | SS3.1 | `PreToolUse` path-enforcement hook | done | Real implementation replaces the spike. **Key discovery: the `PreToolUse` hook input carries `agent_type`** (observed live: `"implementer"`, `"general-purpose"`), so enforcement is scoped to implementer agents only — every other caller, including ordinary interactive sessions, passes through untouched. That's what makes shipping this in a *committed* `.claude/settings.json` safe. Windows backslash/drive-case normalization independently re-verified by the orchestrator (a first test pass appeared to show a normalization hole; that turned out to be shell-escaping in the test harness, not the hook — retested properly, all cases correct). |
 | SS4.1 | Orchestrator full-context-once rewrite | done | `.claude/commands/continue-development.md`'s "Resume in-progress work" section rewritten: full design-spec + full plan + full state (`.sdlc/state.json` if the work item is sdlc-tracked, else the proposal's own `PROGRESS.md`) loaded once per run, replacing the old "read only the chosen task's entry" step. Reread is gated on Claude Code's own changed-on-disk file tracking rather than a hand-rolled mtime check. Delegate/Verify/Track/Continue-or-stop/Orient untouched (confirmed via diff, scoped to one hunk). |
-| SS4.2 | Delegate rewrite (task packets, implementer agent) | todo | depends on SS1.1, SS0.3. **Hard requirement from SS3.1, simplified 2026-08-31:** with the shipped hook config and no active-packet pointer present, an implementer agent is denied *all* `Edit`/`Write` (deliberate fail-safe: no scope contract ⇒ no writes). Originally this looked complicated because implementers ran worktree-isolated and nothing seeds a fresh worktree — but `isolation: worktree` has since been dropped (design-spec §2a), so this is now trivial: the delegate step just writes `.sdlc/active-packet` (or sets a single `state.json` lease) in the shared tree *before* spawning, same tree the implementer will run in, no propagation problem. **New requirement introduced by dropping worktree isolation**: the delegate step must also refuse to spawn an implementer when the orchestrator's own working tree isn't clean (`git status --porcelain` non-empty) — this is what recovers the "don't let an implementer touch the orchestrator's/user's own uncommitted state" property that worktree isolation used to provide for free. **Second requirement, confirmed 2026-09-01 by SS2.2 actually hitting this** (see that row and the session log below): correct retry semantics after fixing a blocked implementer must be specified explicitly, not left to be discovered live. The right recovery is either `SendMessage` to the specific blocked agent's own ID (its context already has the original packet), or a brand-new `Agent` call with the complete packet pasted inline again — **never** a fresh `Agent` call that references prior context by claim rather than either resuming the real agent or resupplying the packet. A fresh agent has no legitimate basis to trust an unverifiable "you already did X" message, and correctly refuses it — which is the right behavior, but means the common recovery mistake (spawn-again-and-reference-history) doesn't just fail quietly, it produces a second wasted agent and a confusing refusal. SS4.2 should make this explicit in the delegate rewrite's own instructions, not assume it's obvious. |
+| SS4.2 | Delegate rewrite (task packets, implementer agent) | done | `.claude/commands/continue-development.md`'s Delegate section split into two explicit sub-paths. Legacy proposal-folder work keeps the pre-existing `general-purpose` behavior verbatim, under its own heading. sdlc-tracked work now follows a 9-step procedure covering every requirement this row had accumulated: clean-working-tree gate before spawning; generate the packet via the SS0.3 generator and explicitly review/hand-correct it (never trust `NEEDS_MANUAL_REVIEW` or an obviously-wrong inferred path); write `.sdlc/active-packet` before spawning and retire it once the task is settled; spawn `subagent_type: implementer` with the full packet JSON pasted inline (never a pointer to go read it); resume a blocked/interrupted implementer via `SendMessage` to its own agent ID, never a fresh `Agent` call asserting unverifiable prior progress; `scope_change_requested` is the orchestrator's own judgment call; expertise skills are draft-only pending human check-in; sdlc-tracked tasks are delegated strictly one at a time (`max_concurrent_implementers: 1`, one active-packet pointer). Dispatched via a real implementer subagent + hand-authored, schema-validated task packet (the generator's heuristic wasn't run against real plan-entry text for this self-referential task; a hand-written packet was more reliable given the stakes). Diff independently verified: confined to exactly the Delegate subsection, 117 insertions/5 deletions, `git diff --stat` shows only this one file changed. Implementer flagged one out-of-scope, non-blocking observation: `.claude/hooks/sdlc-path-check.mjs`'s header comment still describes `isolation: worktree`, stale since design-spec §2a's reversal — worth a small follow-up task, not urgent, not done here (forbidden_paths). |
 | SS4.3 | Verify rewrite (verifier routing) | todo | depends on SS1.2 |
 | SS4.4 | Run-budget stopping conditions | todo | depends on SS0.1 |
 | SS5.1 | `sdlc-doctor` command | todo | depends on SS0.1, SS0.2 |
@@ -100,6 +100,46 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-08-31** — `/continue-development`: implemented **SS4.2**, the
+  Delegate-section rewrite. This is the first task where the packet itself
+  was hand-authored rather than run through
+  `scripts/sdlc/generate-task-packet.mjs` — the task is self-referential
+  (editing the very command this session runs under) and there was no
+  existing plan-entry text file to feed the generator without first
+  extracting it from `IMPLEMENTATION_PLAN.md`, which the orchestrator
+  isn't supposed to hand the implementer anyway. Wrote the packet directly
+  against `docs/sdlc/schemas/task-packet.schema.json`, validated it with
+  `jsonschema.validate()` before spawning (independently, not just trusting
+  it parsed), and put the full condensed design/plan context — everything
+  from design-spec §2a/§3/§5/§7/§10 an implementer would need — into the
+  packet's own `objective` field rather than listing `design-spec.md` in
+  `read_paths`, since `implementer.md` says it must never read that file;
+  worth noting the SS2.2 packet had listed it as a read path anyway, which
+  in hindsight looks like an inconsistency in that earlier packet rather
+  than a precedent to repeat.
+  - Followed the same active-packet bootstrap procedure this task itself
+    was defining: confirmed a clean tree first (only the just-created
+    packet file was untracked), wrote `.sdlc/active-packet` containing
+    `SS4.2`, spawned `subagent_type: implementer` with the packet pasted
+    inline, and removed the pointer after accepting the completion report
+    — exactly the lifecycle the new Delegate text now documents for future
+    runs.
+  - Verified independently rather than on the subagent's report alone:
+    reran `git diff --stat` and read the full `git diff` myself. Confirmed
+    the change is confined to exactly the Delegate subsection (117
+    insertions, 5 deletions) with no other section or file touched.
+  - The implementer surfaced one honest, non-blocking observation outside
+    its own scope (correctly reported as `unresolved_risks` rather than
+    fixed, since `.claude/hooks/sdlc-path-check.mjs` was in its
+    `forbidden_paths`): that hook's own header comment still describes the
+    implementer as `isolation: worktree`-based and describes worktree-local
+    vs. main-repo pointer lookup, which reads as stale now that worktree
+    isolation was dropped (design-spec §2a). Recorded here rather than
+    fixed in this task — a small, separate follow-up task, not urgent
+    (the hook's behavior is still correct for the current shared-tree
+    setup; only the comment is out of date).
+  - Phase SS4 continues: SS4.3 (verifier routing) is next.
 
 - **2026-09-01** — Cross-session review, no new task implemented. The user
   pasted streamed logs from the separate session that ran SS2.2 (below) for

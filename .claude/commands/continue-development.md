@@ -251,11 +251,18 @@ existing work or driving freshly-scaffolded new work.
 
 ### Delegate
 
-For the chosen task (or a small batch of independent tasks — check
-dependency notes first), spawn one subagent per task using the Agent tool
-(`subagent_type: general-purpose`, run in the background unless you have
-nothing else to do while waiting). Independent tasks in one batch go in a
-single message with multiple Agent calls.
+Which mechanism you use depends on which tracking convention the task
+belongs to (see "Resume in-progress work" step 2 above for how to tell
+sdlc-tracked from legacy proposal-folder work). The two paths are
+deliberately different — do not blend them.
+
+#### Legacy proposal-folder work (no `.sdlc/state.json` entry)
+
+Unchanged from before. For the chosen task (or a small batch of
+independent tasks — check dependency notes first), spawn one subagent per
+task using the Agent tool (`subagent_type: general-purpose`, run in the
+background unless you have nothing else to do while waiting). Independent
+tasks in one batch go in a single message with multiple Agent calls.
 
 Each subagent prompt must be **self-contained** and **narrow**:
 - State the task ID and paste its full scope + acceptance criteria text
@@ -282,6 +289,111 @@ Each subagent prompt must be **self-contained** and **narrow**:
 Do not let a subagent read the plan/progress/spec docs — everything it
 needs should already be in the prompt you wrote. This keeps subagent
 context small and prevents drift/scope creep.
+
+#### sdlc-tracked work (`.sdlc/state.json` has this task)
+
+This path uses the sdlc-supervisor framework's task-packet + `implementer`
+subagent mechanism instead of `general-purpose`. Follow it exactly, one
+task at a time — never batch multiple sdlc-tracked tasks into concurrent
+implementer spawns, even when their dependency notes would otherwise allow
+it. `.sdlc/project.yaml`'s `budgets.max_concurrent_implementers` is `1`,
+and only one `.sdlc/active-packet` pointer can exist at a time (see step 3
+below), so there is no batching path here the way there is for legacy
+work.
+
+1. **Require a clean working tree first.** Run `git status --porcelain`.
+   If it produces any output, stop — do not spawn an implementer. The
+   implementer agent runs directly in this shared working tree, not an
+   isolated worktree, so a dirty tree is the one thing standing between
+   its edits and whatever uncommitted work (yours or the user's) is
+   already sitting there. Surface the dirty state to the user and let them
+   decide (commit, stash themselves, or explain what it is) rather than
+   proceeding around it.
+2. **Generate the task packet.** Run
+   `scripts/sdlc/generate-task-packet.mjs` with `--task-id`,
+   `--plan-entry-file`, and, if relevant, `--design-excerpt-file`/
+   `--dependencies` (see the script's own header comment for exact usage).
+   This writes `.sdlc/task-packets/<task_id>.packet.json`.
+3. **Review and correct the generated packet before using it — do not
+   trust it as-is.** The generator's `read_paths`/`write_paths` inference
+   is a documented, honest heuristic operating purely on input text, not
+   real code/semantic understanding, and it has previously produced wrong
+   output that needed hand-correction (mis-parsing a design excerpt into a
+   bogus read-path entry, dropping a leading `.` from a filename, and
+   inferring a read-only doc as a write target, in one real prior case).
+   Read through every field — `read_paths`, `write_paths`,
+   `forbidden_paths`, `acceptance_criteria`, `verification_commands` — and
+   fix anything wrong. In particular:
+   - If the packet contains the literal string `"NEEDS_MANUAL_REVIEW"`
+     anywhere, it is not ready — fill in the real paths by hand.
+   - If any path is plainly wrong on inspection (missing leading `.`,
+     wrong directory, a read-only doc listed as writable, etc.), fix it by
+     hand.
+   - When the heuristic's output needs substantial correction, it's fine
+     to just write the packet file directly (matching
+     `docs/sdlc/schemas/task-packet.schema.json`) instead of patching the
+     generated one field-by-field.
+   Never hand an implementer a packet you haven't actually reviewed.
+4. **Write the active-packet pointer.** Before spawning, write
+   `.sdlc/active-packet` in the repo root containing exactly the task's id
+   and nothing else (a single line, e.g. `SS4.2`). The committed
+   `PreToolUse` hook (`.claude/hooks/sdlc-path-check.mjs`) denies every
+   `Edit`/`Write` call from the implementer unless it can resolve exactly
+   one active packet, and this pointer file is the mechanism that
+   resolves it for a single implementer running in the shared tree. Leave
+   it in place for the duration of that implementer's work.
+5. **Spawn the implementer.** Use the Agent tool with
+   `subagent_type: implementer` (never `general-purpose` for sdlc-tracked
+   work). Paste the **full packet JSON verbatim** into the spawn prompt —
+   the implementer agent's own instructions say every invocation hands it
+   exactly one task packet pasted into its prompt at spawn time; it does
+   not read the packet file itself, and by its own rules it never reads
+   `docs/sdlc/IMPLEMENTATION_PLAN.md`, `docs/sdlc/design-spec.md`, or
+   `docs/sdlc/PROGRESS.md` directly. Don't tell it to go read the plan —
+   that's not how it's built to work, and doing so wastes the turn on a
+   refusal or a scope violation.
+6. **Resuming, not restarting, a blocked or interrupted implementer.** If
+   an implementer's completion report is `blocked`, or a run gets
+   interrupted mid-task and needs to continue, resume it with
+   `SendMessage` addressed to that exact agent's own id — it already has
+   the full packet and context in its memory. Never spin up a brand-new
+   `Agent` call that merely asserts prior progress ("you already did X,
+   now do Y") — a fresh agent has no legitimate basis to verify such a
+   claim and will correctly refuse it, wasting the spawn. If the original
+   agent is genuinely gone (session ended, its id lost), the correct
+   recovery is a brand-new `Agent` spawn with the complete packet pasted
+   inline again, as a fresh attempt — never a message asserting
+   unverifiable prior progress to a new agent.
+7. **Scope-change requests are yours to judge, not auto-approve.** A
+   completion report with `status: scope_change_requested` means the
+   implementer determined it needed to read or write outside the packet's
+   declared paths. You — not the implementer — have the full plan context
+   needed to judge whether that's a real gap in the task's scope or the
+   implementer overreaching. Never auto-approve it into more implementer
+   work, and never silently ignore it either; decide on the merits and act
+   (widen the packet and re-spawn/resume, or push back) accordingly.
+8. **Drafting, not activating, expertise skills.** You may freely write a
+   one-run inline instruction into an implementer's spawn prompt any time
+   — no review needed, and it dies with that run if not reused. If you
+   notice the *same* one-run instruction recurring across multiple tasks,
+   you may draft (write to disk, but not enable, reference, or otherwise
+   activate) a project-local expertise-skill file capturing it. Drafting
+   is not activating: turning a drafted skill into something actually used
+   in a run, or committing it into the project, requires a human check-in
+   first — the same tier as a design-spec sign-off. Never activate a
+   drafted skill unilaterally just because you drafted it.
+9. **Retire the pointer once the task is settled.** After the task's
+   completion report has been accepted (see Verify/Update-tracking below),
+   delete `.sdlc/active-packet` so it doesn't linger and get mistaken for
+   the next task's active packet. If the task is instead abandoned or left
+   blocked, still remove or overwrite the pointer once you've decided what
+   happens next — don't leave a stale pointer sitting there into the next
+   task.
+
+This mechanism is specific to sdlc-tracked work. Legacy proposal-folder
+work keeps using the `general-purpose` path above unchanged — the
+`implementer` agent is not (yet) a generic delegate target for arbitrary
+proposal folders.
 
 ### Verify
 

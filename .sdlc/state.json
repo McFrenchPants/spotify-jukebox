@@ -179,8 +179,8 @@
         {
           "id": "SS4.2",
           "title": "Delegate rewrite (task packets, implementer agent)",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [
             "SS1.1",
             "SS0.3"
@@ -188,11 +188,11 @@
           "lease": {
             "assigned_agent": null,
             "run_id": null,
-            "attempt_count": 0
+            "attempt_count": 1
           },
-          "task_packet_path": null,
+          "task_packet_path": ".sdlc/task-packets/SS4.2.packet.json",
           "report_path": null,
-          "notes": ""
+          "notes": "Delegate section split into two explicit sub-paths: legacy proposal-folder work keeps the existing general-purpose behavior verbatim; sdlc-tracked work now follows a 9-step procedure (clean-tree gate, generate+hand-review packet, write/retire .sdlc/active-packet, spawn subagent_type: implementer with the packet pasted inline, SendMessage-to-same-agent-id resume semantics, scope_change_requested is the orchestrator's judgment call, draft-only expertise skills). Diff confined to exactly one file/section (117 insertions, 5 deletions), independently verified via git diff --stat and a full read of the diff. Implementer flagged one out-of-scope observation: .claude/hooks/sdlc-path-check.mjs's header comment still describes isolation: worktree, stale since that decision was reversed (design-spec §2a) -- worth a small follow-up task, not urgent."
         },
         {
           "id": "SS4.3",
