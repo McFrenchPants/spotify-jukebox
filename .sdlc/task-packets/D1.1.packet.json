@@ -1,0 +1,63 @@
+{
+  "task_id": "D1.1",
+  "plan_revision": "uncommitted:2026-09-01T00:00:00Z",
+  "objective": "Add caching to GET /api/device (BACKLOG.md #26, see analysis/22-spotify-api-call-inventory.md) so N guests opening the app in a short window doesn't mean N real simultaneous Spotify GET /v1/me/player/devices calls, WITHOUT breaking the existing live device-status-flip refresh behavior. DESIGN: add a small, dedicated device-resolution cache to backend/src/spotify/device.ts (deliberately separate from cache.ts's existing generic withCache helper -- this needs explicit invalidation tied to real state changes, not just TTL expiry, which is a different requirement from search/track/artist's simple TTL-only caching). Specifically: (1) Add a module-level cache variable (e.g. `let cachedResolution: { value: DeviceResolution; expiresAt: number } | null = null;`) and a TTL constant (e.g. `const DEVICE_RESOLUTION_CACHE_TTL_MS = 10_000;` -- 10 seconds). (2) Add an exported function, e.g. `export async function getCachedDeviceResolution(fetchFn: typeof fetch = fetch, getTokenFn: () => Promise<string> = getValidAccessToken): Promise<DeviceResolution>`, that returns the cached value if it exists and hasn't expired, otherwise calls the existing resolveDevice(fetchFn, getTokenFn) and caches its result with a fresh expiresAt. (3) Add an exported function `export function invalidateDeviceResolutionCache(): void { cachedResolution = null; }`. (4) In backend/src/routes/device.ts, change the GET / handler to call getCachedDeviceResolution() instead of resolveDevice() directly -- this is the only change needed in that handler's logic (error handling stays the same, classifySpotifyAuthError etc. all unchanged). (5) In backend/src/routes/device.ts's POST /select handler, after setSetting(\"spotify_device_id\", deviceId) succeeds (i.e. right before or alongside the 200 response), call invalidateDeviceResolutionCache() so a subsequent GET /api/device doesn't serve a stale pre-selection cached result for up to 10s -- POST /select itself continues to call listDevices() directly (NOT the new cached wrapper), completely unchanged, since it already explicitly re-fetches live on purpose (see its own existing comment: \"the admin must be selecting from what's currently visible\"). (6) In backend/src/spotify/nowPlaying.ts, both updateDeviceStatusFromDeviceField() and checkDeviceStatusFallback() already detect device online/offline flips via a local `changed` boolean before calling emitEvent(\"device-status\", ...) -- in both places, call the newly-exported invalidateDeviceResolutionCache() (import it from ./device) whenever `changed` is true, right alongside/before that emitEvent call, so the cache is correctly invalidated exactly when the underlying device state actually changes, keeping DeviceSelector.tsx's existing device-status-triggered live refresh accurate rather than serving a stale cached result.",
+  "non_goals": [
+    "Do not add caching to listDevices() or resolveDevice() themselves -- they must remain uncached, low-level functions exactly as they are today. Only GET /api/device's route handler gets the new cached wrapper (getCachedDeviceResolution); POST /device/select keeps calling listDevices() directly, unchanged.",
+    "Do not modify cache.ts's existing withCache() helper or its search/track/artist TTLs -- this is a separate, dedicated cache with different invalidation needs, not a reuse of that generic mechanism.",
+    "Do not touch nowPlaying.ts's polling/scheduling logic (startNowPlayingPoller, computeNextPollDelayMs, triggerImmediateNowPlayingPoll, scheduleNextPoll, runPollAndReschedule, pollNowPlaying's own track-change/play-history/lyrics logic) or rateLimitBackoff.ts -- those were completed in NP1.1/NP1.2/Q1.1 on this same branch. Only add the two invalidateDeviceResolutionCache() calls described above, inside the existing device-status-change detection functions -- do not restructure those functions otherwise.",
+    "Do not touch playback.ts or any other route file.",
+    "Do not change DeviceSelector.tsx or PlaybackControls.tsx on the frontend -- this is a backend-only caching change; the existing frontend fetch-on-mount and SSE-triggered-refetch behavior is unaffected by (and doesn't need to know about) this cache."
+  ],
+  "dependencies": [],
+  "read_paths": [
+    "backend/src/spotify/device.ts",
+    "backend/src/spotify/device.test.ts",
+    "backend/src/routes/device.ts",
+    "backend/src/routes/device.test.ts",
+    "backend/src/spotify/nowPlaying.ts",
+    "backend/src/spotify/nowPlaying.test.ts",
+    "backend/src/spotify/cache.ts",
+    "analysis/22-spotify-api-call-inventory.md",
+    "docs/TESTING.md"
+  ],
+  "write_paths": [
+    "backend/src/spotify/device.ts",
+    "backend/src/spotify/device.test.ts",
+    "backend/src/routes/device.ts",
+    "backend/src/routes/device.test.ts",
+    "backend/src/spotify/nowPlaying.ts",
+    "backend/src/spotify/nowPlaying.test.ts"
+  ],
+  "forbidden_paths": [
+    "backend/src/routes/playback.ts",
+    "backend/src/routes/playback.test.ts",
+    "backend/src/spotify/rateLimitBackoff.ts",
+    "backend/src/spotify/rateLimitBackoff.test.ts",
+    "backend/src/spotify/tokenRefresh.ts",
+    "backend/src/spotify/tokenRefresh.test.ts",
+    "backend/src/spotify/cache.ts",
+    "frontend/**",
+    "BACKLOG.md",
+    "analysis/**",
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    "docs/sdlc/**"
+  ],
+  "acceptance_criteria": [
+    "device.ts exports a new getCachedDeviceResolution() function that returns a cached DeviceResolution if one exists and is within DEVICE_RESOLUTION_CACHE_TTL_MS (10 seconds), otherwise calls resolveDevice() and caches the fresh result.",
+    "device.ts exports a new invalidateDeviceResolutionCache() function that clears the cache so the next getCachedDeviceResolution() call is forced to call resolveDevice() again.",
+    "listDevices() and resolveDevice() themselves are completely unchanged -- verify via diff that no lines inside either existing function were modified.",
+    "routes/device.ts's GET / handler calls getCachedDeviceResolution() instead of resolveDevice() -- verify multiple GET /api/device calls within the TTL window only trigger one real resolveDevice()/listDevices() call (test with a mocked fetchFn call-count assertion).",
+    "routes/device.ts's POST /select handler still calls listDevices() directly (not the cached wrapper) exactly as before, and additionally calls invalidateDeviceResolutionCache() after a successful selection -- verify via a test that a GET-then-select-then-GET sequence returns fresh (not stale-cached) data on the second GET, even within what would otherwise still be inside the TTL window.",
+    "nowPlaying.ts's updateDeviceStatusFromDeviceField() and checkDeviceStatusFallback() both call invalidateDeviceResolutionCache() whenever they detect an actual online/offline change (the existing `changed` condition), and do NOT call it when there's no change (first-ever check, or an unchanged status) -- verify via tests that mock/spy on invalidateDeviceResolutionCache and assert it's called only on an actual flip.",
+    "No change to nowPlaying.ts's own polling schedule, track-change detection, play-history recording, or lyrics logic -- verify via diff that only the two invalidateDeviceResolutionCache() call sites were added.",
+    "cd backend && npx tsc --noEmit and npx vitest run both pass clean."
+  ],
+  "verification_commands": [
+    "cd backend && npx tsc --noEmit",
+    "cd backend && npx vitest run"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}
