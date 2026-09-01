@@ -342,7 +342,7 @@
     {
       "id": "reduce-nowplaying-polling",
       "title": "BACKLOG.md #24: event-scheduled now-playing polling (reduce Spotify API load)",
-      "lifecycle_state": "implementing",
+      "lifecycle_state": "released",
       "tasks": [
         {
           "id": "NP1.1",
@@ -362,17 +362,17 @@
         {
           "id": "NP1.2",
           "title": "Wire own-action fast-path poll trigger into playback.ts routes",
-          "status": "todo",
-          "lifecycle_state": "approved",
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": ["NP1.1"],
           "lease": {
             "assigned_agent": null,
             "run_id": null,
-            "attempt_count": 0
+            "attempt_count": 1
           },
-          "task_packet_path": null,
+          "task_packet_path": ".sdlc/task-packets/NP1.2.packet.json",
           "report_path": null,
-          "notes": "Depends on NP1.1 exposing a way to trigger an immediate one-shot poll + reschedule. pause/resume/skip/previous routes in playback.ts each trigger one after their Spotify call succeeds."
+          "notes": "pause/resume/skip/previous routes in playback.ts each call a new triggerNowPlayingPollFireAndForget() helper (wraps triggerImmediateNowPlayingPoll(), fire-and-forget, defensive try/catch) right before their 200 response, after the underlying Spotify call succeeds. volume/jukebox-volume-report untouched. New resume/skip test describe blocks added (previously untested routes) plus trigger-call assertions on all four. Implementer's first full-suite run showed 50 unrelated failures (queueSync.test.ts, routes/nowPlaying.test.ts, routes/queue.test.ts -- runMigrations/server.close errors); confirmed via git-stash isolation as pre-existing full-suite flakiness, not caused by this change. Orchestrator independently reran and confirmed: diff confined to exactly playback.ts + playback.test.ts, backend tsc clean, vitest 403/403 clean on a fresh full run (no flake reproduced)."
         }
       ]
     }

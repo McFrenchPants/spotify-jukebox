@@ -775,7 +775,7 @@ now this full-app crash) — worth a dedicated follow-up rather than folding
 into this already-live-incident-driven fix.
 
 ## 24. Replace the constant 4s now-playing poll with event-scheduled polling
-**Status:** ready
+**Status:** done
 **Type:** enhancement
 **Analysis:** [analysis/24-event-scheduled-now-playing-poll.md](analysis/24-event-scheduled-now-playing-poll.md)
 
@@ -794,3 +794,18 @@ track's expected end (to catch Spotify auto-advancing), and a 15-second
 safety-net poll for anything else (external/out-of-band changes via a
 device's own controls, drift correction, device-status detection).
 Estimated ~900/hr → ~150-350/hr depending on skip frequency.
+
+Shipped: [nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s
+`startNowPlayingPoller` rewritten from a flat `setInterval(4000)` to
+`setTimeout`-chain scheduling — the next poll fires at whichever is sooner
+of an end-of-track estimate (`duration - progress + 750ms buffer`) or a
+15s safety-net interval, computed fresh after every poll.
+`pollNowPlaying()`'s own logic (track-change detection, play-history/
+leaderboard recording, lyrics lookup, device-status) is unchanged — only
+the scheduling around it changed. A new exported
+`triggerImmediateNowPlayingPoll()` is called (fire-and-forget) from
+[playback.ts](backend/src/routes/playback.ts)'s pause/resume/skip/previous
+routes right after their Spotify call succeeds, so the app's own actions
+get an immediate refresh instead of waiting for the next scheduled tick.
+Implemented on `feature/reduce-nowplaying-polling` (off `master`, not yet
+merged), via two sdlc-tracked tasks (NP1.1 scheduler, NP1.2 route wiring).
