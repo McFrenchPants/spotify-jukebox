@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "merge_to_default_branch",
+  "work_item_id": "sdlc-supervisor-testbed",
+  "task_id": null,
+  "target_branch": "feature/reduce-nowplaying-polling",
+  "commit_sha": "3615a12193df5cd59a8000e4b3babb3621271356",
+  "approved_at": "2026-09-01T16:44:38Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Repo owner, live in this conversation (relayed to the release operator via the orchestrator's task handoff), said: \"go ahead and merge then push so I can test the deployment,\" referring to feature/reduce-nowplaying-polling, which carries the three independently-verified live-incident fixes for BACKLOG.md #24/#25/#26. The task explicitly scoped this to merge+push only -- no live HA deploy trigger, SSH, or adb, since the owner is triggering the actual add-on update themselves via the Store UI.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-01T16:47:00Z",
+  "consumed_by": "supervisor-session-20260901-merge-reduce-nowplaying-polling",
+  "notes": "Preflight before writing this record: backend `npx tsc --noEmit` clean; backend `npx vitest run` -> 45 test files / 417 tests passed; frontend `npx tsc --noEmit` clean; frontend `npm run build` succeeded. Branch had not bumped config.yaml's version -- added 1.0.25 -> 1.0.26 plus a matching CHANGELOG.md entry summarizing the three fixes, committed as 3615a12 before merging, since the branch is user-visible (rate-limit/quota handling + polling load reduction affecting the live add-on). Action taken: `git checkout master` (was at 84edf80, matching origin/master); `git merge --no-ff feature/reduce-nowplaying-polling` -> clean merge (ort strategy, no conflicts) producing 24ae94fa2e82463eaf9d88b3a995819b6d5d2f07."
+}

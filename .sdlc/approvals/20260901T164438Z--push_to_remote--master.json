@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "push_to_remote",
+  "work_item_id": "sdlc-supervisor-testbed",
+  "task_id": null,
+  "target_branch": "master",
+  "commit_sha": "24ae94fa2e82463eaf9d88b3a995819b6d5d2f07",
+  "approved_at": "2026-09-01T16:44:38Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Same live instruction as the accompanying merge_to_default_branch record: \"go ahead and merge then push so I can test the deployment,\" for feature/reduce-nowplaying-polling (BACKLOG.md #24/#25/#26). Push only -- the owner is triggering the actual HA add-on update themselves via the Store UI, not asking the release operator to deploy/restart/SSH.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-01T16:48:00Z",
+  "consumed_by": "supervisor-session-20260901-merge-reduce-nowplaying-polling",
+  "notes": "Follows a clean --no-ff merge of feature/reduce-nowplaying-polling into master (24ae94f), no conflicts. Action taken: `git push origin master` -> `84edf80..24ae94f  master -> master`, a clean fast-forward push, no force needed. origin/master now at 24ae94fa2e82463eaf9d88b3a995819b6d5d2f07, matching this record's commit_sha."
+}
