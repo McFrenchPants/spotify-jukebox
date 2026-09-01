@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "merge_to_default_branch",
+  "work_item_id": "sdlc-supervisor-testbed",
+  "task_id": "F11.1",
+  "target_branch": "feature/favorites-two-column-layout",
+  "commit_sha": "bcc1a3d445bcdcdbbaef3af8e0df1aa5d33ec6f4",
+  "approved_at": "2026-09-01T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Repo owner, live in this conversation, was asked whether to deploy now and whether to isolate just the two live-incident fixes or merge the whole sdlc-supervisor framework too, and explicitly chose: merge everything, including the sdlc-supervisor framework, to master now. feature/favorites-two-column-layout is a descendant of feature/sdlc-supervisor and also carries the B23.1 artist.genres crash fix, so merging it brings all three.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-01T00:05:00Z",
+  "consumed_by": "supervisor-session-20260901-merge-favorites-two-column",
+  "notes": "Preflight before writing this record: backend `npx tsc --noEmit` clean; backend `npx vitest run` -> 45 test files / 388 tests passed; frontend `npx tsc --noEmit` clean; frontend `npm run build` succeeded. Added a version bump (config.yaml 1.0.24 -> 1.0.25) and matching CHANGELOG.md entry in commit bcc1a3d before merging, since the branch is user-visible (crash fix + two-column layout) and had not bumped the version -- required for the HA Supervisor to offer the update at all. Action taken: `git checkout master` (was already up to date with origin/master at e1552ab), `git merge --no-ff feature/favorites-two-column-layout` -> clean merge (ort strategy, no conflicts) producing 78f3998bd993bbff9a3e3ccbd9693c6d2c7b7018."
+}
