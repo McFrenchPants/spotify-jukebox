@@ -773,3 +773,138 @@ field defensively forever. This is the second time a single unguarded
 Spotify-response field has caused a real production issue (item 15's 502,
 now this full-app crash) — worth a dedicated follow-up rather than folding
 into this already-live-incident-driven fix.
+
+## 24. Replace the constant 4s now-playing poll with event-scheduled polling
+**Status:** done
+**Type:** enhancement
+**Analysis:** [analysis/24-event-scheduled-now-playing-poll.md](analysis/24-event-scheduled-now-playing-poll.md)
+
+The now-playing poller ([nowPlaying.ts](backend/src/spotify/nowPlaying.ts))
+calls Spotify's `currently-playing` endpoint every 4 seconds, continuously,
+regardless of guest activity — the dominant source of Spotify API load per
+[item 22's inventory](analysis/22-spotify-api-call-inventory.md) (~900
+calls/hour). User's proposal, confirmed and scoped: since the frontend
+already interpolates playback progress locally between snapshots
+([NowPlaying.tsx:148-159](frontend/src/components/nowplaying/NowPlaying.tsx:148)),
+the backend doesn't need a fresh poll every 4s just to feed a smooth
+progress bar — replace the flat interval with event-scheduled polling: an
+immediate one-shot poll after this app's own playback actions
+(pause/resume/skip/previous), a one-shot poll scheduled around each
+track's expected end (to catch Spotify auto-advancing), and a 15-second
+safety-net poll for anything else (external/out-of-band changes via a
+device's own controls, drift correction, device-status detection).
+Estimated ~900/hr → ~150-350/hr depending on skip frequency.
+
+Shipped: [nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s
+`startNowPlayingPoller` rewritten from a flat `setInterval(4000)` to
+`setTimeout`-chain scheduling — the next poll fires at whichever is sooner
+of an end-of-track estimate (`duration - progress + 750ms buffer`) or a
+15s safety-net interval, computed fresh after every poll.
+`pollNowPlaying()`'s own logic (track-change detection, play-history/
+leaderboard recording, lyrics lookup, device-status) is unchanged — only
+the scheduling around it changed. A new exported
+`triggerImmediateNowPlayingPoll()` is called (fire-and-forget) from
+[playback.ts](backend/src/routes/playback.ts)'s pause/resume/skip/previous
+routes right after their Spotify call succeeds, so the app's own actions
+get an immediate refresh instead of waiting for the next scheduled tick.
+Implemented on `feature/reduce-nowplaying-polling` (off `master`, not yet
+merged), via two sdlc-tracked tasks (NP1.1 scheduler, NP1.2 route wiring).
+
+## 25. rateLimitBackoff.ts doesn't distinguish QUOTA_EXCEEDED from an ordinary rate limit
+**Status:** done
+**Type:** bug
+
+Follow-up from [analysis/22's "concrete follow-up" section](analysis/22-spotify-api-call-inventory.md#concrete-follow-up-this-unlocks).
+The user's own research against Spotify's docs confirmed 429s split into
+two genuinely different conditions: an ordinary rolling-30s rate limit
+(`Retry-After` header, self-clears in seconds) and a `QUOTA_EXCEEDED`
+condition (Development Mode's broader resource allocation exhausted,
+identified by the 429 response **body**, not headers) — a materially
+longer-lived block. [rateLimitBackoff.ts](backend/src/spotify/rateLimitBackoff.ts)'s
+`recordRateLimitFromResponse()` currently only ever reads the `Retry-After`
+header (or a flat 30s default), so a real `QUOTA_EXCEEDED` block gets the
+same short backoff as an ordinary rate limit — the poller waits ~30s,
+retries, gets `QUOTA_EXCEEDED` again, waits ~30s again, indefinitely, with
+no actual progress and no distinct signal in the logs. This is likely the
+real mechanism behind the "stuck for hours, restarts don't help" symptom
+from this incident, not just an unusually long ordinary rate limit.
+
+**Fix**: extend `recordRateLimitFromResponse()` to accept the already-parsed
+429 response body (each of its three call sites — `nowPlaying.ts`,
+`device.ts`, `tokenRefresh.ts` — either already parses the body or can
+cheaply do so without a double-read conflict) and check for a
+`QUOTA_EXCEEDED` reason (checked at both a top-level `reason` field and a
+nested `error.reason`, since the exact shape isn't independently confirmed
+against this app's own traffic yet). When found, apply a much longer
+backoff than the ordinary 30s default (a named, tunable constant — the
+real reset window isn't known, so this is a documented engineering
+estimate, not confirmed data) and a distinctly worded log line. Also log
+the raw 429 body (truncated) whenever one occurs, regardless of whether
+`QUOTA_EXCEEDED` was recognized, so a real future occurrence can confirm
+Spotify's actual shape empirically rather than guessing again. No change
+to `isRateLimited()`'s existing scope (only gates the automatic poller,
+never on-demand/user-triggered calls, per the file's own stated design).
+
+Shipped: `recordRateLimitFromResponse()` gained a third, optional `body`
+parameter (stays synchronous, never reads the body itself — each of the
+three call sites threads through whatever body they already have/parse,
+avoiding a double-read). `body.reason`/`body.error.reason ===
+'QUOTA_EXCEEDED'` arms a new 1800s (30 min, documented as an engineering
+estimate, not a confirmed reset window) backoff with distinct log wording;
+otherwise the existing Retry-After/30s-default behavior is unchanged, and
+the raw (truncated) body is now logged for evidence toward confirming
+Spotify's actual shape next time this fires for real. Routed through the
+`verifier` agent (touches `tokenRefresh.ts`, Spotify token-handling code)
+— verdict `pass`, no findings. Implemented on
+`feature/reduce-nowplaying-polling` (off `master`, not yet merged).
+
+## 26. Cache GET /api/device so N guests opening the app doesn't mean N Spotify calls
+**Status:** done
+**Type:** enhancement
+
+Follow-up from [analysis/22](analysis/22-spotify-api-call-inventory.md): `GET /api/device`
+([routes/device.ts](backend/src/routes/device.ts) → [device.ts](backend/src/spotify/device.ts)`resolveDevice`)
+is the one endpoint in this app that doesn't follow the poll-once/fan-out
+pattern `CLAUDE.md`'s architecture note calls for — it's called fresh,
+uncached, by every guest's `PlaybackControls` mount (the Now Playing page
+everyone lands on) and every admin's `DeviceSelector` mount, with zero
+rate-limit gating (on-demand calls are deliberately ungated, per
+`rateLimitBackoff.ts`'s own design). N guests opening the app in a short
+window means N real, simultaneous `GET /v1/me/player/devices` calls.
+
+**Real correctness constraint a naive TTL cache would break**:
+`DeviceSelector` re-fetches `GET /api/device` specifically on the
+`device-status` SSE event, so an admin sees a bridge-device online/offline
+flip live rather than only on next reload
+([DeviceSelector.tsx](frontend/src/components/admin/DeviceSelector.tsx)).
+A cache with only a TTL (no invalidation) would silently serve stale data
+right when that live refresh matters most.
+
+**Fix**: add a small, dedicated device-resolution cache in
+[device.ts](backend/src/spotify/device.ts) (separate from `cache.ts`'s
+existing generic `withCache` — deliberately, since this needs explicit
+invalidation, not just TTL expiry, which `cache.ts`'s own docs say isn't
+worth the complexity for its existing search/track/artist use cases): a
+short TTL (~10s) covers the burst-of-simultaneous-guests case, and an
+explicit `invalidateDeviceResolutionCache()` call — wired into
+[nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s existing
+`device-status`-change detection (both `updateDeviceStatusFromDeviceField`
+and `checkDeviceStatusFallback`) and into `POST /api/device/select`'s
+success path — keeps it correctly fresh exactly when the underlying state
+actually changes. `POST /device/select` itself keeps calling `listDevices()`
+directly, uncached, unchanged — it already explicitly re-fetches live on
+purpose ("the admin must be selecting from what's currently visible").
+
+Shipped: `getCachedDeviceResolution()` (10s TTL) added to
+[device.ts](backend/src/spotify/device.ts), wrapping `resolveDevice()` for
+`GET /api/device` only. `POST /device/select` still calls `listDevices()`
+directly, unchanged, plus now calls the new `invalidateDeviceResolutionCache()`
+on success. That same invalidation is wired into
+[nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s existing
+`device-status`-change detection (both `updateDeviceStatusFromDeviceField`
+and `checkDeviceStatusFallback`), so `DeviceSelector.tsx`'s live
+device-status refresh still sees fresh data immediately rather than a
+stale cached result. `resolveDevice()`/`listDevices()` themselves
+untouched. Implemented on `feature/reduce-nowplaying-polling` (off
+`master`, not yet merged) — completes the full set of three fixes from
+this incident's investigation (items 24, 25, 26).

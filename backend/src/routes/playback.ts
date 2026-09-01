@@ -9,6 +9,7 @@ import { PlaybackCapability, resolveEffectivePermission } from "../guardrails/pl
 import { ADMIN_TOKEN_HEADER } from "../middleware/adminAuth";
 import { pausePlayback, resumePlayback, setVolume, skipToNext, skipToPrevious } from "../spotify/playback";
 import { classifySpotifyAuthError } from "../spotify/errors";
+import { triggerImmediateNowPlayingPoll } from "../spotify/nowPlaying";
 
 export const playbackRouter = Router();
 
@@ -53,6 +54,24 @@ function checkTrustModeGate(req: { get(name: string): string | undefined }, res:
   return true;
 }
 
+/**
+ * Fire-and-forget kickoff of an immediate now-playing poll (BACKLOG.md #24),
+ * called after a playback-control route's underlying Spotify call succeeds.
+ * Never awaited by the caller — the guest's own HTTP response must not wait
+ * on an extra Spotify round-trip; the poll's result reaches clients via the
+ * existing now-playing SSE event separately. triggerImmediateNowPlayingPoll()
+ * already catches/logs any failure internally, so the try/catch here is
+ * purely defensive against an unexpected synchronous throw.
+ */
+function triggerNowPlayingPollFireAndForget(): void {
+  try {
+    void triggerImmediateNowPlayingPoll();
+  } catch {
+    // Defensive only — triggerImmediateNowPlayingPoll() is not expected to
+    // throw synchronously; see doc comment above.
+  }
+}
+
 /** Reads the resolved Spotify device id, or writes a 503 and returns null if none is set yet. */
 function requireDeviceId(res: Response): string | null {
   const deviceId = getSetting("spotify_device_id");
@@ -79,6 +98,7 @@ playbackRouter.post("/pause", async (req, res) => {
     return;
   }
 
+  triggerNowPlayingPollFireAndForget();
   res.status(200).json({ status: "ok" });
 });
 
@@ -95,6 +115,7 @@ playbackRouter.post("/resume", async (req, res) => {
     return;
   }
 
+  triggerNowPlayingPollFireAndForget();
   res.status(200).json({ status: "ok" });
 });
 
@@ -111,6 +132,7 @@ playbackRouter.post("/skip", async (req, res) => {
     return;
   }
 
+  triggerNowPlayingPollFireAndForget();
   res.status(200).json({ status: "ok" });
 });
 
@@ -127,6 +149,7 @@ playbackRouter.post("/previous", async (req, res) => {
     return;
   }
 
+  triggerNowPlayingPollFireAndForget();
   res.status(200).json({ status: "ok" });
 });
 

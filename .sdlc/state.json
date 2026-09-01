@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "updated_at": "2026-09-01T12:48:15Z",
+  "updated_at": "2026-09-01T15:00:00Z",
   "work_items": [
     {
       "id": "sdlc-supervisor-testbed",
@@ -336,6 +336,87 @@
           "task_packet_path": ".sdlc/task-packets/B23.1.packet.json",
           "report_path": null,
           "notes": "Live incident reported by the user 2026-09-01: deployed app (v1.0.24) went black with a TypeError matching this exact unguarded field, alongside item 22's real rate-limit 503. Jumped the F11.1/SS6.1 queue since it's a live-affecting bug the user asked to fix now. See BACKLOG.md #23 for full root-cause writeup. Fixed: client.ts's genres ?? [] guard + optional type, ArtistInfoPanel.tsx's genres?.length/followers?.toLocaleString() guards, new regression test mirroring item 15's pattern. Orchestrator independently reread the diff (confined to exactly the 3 intended files) and independently reran backend tsc/vitest (388/388) and frontend tsc -- all clean. Implementer flagged one pre-existing, unrelated flaky test (adminAuth.test.ts's tampered-token case) on its first run; reran alone (4/4) and reran the full suite (388/388) and it did not reproduce, confirming it's not caused by this change. Not yet deployed -- this only fixes the source, the live add-on still needs a rebuild+redeploy to actually clear the black screen for guests, which is a supervisor-only operation requiring explicit user go-ahead."
+        }
+      ]
+    },
+    {
+      "id": "reduce-nowplaying-polling",
+      "title": "BACKLOG.md #24: event-scheduled now-playing polling (reduce Spotify API load)",
+      "lifecycle_state": "released",
+      "tasks": [
+        {
+          "id": "NP1.1",
+          "title": "Rewrite now-playing poll scheduling: own-action + end-of-track + 15s safety net",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/NP1.1.packet.json",
+          "report_path": null,
+          "notes": "See analysis/24-event-scheduled-now-playing-poll.md for full design. startNowPlayingPoller rewritten to event-scheduled setTimeout chains (SAFETY_INTERVAL_MS=15000, END_OF_TRACK_POLL_BUFFER_MS=750); pollNowPlaying()'s own body genuinely unchanged (verified via diff -- new code starts right after its closing brace). Added exported triggerImmediateNowPlayingPoll() for NP1.2 to wire in. Handle type changed NodeJS.Timeout -> NowPlayingPollerHandle; index.ts unaffected (calls startNowPlayingPoller() with no args, never touches the return value). Orchestrator independently verified: diff confined to exactly nowPlaying.ts + nowPlaying.test.ts, reran backend tsc (clean) and vitest (395/395, up from 388 pre-task)."
+        },
+        {
+          "id": "NP1.2",
+          "title": "Wire own-action fast-path poll trigger into playback.ts routes",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": ["NP1.1"],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/NP1.2.packet.json",
+          "report_path": null,
+          "notes": "pause/resume/skip/previous routes in playback.ts each call a new triggerNowPlayingPollFireAndForget() helper (wraps triggerImmediateNowPlayingPoll(), fire-and-forget, defensive try/catch) right before their 200 response, after the underlying Spotify call succeeds. volume/jukebox-volume-report untouched. New resume/skip test describe blocks added (previously untested routes) plus trigger-call assertions on all four. Implementer's first full-suite run showed 50 unrelated failures (queueSync.test.ts, routes/nowPlaying.test.ts, routes/queue.test.ts -- runMigrations/server.close errors); confirmed via git-stash isolation as pre-existing full-suite flakiness, not caused by this change. Orchestrator independently reran and confirmed: diff confined to exactly playback.ts + playback.test.ts, backend tsc clean, vitest 403/403 clean on a fresh full run (no flake reproduced)."
+        }
+      ]
+    },
+    {
+      "id": "quota-exceeded-detection",
+      "title": "BACKLOG.md #25: distinguish QUOTA_EXCEEDED from an ordinary rate limit",
+      "lifecycle_state": "released",
+      "tasks": [
+        {
+          "id": "Q1.1",
+          "title": "Detect QUOTA_EXCEEDED in 429 response bodies, apply a longer distinct backoff",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/Q1.1.packet.json",
+          "report_path": null,
+          "notes": "See BACKLOG.md #25 and analysis/22-spotify-api-call-inventory.md's 'concrete follow-up' section. Continued on feature/reduce-nowplaying-polling rather than a fresh branch off master -- deliberate choice, this task touches nowPlaying.ts (already modified by NP1.1/NP1.2 on this branch) and both are part of the same Spotify-rate-limit-incident response. recordRateLimitFromResponse() gained a third optional `body` param (stays synchronous, never reads the body itself); checks body.reason / body.error.reason for QUOTA_EXCEEDED, arms a 1800s backoff with distinct log wording when found, else logs the raw truncated body for future evidence. All three call sites (tokenRefresh.ts, device.ts, nowPlaying.ts) thread their already-parsed body through without a double-read (device.ts reordered, verified via a json-spy call-count test). Touches Spotify token-handling code (tokenRefresh.ts) -- routed through the verifier agent per project.yaml's widen tier rather than an orchestrator spot-check alone. Verifier verdict: PASS, all 8 acceptance criteria met, no forbidden-path violations, both architectural invariants (no token-seeding touched, poller-only gating scope unchanged) confirmed compliant, no findings of substance. Orchestrator independently reran backend tsc/vitest (412/412 clean) before handing to the verifier."
+        }
+      ]
+    },
+    {
+      "id": "device-endpoint-caching",
+      "title": "BACKLOG.md #26: cache GET /api/device with device-status-driven invalidation",
+      "lifecycle_state": "released",
+      "tasks": [
+        {
+          "id": "D1.1",
+          "title": "Add device-resolution cache to device.ts with TTL + invalidation hooks",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/D1.1.packet.json",
+          "report_path": null,
+          "notes": "See BACKLOG.md #26. Continued on feature/reduce-nowplaying-polling -- same Spotify-load-reduction initiative, touches nowPlaying.ts already modified on this branch. Separate cache from cache.ts's generic withCache (needs explicit invalidation, not just TTL). getCachedDeviceResolution() (10s TTL) wraps resolveDevice() for GET /api/device; POST /select keeps calling listDevices() directly unchanged, plus invalidates on success; nowPlaying.ts's device-status-change detection (both updateDeviceStatusFromDeviceField and checkDeviceStatusFallback) invalidates on actual flips. resolveDevice()/listDevices() themselves untouched (verified via diff). Orchestrator independently verified: diff confined to exactly the 6 intended files (device.ts x2, device.test.ts x2, nowPlaying.ts, nowPlaying.test.ts), reran backend tsc (clean) and vitest (417/417 clean)."
         }
       ]
     }

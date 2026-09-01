@@ -3,8 +3,9 @@ import { Server } from "http";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../spotify/device", () => ({
-  resolveDevice: vi.fn(),
   listDevices: vi.fn(),
+  getCachedDeviceResolution: vi.fn(),
+  invalidateDeviceResolutionCache: vi.fn(),
 }));
 
 vi.mock("../db", async () => {
@@ -12,7 +13,7 @@ vi.mock("../db", async () => {
   return { ...actual, setSetting: vi.fn(actual.setSetting) };
 });
 
-import { listDevices, resolveDevice } from "../spotify/device";
+import { getCachedDeviceResolution, invalidateDeviceResolutionCache, listDevices } from "../spotify/device";
 import { runMigrations, setSetting } from "../db";
 import { issueAdminToken } from "../auth/adminToken";
 import { createApp } from "../app";
@@ -59,7 +60,7 @@ afterEach(async () => {
 
 describe("GET /api/device", () => {
   it("returns the resolved device and full device list", async () => {
-    vi.mocked(resolveDevice).mockResolvedValue({ resolved: DEVICE_A, devices: [DEVICE_A, DEVICE_B] });
+    vi.mocked(getCachedDeviceResolution).mockResolvedValue({ resolved: DEVICE_A, devices: [DEVICE_A, DEVICE_B] });
 
     const res = await fetch(`${baseUrl}/api/device`);
     const body = (await res.json()) as any;
@@ -69,7 +70,7 @@ describe("GET /api/device", () => {
   });
 
   it("returns resolved: null when ambiguous", async () => {
-    vi.mocked(resolveDevice).mockResolvedValue({ resolved: null, devices: [DEVICE_A, DEVICE_B] });
+    vi.mocked(getCachedDeviceResolution).mockResolvedValue({ resolved: null, devices: [DEVICE_A, DEVICE_B] });
 
     const res = await fetch(`${baseUrl}/api/device`);
     const body = (await res.json()) as any;
@@ -79,7 +80,7 @@ describe("GET /api/device", () => {
   });
 
   it("returns 503 with a clear message when Spotify hasn't been connected yet", async () => {
-    vi.mocked(resolveDevice).mockRejectedValue(
+    vi.mocked(getCachedDeviceResolution).mockRejectedValue(
       new Error("No spotify_refresh_token stored yet — skip refresh until consent is completed.")
     );
 
@@ -91,7 +92,7 @@ describe("GET /api/device", () => {
   });
 
   it("returns 502 when the Spotify device lookup fails", async () => {
-    vi.mocked(resolveDevice).mockRejectedValue(new Error("Spotify device list failed: 500"));
+    vi.mocked(getCachedDeviceResolution).mockRejectedValue(new Error("Spotify device list failed: 500"));
 
     const res = await fetch(`${baseUrl}/api/device`);
     const body = (await res.json()) as any;
@@ -102,7 +103,7 @@ describe("GET /api/device", () => {
 
   it("returns 503 spotify_reauth_required when the stored refresh token is dead (invalid_grant)", async () => {
     const { SpotifyReauthRequiredError } = await import("../spotify/errors");
-    vi.mocked(resolveDevice).mockRejectedValue(
+    vi.mocked(getCachedDeviceResolution).mockRejectedValue(
       new SpotifyReauthRequiredError("Spotify token refresh failed: invalid_grant Refresh token revoked")
     );
 
@@ -116,7 +117,7 @@ describe("GET /api/device", () => {
 
   it("returns 503 spotify_rate_limited with a friendly message when Spotify 429s the device list, instead of a raw 502", async () => {
     const { SpotifyRateLimitedError } = await import("../spotify/errors");
-    vi.mocked(resolveDevice).mockRejectedValue(
+    vi.mocked(getCachedDeviceResolution).mockRejectedValue(
       new SpotifyRateLimitedError("Spotify device list failed: 429 Too many requests")
     );
 
@@ -155,6 +156,21 @@ describe("POST /api/device/select", () => {
     expect(res.status).toBe(200);
     expect(body).toEqual(DEVICE_B);
     expect(setSetting).toHaveBeenCalledWith("spotify_device_id", "device-b");
+    expect(invalidateDeviceResolutionCache).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not invalidate the cache when the selection fails (device not found)", async () => {
+    vi.mocked(listDevices).mockResolvedValue([DEVICE_A]);
+    const { token } = issueAdminToken();
+
+    const res = await fetch(`${baseUrl}/api/device/select`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", [ADMIN_TOKEN_HEADER]: token },
+      body: JSON.stringify({ deviceId: "not-visible" }),
+    });
+
+    expect(res.status).toBe(400);
+    expect(invalidateDeviceResolutionCache).not.toHaveBeenCalled();
   });
 
   it("returns 400 and does not persist when the id isn't in the current device list", async () => {

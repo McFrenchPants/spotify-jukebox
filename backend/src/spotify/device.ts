@@ -49,16 +49,10 @@ export async function listDevices(
   });
 
   if (!response.ok) {
-    // Arms the automatic pollers' backoff window (see rateLimitBackoff.ts)
-    // on a 429 — this call still throws below either way, so the immediate
-    // caller (an admin's manual retry, or the poller itself) still gets a
-    // real, honest error; this just stops the *automatic* pollers from
-    // continuing to hammer Spotify while the window is active.
-    const wasRateLimited = recordRateLimitFromResponse(response, "device list");
-
     let message = `${response.status}`;
+    let errBody: { error?: { message?: string } } | undefined;
     try {
-      const errBody = (await response.json()) as {
+      errBody = (await response.json()) as {
         error?: { message?: string };
       };
       if (errBody.error?.message) {
@@ -66,7 +60,15 @@ export async function listDevices(
       }
     } catch {
       // Ignore JSON parse failures on the error body; fall back to status.
+      errBody = undefined;
     }
+
+    // Arms the automatic pollers' backoff window (see rateLimitBackoff.ts)
+    // on a 429 — this call still throws below either way, so the immediate
+    // caller (an admin's manual retry, or the poller itself) still gets a
+    // real, honest error; this just stops the *automatic* pollers from
+    // continuing to hammer Spotify while the window is active.
+    const wasRateLimited = recordRateLimitFromResponse(response, "device list", errBody);
 
     if (wasRateLimited) {
       // A dedicated error type so classifySpotifyAuthError() (errors.ts) can
@@ -131,4 +133,50 @@ export async function resolveDevice(
   }
 
   return { resolved: null, devices };
+}
+
+/**
+ * How long a resolved device lookup is served from cache before
+ * getCachedDeviceResolution() falls back to a real resolveDevice() call
+ * again. Deliberately short — this exists purely to collapse N guests
+ * opening the app in a short window into one real Spotify call, not to
+ * paper over real staleness; invalidateDeviceResolutionCache() (called from
+ * POST /select and from nowPlaying.ts's device-status-change detection)
+ * handles the cases where staleness would actually matter.
+ */
+const DEVICE_RESOLUTION_CACHE_TTL_MS = 10_000;
+
+let cachedResolution: { value: DeviceResolution; expiresAt: number } | null = null;
+
+/**
+ * Cached wrapper around resolveDevice(), used by GET /api/device so that N
+ * guests opening the app within a short window collapse into a single real
+ * Spotify device-list call rather than N simultaneous ones. Not used by
+ * POST /select, which intentionally always re-fetches live (see its own
+ * comment).
+ */
+export async function getCachedDeviceResolution(
+  fetchFn: typeof fetch = fetch,
+  getTokenFn: () => Promise<string> = getValidAccessToken
+): Promise<DeviceResolution> {
+  const now = Date.now();
+  if (cachedResolution && cachedResolution.expiresAt > now) {
+    return cachedResolution.value;
+  }
+
+  const value = await resolveDevice(fetchFn, getTokenFn);
+  cachedResolution = { value, expiresAt: now + DEVICE_RESOLUTION_CACHE_TTL_MS };
+  return value;
+}
+
+/**
+ * Clears the cached device resolution so the next getCachedDeviceResolution()
+ * call is forced to re-resolve live. Called after a device selection changes
+ * (POST /select) and whenever nowPlaying.ts's device-status monitoring
+ * detects an actual online/offline flip — both cases where serving the
+ * stale cached result for up to DEVICE_RESOLUTION_CACHE_TTL_MS would be
+ * wrong.
+ */
+export function invalidateDeviceResolutionCache(): void {
+  cachedResolution = null;
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const settings = new Map<string, string>();
 
@@ -10,7 +10,7 @@ vi.mock("../db", () => ({
 }));
 
 import { getSetting, setSetting } from "../db";
-import { listDevices, resolveDevice } from "./device";
+import { getCachedDeviceResolution, invalidateDeviceResolutionCache, listDevices, resolveDevice } from "./device";
 import { SpotifyRateLimitedError } from "./errors";
 import { isRateLimited, resetRateLimitForTests } from "./rateLimitBackoff";
 
@@ -122,6 +122,21 @@ describe("listDevices", () => {
 
     await expect(listDevices(fetchMock, getTokenFn)).rejects.toBeInstanceOf(SpotifyRateLimitedError);
   });
+
+  it("threads the parsed 429 body's QUOTA_EXCEEDED reason through to the shared backoff as a long window, reading the body exactly once", async () => {
+    const response = jsonResponse(
+      { error: { status: 429, reason: "QUOTA_EXCEEDED", message: "quota exceeded" } },
+      false,
+      429
+    );
+    const jsonSpy = vi.spyOn(response, "json");
+    const fetchMock = vi.fn().mockResolvedValue(response);
+    const getTokenFn = vi.fn().mockResolvedValue("test-token");
+
+    await expect(listDevices(fetchMock, getTokenFn)).rejects.toBeInstanceOf(SpotifyRateLimitedError);
+    expect(isRateLimited()).toBe(true);
+    expect(jsonSpy).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("resolveDevice", () => {
@@ -186,5 +201,80 @@ describe("resolveDevice", () => {
     expect(result.resolved).toBeNull();
     expect(result.devices).toEqual([]);
     expect(setSetting).not.toHaveBeenCalled();
+  });
+});
+
+describe("getCachedDeviceResolution / invalidateDeviceResolutionCache", () => {
+  beforeEach(() => {
+    settings.clear();
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+    invalidateDeviceResolutionCache();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    invalidateDeviceResolutionCache();
+  });
+
+  it("only calls resolveDevice (via fetchFn) once for repeated calls within the TTL window", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ devices: [DEVICE_A, DEVICE_B] }));
+    const getTokenFn = vi.fn().mockResolvedValue("test-token");
+
+    const first = await getCachedDeviceResolution(fetchMock, getTokenFn);
+    const second = await getCachedDeviceResolution(fetchMock, getTokenFn);
+    const third = await getCachedDeviceResolution(fetchMock, getTokenFn);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(first).toEqual(second);
+    expect(second).toEqual(third);
+  });
+
+  it("re-resolves once the TTL expires", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ devices: [DEVICE_A, DEVICE_B] }));
+    const getTokenFn = vi.fn().mockResolvedValue("test-token");
+
+    await getCachedDeviceResolution(fetchMock, getTokenFn);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    vi.advanceTimersByTime(10_001);
+
+    await getCachedDeviceResolution(fetchMock, getTokenFn);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns fresh (not stale-cached) data on a GET-then-select-then-GET sequence, even within the TTL window (mirrors routes/device.ts's real flow)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ devices: [DEVICE_A, DEVICE_B] }))
+      .mockResolvedValueOnce(jsonResponse({ devices: [DEVICE_A, DEVICE_B] })) // POST /select's own listDevices() re-fetch
+      .mockResolvedValue(jsonResponse({ devices: [DEVICE_A, DEVICE_B] }));
+    const getTokenFn = vi.fn().mockResolvedValue("test-token");
+
+    // First GET: ambiguous (no prior selection, two devices) -> resolved: null, cached.
+    const firstGet = await getCachedDeviceResolution(fetchMock, getTokenFn);
+    expect(firstGet.resolved).toBeNull();
+
+    // POST /select equivalent: real listDevices() call + invalidate, well within the TTL window.
+    await listDevices(fetchMock, getTokenFn);
+    setSetting("spotify_device_id", "device-b");
+    invalidateDeviceResolutionCache();
+
+    // Second GET, still within the TTL window: must reflect the new selection, not the cached null.
+    const secondGet = await getCachedDeviceResolution(fetchMock, getTokenFn);
+    expect(secondGet.resolved).toEqual(DEVICE_B);
+  });
+
+  it("re-resolves immediately after invalidateDeviceResolutionCache(), even within the TTL window", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ devices: [DEVICE_A, DEVICE_B] }));
+    const getTokenFn = vi.fn().mockResolvedValue("test-token");
+
+    await getCachedDeviceResolution(fetchMock, getTokenFn);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    invalidateDeviceResolutionCache();
+
+    await getCachedDeviceResolution(fetchMock, getTokenFn);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

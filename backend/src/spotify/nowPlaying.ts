@@ -4,7 +4,7 @@ import { recordTrackPlay } from "../db/trackStats";
 import { emitEvent } from "../events/bus";
 import { evictPreviousTrackLyrics, getLyricsForTrack, type LyricsResult } from "../lyrics/lyricsService";
 import { getValidAccessToken } from "./client";
-import { listDevices } from "./device";
+import { invalidateDeviceResolutionCache, listDevices } from "./device";
 import { getSetting } from "../db";
 import { SpotifyRateLimitedError, SpotifyReauthRequiredError } from "./errors";
 import { isRateLimited, recordRateLimitFromResponse } from "./rateLimitBackoff";
@@ -12,8 +12,24 @@ import { logError, logInfo } from "../logger";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
-/** Default poll interval: 4 seconds (within the 3-5s target range). */
-export const DEFAULT_POLL_INTERVAL_MS = 4000;
+/**
+ * Low-frequency safety-net poll interval (BACKLOG.md #24 / see
+ * analysis/24-event-scheduled-now-playing-poll.md). Always the outer bound
+ * on how long the poller will wait before checking again, regardless of
+ * what else is scheduled — catches out-of-band playback changes (a
+ * hardware remote, another Spotify client, the bridge device's own
+ * controls), general drift, and keeps device online/offline detection
+ * alive (it piggybacks on every poll's `device` field).
+ */
+export const SAFETY_INTERVAL_MS = 15000;
+
+/**
+ * Small buffer added on top of the computed "time until this track ends"
+ * delay, so the end-of-track poll fires slightly after Spotify's own
+ * server-side transition rather than a hair before it (which would just
+ * see the same track still playing and have to wait for the next trigger).
+ */
+const END_OF_TRACK_POLL_BUFFER_MS = 750;
 
 export interface NowPlayingState {
   isPlaying: boolean;
@@ -173,6 +189,7 @@ function updateDeviceStatusFromDeviceField(device: { id: string; name: string })
   lastDeviceOnline = online;
 
   if (changed) {
+    invalidateDeviceResolutionCache();
     emitEvent("device-status", {
       online,
       deviceId,
@@ -227,6 +244,7 @@ async function checkDeviceStatusFallback(fetchFn: typeof fetch, accessToken: str
   lastDeviceOnline = online;
 
   if (changed) {
+    invalidateDeviceResolutionCache();
     emitEvent("device-status", {
       online,
       deviceId,
@@ -304,7 +322,14 @@ export async function pollNowPlaying(
     // lets a device-list failure abort this poll).
     await checkDeviceStatusFallback(fetchFn, accessToken);
   } else if (!response.ok) {
-    if (recordRateLimitFromResponse(response, "nowPlaying poll")) {
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      // Not JSON (or empty body) — leave body undefined, ordinary
+      // rate-limit handling still works without it.
+    }
+    if (recordRateLimitFromResponse(response, "nowPlaying poll", body)) {
       // Arms the backoff window so the next tick skips outright instead of
       // immediately re-triggering the same 429 — see rateLimitBackoff.ts.
       // Not an error worth logging every tick; the poller will just resume
@@ -408,62 +433,171 @@ export async function pollNowPlaying(
 }
 
 /**
- * Starts a background interval that polls Spotify's currently-playing
- * endpoint every `intervalMs` (default 4s) and emits a `now-playing` event
- * on the event bus when the track or play/pause state changes.
+ * A running poller "session" — the mutable bits that need to survive
+ * across scheduled polls (which fetchFn/getTokenFn to keep using, the
+ * pending timer handle, and the consecutive-failure counter). Opaque to
+ * callers; treat the return value of startNowPlayingPoller as a handle to
+ * pass to stopNowPlayingPoller and nothing else.
+ */
+export interface NowPlayingPollerHandle {
+  fetchFn: typeof fetch;
+  getTokenFn: () => Promise<string>;
+  timer: ReturnType<typeof setTimeout> | null;
+  consecutiveFailures: number;
+  stopped: boolean;
+}
+
+/**
+ * The currently-running poller, if any, started via startNowPlayingPoller.
+ * Module-level so triggerImmediateNowPlayingPoll() — called from outside
+ * this file, with no context of its own — can find it. There is only ever
+ * meant to be one real poller running per process (matches how
+ * index.ts uses this today: a single startNowPlayingPoller() call at
+ * startup).
+ */
+let activePoller: NowPlayingPollerHandle | null = null;
+
+/**
+ * Computes the delay (ms) until the next automatic poll should fire, given
+ * the most recently observed state: whichever is sooner of "estimated time
+ * until the current track ends" (plus a small buffer) and the safety-net
+ * interval. When nothing is playing, or duration/progress aren't known,
+ * there's no end-of-track estimate to compute against — only the safety
+ * interval applies.
+ */
+function computeNextPollDelayMs(state: NowPlayingState): number {
+  if (
+    state.isPlaying &&
+    typeof state.durationMs === "number" &&
+    typeof state.progressMs === "number"
+  ) {
+    const remainingMs = state.durationMs - state.progressMs + END_OF_TRACK_POLL_BUFFER_MS;
+    return Math.max(0, Math.min(remainingMs, SAFETY_INTERVAL_MS));
+  }
+  return SAFETY_INTERVAL_MS;
+}
+
+/**
+ * Runs one poll for `poller`, then (unless it's been stopped in the
+ * meantime) schedules the next one based on the freshly observed state.
+ * Shared by both the automatic timer chain and triggerImmediateNowPlayingPoll,
+ * so every trigger reschedules consistently and never leaves a stale timer
+ * behind.
+ */
+async function runPollAndReschedule(poller: NowPlayingPollerHandle): Promise<void> {
+  try {
+    await pollNowPlaying(poller.fetchFn, poller.getTokenFn);
+    if (poller.consecutiveFailures > 0) {
+      logInfo(
+        "nowPlaying",
+        `Poll recovered after ${poller.consecutiveFailures} consecutive failure(s)`
+      );
+      poller.consecutiveFailures = 0;
+    }
+  } catch (err) {
+    poller.consecutiveFailures += 1;
+    // Log the first failure in a streak in full, then only every 15th
+    // after that — enough to confirm it's still failing and see the cause,
+    // without flooding the log with identical lines.
+    if (poller.consecutiveFailures === 1 || poller.consecutiveFailures % 15 === 0) {
+      logError(
+        "nowPlaying",
+        `Spotify currently-playing poll failed (${poller.consecutiveFailures} consecutive failure(s) so far)`,
+        err
+      );
+    }
+  } finally {
+    if (!poller.stopped) {
+      scheduleNextPoll(poller);
+    }
+  }
+}
+
+/**
+ * Clears any pending timer on `poller` and schedules the next automatic
+ * poll based on the current now-playing state (see computeNextPollDelayMs).
+ */
+function scheduleNextPoll(poller: NowPlayingPollerHandle): void {
+  if (poller.timer) {
+    clearTimeout(poller.timer);
+    poller.timer = null;
+  }
+
+  const delay = computeNextPollDelayMs(lastState);
+  const timer = setTimeout(() => {
+    void runPollAndReschedule(poller);
+  }, delay);
+  // Don't let this timer keep the process alive on its own.
+  timer.unref?.();
+  poller.timer = timer;
+}
+
+/**
+ * Starts event-scheduled polling of Spotify's currently-playing endpoint
+ * (BACKLOG.md #24 / analysis/24-event-scheduled-now-playing-poll.md),
+ * replacing the old flat interval. After each poll, the next one is
+ * scheduled at whichever is sooner: an estimate of when the currently
+ * playing track will end, or the SAFETY_INTERVAL_MS (15s) safety net.
+ * Callers outside this file can also request an immediate one-shot poll at
+ * any time via triggerImmediateNowPlayingPoll(), which reschedules from
+ * that fresh result the same way.
  *
  * Errors from individual polls are caught and logged so a single failure
  * doesn't crash the process or stop future polls.
  */
 export function startNowPlayingPoller(
-  intervalMs: number = DEFAULT_POLL_INTERVAL_MS,
   fetchFn: typeof fetch = fetch,
   getTokenFn: () => Promise<string> = getValidAccessToken
-): NodeJS.Timeout {
-  // Tracks a run of consecutive poll failures (e.g. the container losing
-  // outbound network access, not just an HTTP-level Spotify error — those
-  // are already handled/silenced inside pollNowPlaying itself) so a
-  // sustained outage logs one detailed entry plus periodic reminders,
-  // instead of one near-identical `fetch failed` line per tick for as long
-  // as the outage lasts (a real incident produced dozens of these with no
-  // timestamp and no indication of the underlying cause — see BACKLOG.md
-  // item 21).
-  let consecutiveFailures = 0;
+): NowPlayingPollerHandle {
+  const poller: NowPlayingPollerHandle = {
+    fetchFn,
+    getTokenFn,
+    timer: null,
+    consecutiveFailures: 0,
+    stopped: false,
+  };
 
-  const timer = setInterval(() => {
-    pollNowPlaying(fetchFn, getTokenFn)
-      .then(() => {
-        if (consecutiveFailures > 0) {
-          logInfo(
-            "nowPlaying",
-            `Poll recovered after ${consecutiveFailures} consecutive failure(s)`
-          );
-          consecutiveFailures = 0;
-        }
-      })
-      .catch((err) => {
-        consecutiveFailures += 1;
-        // Log the first failure in a streak in full, then only every 15th
-        // after that (~once/minute at the default 4s interval) — enough to
-        // confirm it's still failing and see the cause, without flooding
-        // the log with identical lines.
-        if (consecutiveFailures === 1 || consecutiveFailures % 15 === 0) {
-          logError(
-            "nowPlaying",
-            `Spotify currently-playing poll failed (${consecutiveFailures} consecutive failure(s) so far)`,
-            err
-          );
-        }
-      });
-  }, intervalMs);
+  activePoller = poller;
+  scheduleNextPoll(poller);
 
-  // Don't let this interval keep the process alive on its own.
-  timer.unref?.();
-
-  return timer;
+  return poller;
 }
 
-/** Stops a poller previously started with startNowPlayingPoller. */
-export function stopNowPlayingPoller(timer: NodeJS.Timeout): void {
-  clearInterval(timer);
+/**
+ * Stops a poller previously started with startNowPlayingPoller — cancels
+ * any pending scheduled timer (safety-net or end-of-track) and prevents
+ * any in-flight poll's completion from scheduling another one.
+ */
+export function stopNowPlayingPoller(poller: NowPlayingPollerHandle): void {
+  poller.stopped = true;
+  if (poller.timer) {
+    clearTimeout(poller.timer);
+    poller.timer = null;
+  }
+  if (activePoller === poller) {
+    activePoller = null;
+  }
+}
+
+/**
+ * Triggers an immediate one-shot poll on the currently-running poller
+ * (started via startNowPlayingPoller), cancelling whatever timer was
+ * pending and rescheduling from the fresh result once it completes —
+ * so a caller (e.g. a playback route, after its own pause/resume/skip/
+ * previous call succeeds) never leaves a stale duplicate timer running or
+ * causes a double-poll race with the next automatically scheduled one.
+ *
+ * A no-op if no poller is currently running (e.g. in a test that never
+ * called startNowPlayingPoller).
+ */
+export async function triggerImmediateNowPlayingPoll(): Promise<void> {
+  const poller = activePoller;
+  if (!poller) {
+    return;
+  }
+  if (poller.timer) {
+    clearTimeout(poller.timer);
+    poller.timer = null;
+  }
+  await runPollAndReschedule(poller);
 }

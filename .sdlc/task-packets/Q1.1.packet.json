@@ -1,0 +1,62 @@
+{
+  "task_id": "Q1.1",
+  "plan_revision": "uncommitted:2026-09-01T00:00:00Z",
+  "objective": "Extend backend/src/spotify/rateLimitBackoff.ts's recordRateLimitFromResponse() to distinguish Spotify's QUOTA_EXCEEDED condition from an ordinary rolling-30s rate limit (BACKLOG.md #25, see analysis/22-spotify-api-call-inventory.md's 'concrete follow-up' section for the full research). Spotify's 429s split into two conditions: an ordinary rate limit (Retry-After header, self-clears in seconds -- already handled) and QUOTA_EXCEEDED (Development Mode's broader resource allocation exhausted, identified by a `reason` field in the 429 response BODY, not headers -- currently completely unhandled, so it gets treated identically to a short rate limit and the poller keeps re-triggering it every ~30s indefinitely with no progress). DESIGN (avoids body-double-read conflicts across the three real call sites, each of which handles its response body differently today): change recordRateLimitFromResponse()'s signature to accept a third, optional parameter for the already-parsed response body (`body?: unknown`) -- it stays synchronous, it does NOT read/await the response body itself. Add a helper that checks for a QUOTA_EXCEEDED reason at both a top-level `body.reason` field and a nested `body.error.reason` field (the exact real shape isn't confirmed against this app's own traffic yet -- check defensively for both, don't assume one). When status is 429 and either check finds `'QUOTA_EXCEEDED'`, arm the backoff window for a new, longer, named constant (QUOTA_EXCEEDED_BACKOFF_SECONDS -- use 1800 (30 minutes) as the value; document in a comment that this is an engineering estimate, not a confirmed reset window, since that's genuinely not known yet) instead of the existing Retry-After/30s-default logic, and log a distinctly-worded warning (something like '<source> hit Spotify QUOTA_EXCEEDED -- backing off for Ns (no confirmed reset window known, see BACKLOG.md #25)') rather than the existing ordinary-rate-limit wording. When status is 429 but no QUOTA_EXCEEDED reason is found, keep the existing Retry-After/30s-default behavior exactly as it is today, but ALSO log the raw body (JSON.stringify'd, truncated to a reasonable length e.g. 500 chars, wrapped in a try/catch in case body isn't stringifiable) at the same warn level whenever body is non-null/non-undefined, so a real future 429 builds an evidence trail of Spotify's actual response shape rather than guessing again. Then update each of the three real call sites to pass in the body they already have or can cheaply obtain, WITHOUT causing a double-read of the response body (each site's existing body-handling order differs -- read the actual current code in each file before changing it): (1) backend/src/spotify/tokenRefresh.ts's refreshAccessToken() already parses `const tokenData = (await response.json())` BEFORE its existing recordRateLimitFromResponse(response, \"token refresh\") call -- just pass `tokenData` as the third argument, no reordering needed. (2) backend/src/spotify/device.ts's listDevices() currently calls recordRateLimitFromResponse(response, \"device list\") BEFORE it parses `errBody` via `await response.json()` a few lines later -- reorder so the body-parsing try/catch runs FIRST, then pass the parsed `errBody` (or undefined if parsing failed) into recordRateLimitFromResponse as the third argument. (3) backend/src/spotify/nowPlaying.ts's pollNowPlaying() currently does NOT read the response body at all in its `!response.ok` branch before calling recordRateLimitFromResponse(response, \"nowPlaying poll\") -- add a `let body: unknown; try { body = await response.json(); } catch { /* not JSON, leave body undefined */ }` right before that call and pass `body` as the third argument (this is safe to add since nothing else in that branch reads the response body afterward).",
+  "non_goals": [
+    "Do not change isRateLimited()'s existing scope or the automatic-poller-only gating design (on-demand/user-triggered Spotify calls -- search, an admin's manual device-list retry, queueing -- remain ungated by design, per the file's own existing header comment; this task does not touch that).",
+    "Do not change the existing ordinary-rate-limit (non-QUOTA_EXCEEDED) behavior at all beyond adding the raw-body logging -- Retry-After header parsing and the 30s DEFAULT_BACKOFF_SECONDS default stay exactly as they are today for that case.",
+    "Do not touch nowPlaying.ts's scheduling logic (startNowPlayingPoller, computeNextPollDelayMs, triggerImmediateNowPlayingPoll, scheduleNextPoll, runPollAndReschedule) or playback.ts -- those were completed in NP1.1/NP1.2 on this same branch and must not be modified here. Only the specific `!response.ok` branch inside pollNowPlaying() that already calls recordRateLimitFromResponse gets the small body-read addition described above.",
+    "Do not attempt to confirm Spotify's real QUOTA_EXCEEDED response shape by any live/network means -- there is no way to trigger this on demand, and this task must not attempt any live Spotify API calls beyond what the existing test suite already mocks.",
+    "Do not implement the GET /api/device caching fix from analysis/22 -- that's a separate, unrelated task."
+  ],
+  "dependencies": [],
+  "read_paths": [
+    "backend/src/spotify/rateLimitBackoff.ts",
+    "backend/src/spotify/rateLimitBackoff.test.ts",
+    "backend/src/spotify/nowPlaying.ts",
+    "backend/src/spotify/nowPlaying.test.ts",
+    "backend/src/spotify/device.ts",
+    "backend/src/spotify/device.test.ts",
+    "backend/src/spotify/tokenRefresh.ts",
+    "backend/src/spotify/tokenRefresh.test.ts",
+    "analysis/22-spotify-api-call-inventory.md",
+    "docs/TESTING.md"
+  ],
+  "write_paths": [
+    "backend/src/spotify/rateLimitBackoff.ts",
+    "backend/src/spotify/rateLimitBackoff.test.ts",
+    "backend/src/spotify/nowPlaying.ts",
+    "backend/src/spotify/nowPlaying.test.ts",
+    "backend/src/spotify/device.ts",
+    "backend/src/spotify/device.test.ts",
+    "backend/src/spotify/tokenRefresh.ts",
+    "backend/src/spotify/tokenRefresh.test.ts"
+  ],
+  "forbidden_paths": [
+    "backend/src/routes/playback.ts",
+    "backend/src/routes/playback.test.ts",
+    "backend/src/routes/device.ts",
+    "backend/src/routes/device.test.ts",
+    "BACKLOG.md",
+    "analysis/**",
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    "docs/sdlc/**"
+  ],
+  "acceptance_criteria": [
+    "recordRateLimitFromResponse() has a new third, optional parameter for an already-parsed body; it remains synchronous (no `async`/`await` added to its own signature) and never itself calls response.json() or any body-reading method.",
+    "When a 429's body (via the new parameter) has 'QUOTA_EXCEEDED' at either `body.reason` or `body.error.reason`, the backoff window is armed for QUOTA_EXCEEDED_BACKOFF_SECONDS (1800) regardless of any Retry-After header present, and a distinctly-worded log line (mentioning quota, not just an ordinary rate limit) is emitted.",
+    "When a 429's body does NOT indicate QUOTA_EXCEEDED (or body is undefined/unparseable), the existing Retry-After-header-or-30s-default behavior is completely unchanged, but the raw body (if present) is also logged at warn level, truncated to a reasonable length, wrapped defensively so a non-stringifiable body can't throw.",
+    "tokenRefresh.ts passes its already-parsed `tokenData` into recordRateLimitFromResponse's new third parameter -- no new body read added, no reordering needed there.",
+    "device.ts's listDevices() is reordered so its existing body-parsing (errBody) happens BEFORE the recordRateLimitFromResponse call, and the parsed body (or undefined on parse failure) is passed in -- verify there's still exactly one response.json() call on that response object, not two.",
+    "nowPlaying.ts's pollNowPlaying() gains a small try/catch body read (only in the `!response.ok` branch that already calls recordRateLimitFromResponse) and passes the result in -- verify this doesn't break the 204 (nothing playing) path or the success path, which don't go through this branch at all.",
+    "New/updated tests cover: a 429 with `{ reason: 'QUOTA_EXCEEDED' }` in the body arms the longer backoff and produces the distinct log wording (spy on the logger); a 429 with `{ error: { reason: 'QUOTA_EXCEEDED' } }` (nested shape) also triggers it; an ordinary 429 (Retry-After present, no quota reason) keeps the existing short-backoff behavior unchanged; a 429 with an unparseable/missing body still falls back to ordinary rate-limit handling without throwing. At least one test per real call site (nowPlaying.ts, device.ts, tokenRefresh.ts) confirming the body is actually threaded through correctly end-to-end, not just unit-tested on recordRateLimitFromResponse in isolation.",
+    "cd backend && npx tsc --noEmit and npx vitest run both pass clean."
+  ],
+  "verification_commands": [
+    "cd backend && npx tsc --noEmit",
+    "cd backend && npx vitest run"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}
