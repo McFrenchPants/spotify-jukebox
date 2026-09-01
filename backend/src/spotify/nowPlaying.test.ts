@@ -19,13 +19,14 @@ import { listQueueEntries } from "../db/queueEntries";
 import { listDevices } from "./device";
 import { evictPreviousTrackLyrics, getLyricsForTrack } from "../lyrics/lyricsService";
 import {
-  DEFAULT_POLL_INTERVAL_MS,
+  SAFETY_INTERVAL_MS,
   getLastPolledAt,
   getLyricsSnapshot,
   pollNowPlaying,
   resetNowPlayingState,
   startNowPlayingPoller,
   stopNowPlayingPoller,
+  triggerImmediateNowPlayingPoll,
 } from "./nowPlaying";
 import { isRateLimited, resetRateLimitForTests } from "./rateLimitBackoff";
 
@@ -735,9 +736,11 @@ describe("pollNowPlaying", () => {
   });
 });
 
-describe("startNowPlayingPoller", () => {
+describe("startNowPlayingPoller (event-scheduled polling, BACKLOG #24)", () => {
   beforeEach(() => {
+    runMigrations();
     resetNowPlayingState();
+    resetRateLimitForTests();
     vi.clearAllMocks();
     vi.useFakeTimers();
   });
@@ -746,43 +749,188 @@ describe("startNowPlayingPoller", () => {
     vi.useRealTimers();
   });
 
-  it("polls on the configured interval and survives rejections", async () => {
+  function playingResponse(progressMs: number, durationMs: number): Response {
+    return jsonResponse({
+      is_playing: true,
+      progress_ms: progressMs,
+      item: {
+        id: "track-x",
+        name: "Song X",
+        artists: [{ name: "Artist X" }],
+        album: { images: [{ url: "https://example.com/x.jpg" }] },
+        duration_ms: durationMs,
+      },
+    });
+  }
+
+  function rateLimitedShortResponse(): Response {
+    return {
+      ok: false,
+      status: 429,
+      json: async () => ({ error: { message: "Too many requests" } }),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === "retry-after" ? "1" : null),
+      },
+    } as unknown as Response;
+  }
+
+  it("does not poll on a fixed cadence before anything triggers it", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(TRACK_A));
     const getTokenFn = vi.fn().mockResolvedValue("access-token");
 
-    const timer = startNowPlayingPoller(1000, fetchMock, getTokenFn);
-
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
     expect(fetchMock).not.toHaveBeenCalled();
-
-    await vi.advanceTimersByTimeAsync(1000);
+    // Nothing is known to be playing yet, so the only pending timer is the
+    // safety net (15s) -- not some other fixed cadence.
+    await vi.advanceTimersByTimeAsync(SAFETY_INTERVAL_MS - 1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-
-    stopNowPlayingPoller(timer);
-    await vi.advanceTimersByTimeAsync(5000);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    stopNowPlayingPoller(poller);
   });
 
-  it("a single failing poll does not stop future polls", async () => {
+  it("schedules the next poll at end-of-track-delay + buffer when a track is ending sooner than the safety interval", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(playingResponse(197000, 200000)); // 3s remaining
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
+    await triggerImmediateNowPlayingPoll();
+    fetchMock.mockClear();
+
+    // 3s remaining + ~750ms buffer = ~3.75s, well under the 15s safety net.
+    await vi.advanceTimersByTimeAsync(3749);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    stopNowPlayingPoller(poller);
+  });
+
+  it("caps the next poll at the 15s safety interval when a track has much longer left to play", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(playingResponse(1000, 61000)); // 60s remaining
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
+    await triggerImmediateNowPlayingPoll();
+    fetchMock.mockClear();
+
+    await vi.advanceTimersByTimeAsync(SAFETY_INTERVAL_MS - 1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    stopNowPlayingPoller(poller);
+  });
+
+  it("uses the 15s safety interval alone when nothing is playing (no end-of-track timer to schedule)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(noContentResponse());
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
+    await triggerImmediateNowPlayingPoll();
+    fetchMock.mockClear();
+
+    await vi.advanceTimersByTimeAsync(SAFETY_INTERVAL_MS - 1);
+    expect(fetchMock).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    stopNowPlayingPoller(poller);
+  });
+
+  it("triggerImmediateNowPlayingPoll polls immediately and reschedules without leaving a stale/duplicate timer", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(playingResponse(1000, 61000)); // 60s remaining
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(1);
+
+    await triggerImmediateNowPlayingPoll();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Exactly one pending timer after the trigger -- the pre-trigger timer
+    // was cancelled, and rescheduling created exactly one new one.
+    expect(vi.getTimerCount()).toBe(1);
+
+    // The rescheduled timer reflects the freshly polled state (60s
+    // remaining -> capped at the 15s safety interval), not a stale timer
+    // left over from before the trigger.
+    await vi.advanceTimersByTimeAsync(SAFETY_INTERVAL_MS - 1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    stopNowPlayingPoller(poller);
+  });
+
+  it("triggerImmediateNowPlayingPoll is a no-op when no poller is currently running", async () => {
+    await expect(triggerImmediateNowPlayingPoll()).resolves.toBeUndefined();
+  });
+
+  it("stopNowPlayingPoller cancels all pending timers, leaving nothing running", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(TRACK_A));
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
+    expect(vi.getTimerCount()).toBe(1);
+
+    stopNowPlayingPoller(poller);
+    expect(vi.getTimerCount()).toBe(0);
+
+    await vi.advanceTimersByTimeAsync(SAFETY_INTERVAL_MS + 5000);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("does not schedule another poll after a stop, even if a trigger poll was already in flight", async () => {
+    let resolveFetch: (v: Response) => void = () => {};
+    const pending = new Promise<Response>((resolve) => {
+      resolveFetch = resolve;
+    });
+    const fetchMock = vi.fn().mockReturnValueOnce(pending).mockResolvedValue(jsonResponse(TRACK_A));
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
+    const triggerPromise = triggerImmediateNowPlayingPoll();
+    stopNowPlayingPoller(poller);
+    resolveFetch(jsonResponse(TRACK_A));
+    await triggerPromise;
+
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("a single failing poll does not stop future scheduled polls, and still reschedules at the safety interval", async () => {
     const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
     const getTokenFn = vi.fn().mockResolvedValue("access-token");
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    const timer = startNowPlayingPoller(1000, fetchMock, getTokenFn);
-
-    await vi.advanceTimersByTimeAsync(1000);
-    await vi.advanceTimersByTimeAsync(1000);
-
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
+    await triggerImmediateNowPlayingPoll();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(consoleErrorSpy).toHaveBeenCalled();
 
-    stopNowPlayingPoller(timer);
+    await vi.advanceTimersByTimeAsync(SAFETY_INTERVAL_MS);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    stopNowPlayingPoller(poller);
     consoleErrorSpy.mockRestore();
   });
 
-  it("defaults to a 4 second interval", () => {
-    expect(DEFAULT_POLL_INTERVAL_MS).toBe(4000);
+  it("the isRateLimited() backoff still gates every poll regardless of trigger, and scheduling does not get stuck", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(rateLimitedShortResponse());
+    const getTokenFn = vi.fn().mockResolvedValue("access-token");
+
+    const poller = startNowPlayingPoller(fetchMock, getTokenFn);
+    await triggerImmediateNowPlayingPoll(); // hits 429, arms a 1s backoff, returns early
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(isRateLimited()).toBe(true);
+
+    // A next attempt is still scheduled (falls back to the safety interval,
+    // since no playing-state info was available) -- the backoff doesn't
+    // leave the scheduler stuck with nothing pending.
+    await vi.advanceTimersByTimeAsync(SAFETY_INTERVAL_MS);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    stopNowPlayingPoller(poller);
   });
 });
