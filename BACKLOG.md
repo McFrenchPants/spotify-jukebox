@@ -809,3 +809,38 @@ routes right after their Spotify call succeeds, so the app's own actions
 get an immediate refresh instead of waiting for the next scheduled tick.
 Implemented on `feature/reduce-nowplaying-polling` (off `master`, not yet
 merged), via two sdlc-tracked tasks (NP1.1 scheduler, NP1.2 route wiring).
+
+## 25. rateLimitBackoff.ts doesn't distinguish QUOTA_EXCEEDED from an ordinary rate limit
+**Status:** ready
+**Type:** bug
+
+Follow-up from [analysis/22's "concrete follow-up" section](analysis/22-spotify-api-call-inventory.md#concrete-follow-up-this-unlocks).
+The user's own research against Spotify's docs confirmed 429s split into
+two genuinely different conditions: an ordinary rolling-30s rate limit
+(`Retry-After` header, self-clears in seconds) and a `QUOTA_EXCEEDED`
+condition (Development Mode's broader resource allocation exhausted,
+identified by the 429 response **body**, not headers) — a materially
+longer-lived block. [rateLimitBackoff.ts](backend/src/spotify/rateLimitBackoff.ts)'s
+`recordRateLimitFromResponse()` currently only ever reads the `Retry-After`
+header (or a flat 30s default), so a real `QUOTA_EXCEEDED` block gets the
+same short backoff as an ordinary rate limit — the poller waits ~30s,
+retries, gets `QUOTA_EXCEEDED` again, waits ~30s again, indefinitely, with
+no actual progress and no distinct signal in the logs. This is likely the
+real mechanism behind the "stuck for hours, restarts don't help" symptom
+from this incident, not just an unusually long ordinary rate limit.
+
+**Fix**: extend `recordRateLimitFromResponse()` to accept the already-parsed
+429 response body (each of its three call sites — `nowPlaying.ts`,
+`device.ts`, `tokenRefresh.ts` — either already parses the body or can
+cheaply do so without a double-read conflict) and check for a
+`QUOTA_EXCEEDED` reason (checked at both a top-level `reason` field and a
+nested `error.reason`, since the exact shape isn't independently confirmed
+against this app's own traffic yet). When found, apply a much longer
+backoff than the ordinary 30s default (a named, tunable constant — the
+real reset window isn't known, so this is a documented engineering
+estimate, not confirmed data) and a distinctly worded log line. Also log
+the raw 429 body (truncated) whenever one occurs, regardless of whether
+`QUOTA_EXCEEDED` was recognized, so a real future occurrence can confirm
+Spotify's actual shape empirically rather than guessing again. No change
+to `isRateLimited()`'s existing scope (only gates the automatic poller,
+never on-demand/user-triggered calls, per the file's own stated design).
