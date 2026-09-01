@@ -773,3 +773,24 @@ field defensively forever. This is the second time a single unguarded
 Spotify-response field has caused a real production issue (item 15's 502,
 now this full-app crash) — worth a dedicated follow-up rather than folding
 into this already-live-incident-driven fix.
+
+## 24. Replace the constant 4s now-playing poll with event-scheduled polling
+**Status:** ready
+**Type:** enhancement
+**Analysis:** [analysis/24-event-scheduled-now-playing-poll.md](analysis/24-event-scheduled-now-playing-poll.md)
+
+The now-playing poller ([nowPlaying.ts](backend/src/spotify/nowPlaying.ts))
+calls Spotify's `currently-playing` endpoint every 4 seconds, continuously,
+regardless of guest activity — the dominant source of Spotify API load per
+[item 22's inventory](analysis/22-spotify-api-call-inventory.md) (~900
+calls/hour). User's proposal, confirmed and scoped: since the frontend
+already interpolates playback progress locally between snapshots
+([NowPlaying.tsx:148-159](frontend/src/components/nowplaying/NowPlaying.tsx:148)),
+the backend doesn't need a fresh poll every 4s just to feed a smooth
+progress bar — replace the flat interval with event-scheduled polling: an
+immediate one-shot poll after this app's own playback actions
+(pause/resume/skip/previous), a one-shot poll scheduled around each
+track's expected end (to catch Spotify auto-advancing), and a 15-second
+safety-net poll for anything else (external/out-of-band changes via a
+device's own controls, drift correction, device-status detection).
+Estimated ~900/hr → ~150-350/hr depending on skip frequency.
