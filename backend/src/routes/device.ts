@@ -1,7 +1,7 @@
 import { Response, Router } from "express";
 import { setSetting } from "../db";
 import { requireAdminAuth } from "../middleware/adminAuth";
-import { listDevices, resolveDevice } from "../spotify/device";
+import { getCachedDeviceResolution, invalidateDeviceResolutionCache, listDevices } from "../spotify/device";
 import { classifySpotifyAuthError } from "../spotify/errors";
 
 export const deviceRouter = Router();
@@ -21,7 +21,7 @@ function handleSpotifyError(err: unknown, res: Response) {
 
 deviceRouter.get("/", async (_req, res) => {
   try {
-    const result = await resolveDevice();
+    const result = await getCachedDeviceResolution();
     res.status(200).json(result);
   } catch (err) {
     handleSpotifyError(err, res);
@@ -54,6 +54,7 @@ deviceRouter.post("/select", requireAdminAuth, async (req, res) => {
     }
 
     setSetting("spotify_device_id", deviceId);
+    invalidateDeviceResolutionCache();
     res.status(200).json(match);
   } catch (err) {
     handleSpotifyError(err, res);

@@ -401,22 +401,22 @@
     {
       "id": "device-endpoint-caching",
       "title": "BACKLOG.md #26: cache GET /api/device with device-status-driven invalidation",
-      "lifecycle_state": "implementing",
+      "lifecycle_state": "released",
       "tasks": [
         {
           "id": "D1.1",
           "title": "Add device-resolution cache to device.ts with TTL + invalidation hooks",
-          "status": "todo",
-          "lifecycle_state": "approved",
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [],
           "lease": {
             "assigned_agent": null,
             "run_id": null,
-            "attempt_count": 0
+            "attempt_count": 1
           },
-          "task_packet_path": null,
+          "task_packet_path": ".sdlc/task-packets/D1.1.packet.json",
           "report_path": null,
-          "notes": "See BACKLOG.md #26. Continued on feature/reduce-nowplaying-polling -- same Spotify-load-reduction initiative, touches nowPlaying.ts already modified on this branch. Separate cache from cache.ts's generic withCache (needs explicit invalidation, not just TTL)."
+          "notes": "See BACKLOG.md #26. Continued on feature/reduce-nowplaying-polling -- same Spotify-load-reduction initiative, touches nowPlaying.ts already modified on this branch. Separate cache from cache.ts's generic withCache (needs explicit invalidation, not just TTL). getCachedDeviceResolution() (10s TTL) wraps resolveDevice() for GET /api/device; POST /select keeps calling listDevices() directly unchanged, plus invalidates on success; nowPlaying.ts's device-status-change detection (both updateDeviceStatusFromDeviceField and checkDeviceStatusFallback) invalidates on actual flips. resolveDevice()/listDevices() themselves untouched (verified via diff). Orchestrator independently verified: diff confined to exactly the 6 intended files (device.ts x2, device.test.ts x2, nowPlaying.ts, nowPlaying.test.ts), reran backend tsc (clean) and vitest (417/417 clean)."
         }
       ]
     }

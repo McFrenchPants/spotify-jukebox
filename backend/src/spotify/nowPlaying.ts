@@ -4,7 +4,7 @@ import { recordTrackPlay } from "../db/trackStats";
 import { emitEvent } from "../events/bus";
 import { evictPreviousTrackLyrics, getLyricsForTrack, type LyricsResult } from "../lyrics/lyricsService";
 import { getValidAccessToken } from "./client";
-import { listDevices } from "./device";
+import { invalidateDeviceResolutionCache, listDevices } from "./device";
 import { getSetting } from "../db";
 import { SpotifyRateLimitedError, SpotifyReauthRequiredError } from "./errors";
 import { isRateLimited, recordRateLimitFromResponse } from "./rateLimitBackoff";
@@ -189,6 +189,7 @@ function updateDeviceStatusFromDeviceField(device: { id: string; name: string })
   lastDeviceOnline = online;
 
   if (changed) {
+    invalidateDeviceResolutionCache();
     emitEvent("device-status", {
       online,
       deviceId,
@@ -243,6 +244,7 @@ async function checkDeviceStatusFallback(fetchFn: typeof fetch, accessToken: str
   lastDeviceOnline = online;
 
   if (changed) {
+    invalidateDeviceResolutionCache();
     emitEvent("device-status", {
       online,
       deviceId,

@@ -134,3 +134,49 @@ export async function resolveDevice(
 
   return { resolved: null, devices };
 }
+
+/**
+ * How long a resolved device lookup is served from cache before
+ * getCachedDeviceResolution() falls back to a real resolveDevice() call
+ * again. Deliberately short — this exists purely to collapse N guests
+ * opening the app in a short window into one real Spotify call, not to
+ * paper over real staleness; invalidateDeviceResolutionCache() (called from
+ * POST /select and from nowPlaying.ts's device-status-change detection)
+ * handles the cases where staleness would actually matter.
+ */
+const DEVICE_RESOLUTION_CACHE_TTL_MS = 10_000;
+
+let cachedResolution: { value: DeviceResolution; expiresAt: number } | null = null;
+
+/**
+ * Cached wrapper around resolveDevice(), used by GET /api/device so that N
+ * guests opening the app within a short window collapse into a single real
+ * Spotify device-list call rather than N simultaneous ones. Not used by
+ * POST /select, which intentionally always re-fetches live (see its own
+ * comment).
+ */
+export async function getCachedDeviceResolution(
+  fetchFn: typeof fetch = fetch,
+  getTokenFn: () => Promise<string> = getValidAccessToken
+): Promise<DeviceResolution> {
+  const now = Date.now();
+  if (cachedResolution && cachedResolution.expiresAt > now) {
+    return cachedResolution.value;
+  }
+
+  const value = await resolveDevice(fetchFn, getTokenFn);
+  cachedResolution = { value, expiresAt: now + DEVICE_RESOLUTION_CACHE_TTL_MS };
+  return value;
+}
+
+/**
+ * Clears the cached device resolution so the next getCachedDeviceResolution()
+ * call is forced to re-resolve live. Called after a device selection changes
+ * (POST /select) and whenever nowPlaying.ts's device-status monitoring
+ * detects an actual online/offline flip — both cases where serving the
+ * stale cached result for up to DEVICE_RESOLUTION_CACHE_TTL_MS would be
+ * wrong.
+ */
+export function invalidateDeviceResolutionCache(): void {
+  cachedResolution = null;
+}

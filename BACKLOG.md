@@ -859,7 +859,7 @@ Spotify's actual shape next time this fires for real. Routed through the
 `feature/reduce-nowplaying-polling` (off `master`, not yet merged).
 
 ## 26. Cache GET /api/device so N guests opening the app doesn't mean N Spotify calls
-**Status:** ready
+**Status:** done
 **Type:** enhancement
 
 Follow-up from [analysis/22](analysis/22-spotify-api-call-inventory.md): `GET /api/device`
@@ -894,3 +894,17 @@ success path — keeps it correctly fresh exactly when the underlying state
 actually changes. `POST /device/select` itself keeps calling `listDevices()`
 directly, uncached, unchanged — it already explicitly re-fetches live on
 purpose ("the admin must be selecting from what's currently visible").
+
+Shipped: `getCachedDeviceResolution()` (10s TTL) added to
+[device.ts](backend/src/spotify/device.ts), wrapping `resolveDevice()` for
+`GET /api/device` only. `POST /device/select` still calls `listDevices()`
+directly, unchanged, plus now calls the new `invalidateDeviceResolutionCache()`
+on success. That same invalidation is wired into
+[nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s existing
+`device-status`-change detection (both `updateDeviceStatusFromDeviceField`
+and `checkDeviceStatusFallback`), so `DeviceSelector.tsx`'s live
+device-status refresh still sees fresh data immediately rather than a
+stale cached result. `resolveDevice()`/`listDevices()` themselves
+untouched. Implemented on `feature/reduce-nowplaying-polling` (off
+`master`, not yet merged) — completes the full set of three fixes from
+this incident's investigation (items 24, 25, 26).

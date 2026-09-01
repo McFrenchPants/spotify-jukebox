@@ -6,6 +6,7 @@ vi.mock("../events/bus", () => ({
 
 vi.mock("./device", () => ({
   listDevices: vi.fn(),
+  invalidateDeviceResolutionCache: vi.fn(),
 }));
 
 vi.mock("../lyrics/lyricsService", () => ({
@@ -16,7 +17,7 @@ vi.mock("../lyrics/lyricsService", () => ({
 import { emitEvent } from "../events/bus";
 import { db, runMigrations, setSetting, deleteSetting } from "../db";
 import { listQueueEntries } from "../db/queueEntries";
-import { listDevices } from "./device";
+import { invalidateDeviceResolutionCache, listDevices } from "./device";
 import { evictPreviousTrackLyrics, getLyricsForTrack } from "../lyrics/lyricsService";
 import {
   SAFETY_INTERVAL_MS,
@@ -355,6 +356,7 @@ describe("pollNowPlaying", () => {
 
       expect(listDevices).not.toHaveBeenCalled();
       expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+      expect(invalidateDeviceResolutionCache).not.toHaveBeenCalled();
     });
 
     it("updates status for free from the currently-playing response's device field, never calling listDevices", async () => {
@@ -368,6 +370,7 @@ describe("pollNowPlaying", () => {
       );
       expect(listDevices).not.toHaveBeenCalled();
       expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+      expect(invalidateDeviceResolutionCache).not.toHaveBeenCalled();
 
       // Device field now shows a different device -> real change, still no listDevices call.
       await pollNowPlaying(
@@ -382,6 +385,7 @@ describe("pollNowPlaying", () => {
         deviceId: "device-a",
         deviceName: undefined,
       });
+      expect(invalidateDeviceResolutionCache).toHaveBeenCalledTimes(1);
     });
 
     it("falls back to a throttled real device-list check only when the response has no device field (204)", async () => {
@@ -400,6 +404,7 @@ describe("pollNowPlaying", () => {
       await pollNowPlaying(fetchMock, getTokenFn);
       expect(listDevices).toHaveBeenCalledTimes(1);
       expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+      expect(invalidateDeviceResolutionCache).not.toHaveBeenCalled();
 
       // Once the window passes, the next 204 tick checks again — device is
       // now missing, a real change from the established baseline.
@@ -412,6 +417,7 @@ describe("pollNowPlaying", () => {
         deviceId: "device-a",
         deviceName: undefined,
       });
+      expect(invalidateDeviceResolutionCache).toHaveBeenCalledTimes(1);
     });
 
     it("does not re-check via the fallback while something is actively playing (device field keeps refreshing the throttle window)", async () => {
@@ -427,6 +433,7 @@ describe("pollNowPlaying", () => {
 
       expect(listDevices).not.toHaveBeenCalled();
       expect(emitEvent).not.toHaveBeenCalledWith("device-status", expect.anything());
+      expect(invalidateDeviceResolutionCache).not.toHaveBeenCalled();
     });
 
     it("emits online:true when the device comes back after being offline (fallback path)", async () => {
@@ -453,6 +460,8 @@ describe("pollNowPlaying", () => {
         "device-status",
         expect.objectContaining({ online: true, deviceName: "Kitchen Phone" })
       );
+      // Two real flips (online->offline, offline->online) — invalidated both times.
+      expect(invalidateDeviceResolutionCache).toHaveBeenCalledTimes(2);
     });
 
     it("does not abort the poll when the device-list fetch itself fails", async () => {
