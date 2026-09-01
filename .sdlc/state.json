@@ -313,29 +313,29 @@
           },
           "task_packet_path": ".sdlc/task-packets/F11.1.packet.json",
           "report_path": null,
-          "notes": "PAUSED for a higher-priority live-incident fix (BACKLOG.md #23, work_item artist-genres-crash-fix) -- see that work_item's own notes. SS6.1 dogfood target -- first real (non-framework) work item run through the sdlc-tracked implementer/verifier mechanism. See analysis/11-favorites-two-column-layout.md for the scrutinized scope. Branched off feature/sdlc-supervisor (not master) since .sdlc/ only exists there. Implementer's code change looks correct on review (git diff confined to SearchAndQueue.tsx, tsc/build clean, mirrors the HistoryPage/SettingsPage/NowPlaying lg:flex-row precedent, correctly mount-gates FavoritesSection below lg to avoid a new eager fetch) but self-reported status: blocked because it has no browser tooling to do the packet's required live-viewport verification -- expected, that's the orchestrator's job on this task's default (non-strong-verification) path. BLOCKED for a different, more serious reason found while attempting that live check: starting the frontend preview surfaced a stray local backend already LISTENING on :8085 since 2026-08-31 ~12:48pm (21+ hours), confirmed live and already showing rateLimited:true against the real Spotify account -- the exact BACKLOG.md item 20 incident recurring. Killed the stray process immediately per CLAUDE.md; did NOT start a fresh local backend for verification afterward since the account may still be mid-backoff and the live HA add-on may be affected. Live UI verification for this task is deferred until the user confirms the account's rate-limit state has cleared. See PROGRESS.md session log and a new BACKLOG.md entry for the incident itself."
+          "notes": "RESUMED -- the higher-priority live-incident fix (BACKLOG.md #23, work_item artist-genres-crash-fix) that paused this task is now done (source-fixed, locally verified; not yet deployed). SS6.1 dogfood target -- first real (non-framework) work item run through the sdlc-tracked implementer/verifier mechanism. See analysis/11-favorites-two-column-layout.md for the scrutinized scope. Branched off feature/sdlc-supervisor (not master) since .sdlc/ only exists there. Implementer's code change looks correct on review (git diff confined to SearchAndQueue.tsx, tsc/build clean, mirrors the HistoryPage/SettingsPage/NowPlaying lg:flex-row precedent, correctly mount-gates FavoritesSection below lg to avoid a new eager fetch) but self-reported status: blocked because it has no browser tooling to do the packet's required live-viewport verification -- expected, that's the orchestrator's job on this task's default (non-strong-verification) path. BLOCKED for a different, more serious reason found while attempting that live check: starting the frontend preview surfaced a stray local backend already LISTENING on :8085 since 2026-08-31 ~12:48pm (21+ hours), confirmed live and already showing rateLimited:true against the real Spotify account -- the exact BACKLOG.md item 20 incident recurring. Killed the stray process immediately per CLAUDE.md; did NOT start a fresh local backend for verification afterward since the account may still be mid-backoff and the live HA add-on may be affected. Live UI verification for this task is deferred until the user confirms the account's rate-limit state has cleared. See PROGRESS.md session log and a new BACKLOG.md entry for the incident itself."
         }
       ]
     },
     {
       "id": "artist-genres-crash-fix",
       "title": "BACKLOG.md #23: unguarded artist.genres crashes the whole app to a black screen",
-      "lifecycle_state": "implementing",
+      "lifecycle_state": "released",
       "tasks": [
         {
           "id": "B23.1",
           "title": "Guard artist.genres backend+frontend, regression tests",
-          "status": "todo",
-          "lifecycle_state": "approved",
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [],
           "lease": {
             "assigned_agent": null,
             "run_id": null,
-            "attempt_count": 0
+            "attempt_count": 1
           },
-          "task_packet_path": null,
+          "task_packet_path": ".sdlc/task-packets/B23.1.packet.json",
           "report_path": null,
-          "notes": "Live incident reported by the user 2026-09-01: deployed app (v1.0.24) went black with a TypeError matching this exact unguarded field, alongside item 22's real rate-limit 503. Jumped the F11.1/SS6.1 queue since it's a live-affecting bug the user asked to fix now. See BACKLOG.md #23 for full root-cause writeup."
+          "notes": "Live incident reported by the user 2026-09-01: deployed app (v1.0.24) went black with a TypeError matching this exact unguarded field, alongside item 22's real rate-limit 503. Jumped the F11.1/SS6.1 queue since it's a live-affecting bug the user asked to fix now. See BACKLOG.md #23 for full root-cause writeup. Fixed: client.ts's genres ?? [] guard + optional type, ArtistInfoPanel.tsx's genres?.length/followers?.toLocaleString() guards, new regression test mirroring item 15's pattern. Orchestrator independently reread the diff (confined to exactly the 3 intended files) and independently reran backend tsc/vitest (388/388) and frontend tsc -- all clean. Implementer flagged one pre-existing, unrelated flaky test (adminAuth.test.ts's tampered-token case) on its first run; reran alone (4/4) and reran the full suite (388/388) and it did not reproduce, confirming it's not caused by this change. Not yet deployed -- this only fixes the source, the live add-on still needs a rebuild+redeploy to actually clear the black screen for guests, which is a supervisor-only operation requiring explicit user go-ahead."
         }
       ]
     }

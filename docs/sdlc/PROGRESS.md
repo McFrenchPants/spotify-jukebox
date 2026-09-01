@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Phases SS0-SS5 done. SS6.1 in progress (dogfood run on BACKLOG.md #11), blocked pending live verification -- see session log.
+## Status: Phases SS0-SS5 done. SS6.1 in progress (dogfood run on BACKLOG.md #11); a live-incident fix (BACKLOG.md #23) jumped the queue and is now done (source-fixed, not yet deployed); F11.1 resumed, still blocked pending live verification -- see session log.
 
 ## Task Table
 
@@ -100,6 +100,53 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-09-01** — Live-incident fix, **B23.1** (`BACKLOG.md` #23),
+  interleaved with SS6.1/F11.1 — the user reported the deployed app
+  (v1.0.24) going fully black with `Uncaught TypeError: Cannot read
+  properties of undefined (reading 'length')`, alongside a real `/api/device
+  503` (item 22's rate-limit incident, found a few minutes earlier in this
+  same session). Traced the crash directly by reading code before scaffolding
+  anything: `backend/src/spotify/client.ts`'s `getArtist()` guards
+  `images`/`followers` against Spotify omitting them (item 15's fix) but
+  never applied the same guard to `genres`; `ArtistInfoPanel.tsx:97` then
+  reads `artist.genres.length` unguarded, and since no error boundary exists
+  anywhere in this app (`grep` for `ErrorBoundary`/`componentDidCatch`
+  across `frontend/src` returns nothing), that one crash unmounts the entire
+  React tree — a black screen. Root-cause match to the reported error was
+  exact, not a guess.
+  - Added `BACKLOG.md` #23 with the full root-cause writeup (bug-type entry,
+    no separate analysis file needed, matching the project's own convention
+    for bugs whose root cause is already fully scoped).
+  - **Deliberately jumped this ahead of F11.1** in `.sdlc/state.json` — added
+    as its own work_item (`artist-genres-crash-fix`, task `B23.1`) rather
+    than folding it into `favorites-two-column-layout`, since it's an
+    unrelated bug; F11.1's own row marked "PAUSED" with a pointer to this
+    one, not abandoned or silently reordered.
+  - Hand-authored the packet (same rationale as every packet so far this
+    session — small, well-understood, mirrors an established in-file
+    pattern exactly). This task did **not** qualify for SS4.3's strong-
+    verification tier (touches artist metadata shaping, not
+    auth/credential/token logic specifically) — orchestrator spot-check
+    used.
+  - Implementer's fix matched the packet exactly: `genres: artist.genres ??
+    []` + optional typing on the backend, `artist.genres?.length`/
+    `artist.followers?.toLocaleString()` guards on the frontend, a new
+    regression test mirroring item 15's own pattern. Implementer flagged one
+    pre-existing, unrelated flaky test (`adminAuth.test.ts`'s tampered-token
+    case) on its first run, reran it alone and the full suite again and it
+    passed both times — correctly judged as a pre-existing flake, not
+    in-scope to chase down as part of this fix.
+  - **Verified independently, not taken on the implementer's word**: reread
+    the full diff (confined to exactly the 3 intended files via `git diff
+    --stat`), independently reran `backend`'s `tsc --noEmit` + `vitest run`
+    (388/388, the flake didn't reproduce) and `frontend`'s `tsc --noEmit`,
+    all clean. `B23.1` marked `done`/`released` in `.sdlc/state.json`.
+  - **Not yet deployed.** This fixes the source only — the live add-on
+    (v1.0.24) still needs a rebuild + redeploy to actually clear the black
+    screen guests are seeing right now. That's a supervisor-only operation
+    (merge/push/deploy boundary per `CLAUDE.md`) requiring the user's
+    explicit go-ahead; not done automatically as part of this fix.
 
 - **2026-09-01** — `/continue-development`: started **SS6.1** (dogfood),
   the first real (non-framework) work item run through the sdlc-tracked
