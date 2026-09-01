@@ -711,3 +711,52 @@ whatever's currently happening on the real deployment.
   or a periodic reminder baked into a command like `/continue-development`
   itself to check for stray listeners on the backend's port before doing
   any Spotify-touching verification work.
+
+## 23. Uncaught crash on missing `artist.genres` blanks the entire live app
+**Status:** done
+**Type:** bug
+
+Reported live 2026-09-01 (v1.0.24): the deployed app went fully black with
+`Uncaught TypeError: Cannot read properties of undefined (reading
+'length')` in the console, alongside a `GET /api/device 503` (a real
+Spotify rate-limit, tracked separately as item 22).
+
+**Root cause**: [client.ts](backend/src/spotify/client.ts)'s `getArtist()`
+guards `images`/`followers` against Spotify sometimes omitting them for a
+given artist ID (fixed for item 15) but never applied the same guard to
+`genres` — `genres: artist.genres` is passed through unguarded, and
+`SpotifyArtistResponse.genres` is still typed as required `string[]`
+despite the same reliability caveat already documented for the other two
+fields. [ArtistInfoPanel.tsx:97](frontend/src/components/artist/ArtistInfoPanel.tsx:97)
+then calls `artist.genres.length > 0` unguarded, which throws exactly the
+reported `TypeError` when `genres` is actually `undefined` at runtime.
+Compounding this: **no error boundary exists anywhere in the app** — a grep
+for `ErrorBoundary`/`componentDidCatch`/`getDerivedStateFromError` across
+`frontend/src` returns nothing — so this one uncaught render error crashes
+React's entire tree, unmounting everything and leaving the raw (black)
+page background with nothing rendered on top of it. `ArtistInfoPanel`'s own
+doc comment says it's meant to "fail silently... since this panel is
+decorative, not core functionality," but that intent only covers its own
+fetch `.catch()`, not a render-time property-access crash — the two are
+different failure modes and only the first was actually guarded against.
+
+**Fixed**:
+1. `client.ts`: `genres: artist.genres ?? []` (matching the existing
+   `images`/`followers` guard pattern exactly), `SpotifyArtistResponse.genres`
+   typed optional with the same reliability comment as `images`/`followers`.
+2. `ArtistInfoPanel.tsx`: defense in depth even with the backend fix in
+   place — `artist.genres?.length` and `artist.followers?.toLocaleString()`
+   guarded so a future unguarded/malformed field on this decorative panel
+   degrades gracefully (shows what it can) instead of crashing the whole
+   app again.
+3. Regression tests added on both sides mirroring item 15's own
+   missing-fields test.
+
+**Not done here** (flagged as a real gap, not silently deferred): adding a
+top-level React error boundary so *any* future unforeseen render crash
+degrades to a "something went wrong, try reloading" message instead of a
+silent black screen, rather than relying on guarding every individual
+field defensively forever. This is the second time a single unguarded
+Spotify-response field has caused a real production issue (item 15's 502,
+now this full-app crash) — worth a dedicated follow-up rather than folding
+into this already-live-incident-driven fix.
