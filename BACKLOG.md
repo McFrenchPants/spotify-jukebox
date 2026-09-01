@@ -315,9 +315,9 @@ message now share the same centered 384px column. Implemented on
 `fix/desktop-volume-slider-alignment`.
 
 ## 11. Find Music page: Favorites should sit alongside search, not in a separate tab, on wide screens
-**Status:** idea
+**Status:** ready
 **Type:** enhancement
-**Analysis:** analysis/11-favorites-two-column-layout.md (not yet written)
+**Analysis:** [analysis/11-favorites-two-column-layout.md](analysis/11-favorites-two-column-layout.md)
 
 On tablet/desktop widths, Favorites shouldn't be a separate tab a guest has
 to switch to — it should display side-by-side with search in a two-column
