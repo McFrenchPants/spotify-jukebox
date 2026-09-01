@@ -1,0 +1,57 @@
+{
+  "task_id": "NP1.1",
+  "plan_revision": "uncommitted:2026-09-01T00:00:00Z",
+  "objective": "Rewrite backend/src/spotify/nowPlaying.ts's polling schedule (BACKLOG.md #24, see analysis/24-event-scheduled-now-playing-poll.md for the full design) to replace the current flat setInterval(4000)-based startNowPlayingPoller with event-scheduled polling driven by three triggers: (1) an exported function that lets a caller (e.g. a future playback-route handler in a follow-up task, NP1.2) request an immediate one-shot poll; (2) a scheduled one-shot poll timed around each currently-playing track's expected end (durationMs - progressMs + a small buffer, e.g. 500-1000ms) to catch Spotify auto-advancing to a new track without any explicit action; (3) a 15-second safety-net poll (SAFETY_INTERVAL_MS = 15000) that always fires if nothing else has polled more recently, to catch anything else (external/out-of-band playback changes via a device's own controls or another Spotify client, general drift) and to keep device-online/offline detection alive (it currently piggybacks on every poll's `device` field). At any point, the *next* scheduled poll should be whichever fires sooner: the end-of-track timer (if a track is currently playing) or the safety-net timer -- and each real poll result should reset/reschedule both timers based on the fresh state. When nothing is playing (isPlaying: false / no track), there is no end-of-track timer to schedule -- only the safety-net interval applies. The critical constraint: pollNowPlaying()'s own body (track-change detection via hasChanged(), play-history/leaderboard recording, lyrics lookup, device-status updates via updateDeviceStatusFromDeviceField/checkDeviceStatusFallback, and the isRateLimited() backoff check at the top) must NOT be changed at all -- this task is purely about changing what schedules calls to the existing, unmodified pollNowPlaying() function, not about changing what that function does once called.",
+  "non_goals": [
+    "Do not modify pollNowPlaying()'s own internal logic (track-change detection, play-history/leaderboard recording, lyrics lookup, device-status updates, rate-limit backoff check) -- only the code that decides WHEN to call it.",
+    "Do not touch playback.ts, admin.ts, or any route file -- wiring the own-action fast-path trigger into playback.ts's pause/resume/skip/previous routes is NP1.2's job, a separate dependent task. This task only needs to EXPOSE a way for a future caller to trigger an immediate poll + reschedule (e.g. an exported function), not wire it into any route.",
+    "Do not touch queueSync.ts, device.ts, client.ts, or any other Spotify module.",
+    "Do not change the existing isRateLimited()/recordRateLimitFromResponse() rate-limit backoff mechanism -- it must continue to apply exactly as it does today, regardless of which trigger caused a given pollNowPlaying() call.",
+    "Do not implement the QUOTA_EXCEEDED-vs-rate-limit distinction from analysis/22-spotify-api-call-inventory.md's 'concrete follow-up' section -- that's a separate, not-yet-scoped task, unrelated to this one."
+  ],
+  "dependencies": [],
+  "read_paths": [
+    "backend/src/spotify/nowPlaying.ts",
+    "backend/src/spotify/nowPlaying.test.ts",
+    "backend/src/spotify/rateLimitBackoff.ts",
+    "backend/src/spotify/device.ts",
+    "backend/src/index.ts",
+    "analysis/24-event-scheduled-now-playing-poll.md",
+    "docs/TESTING.md"
+  ],
+  "write_paths": [
+    "backend/src/spotify/nowPlaying.ts",
+    "backend/src/spotify/nowPlaying.test.ts"
+  ],
+  "forbidden_paths": [
+    "backend/src/routes/playback.ts",
+    "backend/src/routes/admin.ts",
+    "backend/src/spotify/queueSync.ts",
+    "backend/src/spotify/device.ts",
+    "backend/src/spotify/client.ts",
+    "backend/src/spotify/rateLimitBackoff.ts",
+    "backend/src/index.ts",
+    "BACKLOG.md",
+    "analysis/**",
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    "docs/sdlc/**"
+  ],
+  "acceptance_criteria": [
+    "startNowPlayingPoller no longer uses a flat setInterval(4000) firing on a fixed cadence -- it uses a scheduling mechanism (e.g. setTimeout chains) where the delay to the next poll is recomputed after each poll based on the current state.",
+    "When a poll result shows isPlaying: true with a known durationMs and progressMs, the next automatic poll is scheduled at min(remaining-time-until-track-end + a small buffer, SAFETY_INTERVAL_MS=15000) from that poll's completion -- i.e. whichever is sooner.",
+    "When a poll result shows nothing playing (isPlaying: false or no trackId), the next automatic poll is scheduled at SAFETY_INTERVAL_MS (15000ms) -- there's no track-end to schedule against.",
+    "An exported function (name and exact signature are the implementer's judgment call, but it must be usable by a future caller outside this file) exists that triggers an immediate one-shot poll and correctly cancels/reschedules any pending scheduled timer so there's no stale duplicate timer left running afterward, and no double-poll race.",
+    "pollNowPlaying()'s own function body is unchanged from before this task (verify via diff -- only add/change code around it, in startNowPlayingPoller and any new scheduling helpers, not inside pollNowPlaying itself).",
+    "The isRateLimited() check inside pollNowPlaying() continues to gate every poll call regardless of which of the three triggers caused it -- a poll that fires while rate-limited still returns early exactly as it does today, and the scheduling logic still schedules a next attempt afterward (doesn't get stuck).",
+    "stopNowPlayingPoller (or an equivalent) still cleanly stops all pending scheduled polls (both the safety-net timer and any pending end-of-track timer), leaving nothing running -- verify no timer leaks in tests (e.g. via vi.useFakeTimers()/vi.getTimerCount() or equivalent).",
+    "New/updated tests in nowPlaying.test.ts cover: (a) the scheduling picks the sooner of end-of-track-delay vs. the 15s safety interval correctly in both directions (a track ending in 3s schedules for ~3s+buffer, not 15s; a track with 60s remaining schedules for 15s, not 60s); (b) nothing-playing state uses the 15s safety interval; (c) the immediate-poll-trigger function correctly triggers a poll and reschedules without leaving a duplicate/stale timer; (d) stopping the poller cancels all pending timers.",
+    "cd backend && npx tsc --noEmit and npx vitest run both pass clean."
+  ],
+  "verification_commands": [
+    "cd backend && npx tsc --noEmit",
+    "cd backend && npx vitest run"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}
