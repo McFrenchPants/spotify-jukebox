@@ -857,3 +857,40 @@ Spotify's actual shape next time this fires for real. Routed through the
 `verifier` agent (touches `tokenRefresh.ts`, Spotify token-handling code)
 — verdict `pass`, no findings. Implemented on
 `feature/reduce-nowplaying-polling` (off `master`, not yet merged).
+
+## 26. Cache GET /api/device so N guests opening the app doesn't mean N Spotify calls
+**Status:** ready
+**Type:** enhancement
+
+Follow-up from [analysis/22](analysis/22-spotify-api-call-inventory.md): `GET /api/device`
+([routes/device.ts](backend/src/routes/device.ts) → [device.ts](backend/src/spotify/device.ts)`resolveDevice`)
+is the one endpoint in this app that doesn't follow the poll-once/fan-out
+pattern `CLAUDE.md`'s architecture note calls for — it's called fresh,
+uncached, by every guest's `PlaybackControls` mount (the Now Playing page
+everyone lands on) and every admin's `DeviceSelector` mount, with zero
+rate-limit gating (on-demand calls are deliberately ungated, per
+`rateLimitBackoff.ts`'s own design). N guests opening the app in a short
+window means N real, simultaneous `GET /v1/me/player/devices` calls.
+
+**Real correctness constraint a naive TTL cache would break**:
+`DeviceSelector` re-fetches `GET /api/device` specifically on the
+`device-status` SSE event, so an admin sees a bridge-device online/offline
+flip live rather than only on next reload
+([DeviceSelector.tsx](frontend/src/components/admin/DeviceSelector.tsx)).
+A cache with only a TTL (no invalidation) would silently serve stale data
+right when that live refresh matters most.
+
+**Fix**: add a small, dedicated device-resolution cache in
+[device.ts](backend/src/spotify/device.ts) (separate from `cache.ts`'s
+existing generic `withCache` — deliberately, since this needs explicit
+invalidation, not just TTL expiry, which `cache.ts`'s own docs say isn't
+worth the complexity for its existing search/track/artist use cases): a
+short TTL (~10s) covers the burst-of-simultaneous-guests case, and an
+explicit `invalidateDeviceResolutionCache()` call — wired into
+[nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s existing
+`device-status`-change detection (both `updateDeviceStatusFromDeviceField`
+and `checkDeviceStatusFallback`) and into `POST /api/device/select`'s
+success path — keeps it correctly fresh exactly when the underlying state
+actually changes. `POST /device/select` itself keeps calling `listDevices()`
+directly, uncached, unchanged — it already explicitly re-fetches live on
+purpose ("the admin must be selecting from what's currently visible").
