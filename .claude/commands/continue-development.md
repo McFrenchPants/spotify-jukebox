@@ -504,19 +504,76 @@ Once a task is genuinely done:
 ### Continue or stop
 
 Move to the next `todo` task and repeat, batching independent tasks where
-dependency notes make it safe. Stop and summarize for the user when:
+dependency notes make it safe (legacy proposal-folder work only — see
+"Delegate" above for why sdlc-tracked work never batches). Whether to keep
+going or stop is governed by the run budgets in `.sdlc/project.yaml`'s
+`budgets` block, plus a fixed set of unconditional stop conditions — read
+this file at the top of the loop and whenever you need to check a limit;
+never hardcode the numbers below into your own reasoning, since a future
+edit to `project.yaml` should change this loop's behavior without a
+matching edit here. These budgets apply to the run as a whole, regardless
+of which tracking convention the current task uses — `.sdlc/project.yaml`
+is a single repo-wide file, not one per work item, so it paces sdlc-tracked
+and legacy proposal-folder work identically. (This is a different axis
+from the Delegate section's task-packet/implementer mechanism, which
+genuinely is sdlc-tracked-only — don't conflate the two.)
+
+**Task-count budget.** Keep a plain running count, in your own working
+context for this session, of how many tasks you've completed this run —
+this is in-session bookkeeping only, not a new persisted field (`.sdlc/state.json`
+already tracks per-task status, not a run-level tally). Once that count
+reaches `budgets.max_tasks_per_run`, stop, regardless of how much budget
+headroom or momentum remains. This is the concrete, numeric replacement
+for "don't grind through every remaining task unattended in one go": the
+trigger is a number read from config, not a judgment call about what
+counts as a "substantial batch."
+
+**Per-task and per-verifier attempt budgets.** `budgets.max_attempts_per_task`
+caps how many times a single task gets retried before you stop retrying it
+automatically and escalate to your own judgment instead — treat that
+escalation the same as hitting a genuine blocker (surface it to the user
+rather than spawning attempt after attempt). For sdlc-tracked work, track
+attempts via `.sdlc/state.json`'s `lease.attempt_count` for that task; for
+legacy work, which has no such field, keep an in-session count yourself.
+Separately, when the SS4.3 verifier-routing path is in play,
+`budgets.max_verifier_retries` caps how many times you re-send a task back
+against the verifier after a `fail` verdict — once a task hits that count,
+stop retrying it against the verifier and escalate rather than looping
+indefinitely.
+
+**Token/time budget (soft).** `budgets.token_or_time_budget.minutes` (and
+`.tokens`, if set — it may be `null`, meaning not tracked) is a soft
+budget: keep only a rough, approximate sense of it over the run — e.g.
+noticing that a run has clearly gone long relative to the configured
+minutes — and log/flag it if it looks like you're exceeding it. This is
+never a hard stop condition: Claude Code has no clean mid-run cutoff
+primitive to enforce it with, so don't overstate the precision here.
+
+**Unconditional stop conditions.** Stop regardless of remaining budget
+headroom when any of these correctness/safety triggers fire (design-spec
+§7's list):
+- A phase boundary is reached.
+- Plan divergence: a subagent's actual change doesn't match what the
+  plan/design expected — a locally-plausible change that's globally wrong.
+- An unexpected file gets touched outside every currently-open task's
+  `write_paths` — a scope-drift signal even if the hook/verifier didn't
+  already catch it.
+- A test regression: something that passed before a task now fails.
+- An acceptance-criteria ambiguity that genuinely isn't this task's to
+  resolve — it needs a product/design decision only the user can make.
 - You hit a genuine blocker (a decision only the user can make, a
-  real-hardware/credential/access dependency).
-- A phase boundary is reached and it's a reasonable point for a sanity
-  check (a visual change, a risky migration, anything worth eyeballing
-  before building further on top of it).
-- You've done a substantial batch of work and it's a reasonable point for
-  the user to review — don't grind through every remaining task unattended
-  in one go.
+  real-hardware/credential/access dependency) — same tier as an
+  exhausted per-task/per-verifier attempt budget above.
 - The work is fully done and the only remaining step is merging to the
   default branch — treat that specifically as a stopping point requiring
   explicit go-ahead, not something to do automatically just because
   everything upstream of it succeeded.
+
+**Otherwise, continue automatically.** Absent an exhausted budget or a
+fired stop condition above, move on to the next task without pausing to
+ask — that's what makes these budgets a real replacement for a vague
+"substantial batch" judgment call rather than just another check sitting
+alongside one.
 
 **End every stopping point with:**
 1. A short summary: tasks completed this run (with task IDs), current

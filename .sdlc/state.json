@@ -214,19 +214,19 @@
         {
           "id": "SS4.4",
           "title": "Run-budget stopping conditions",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [
             "SS0.1"
           ],
           "lease": {
             "assigned_agent": null,
             "run_id": null,
-            "attempt_count": 0
+            "attempt_count": 1
           },
-          "task_packet_path": null,
+          "task_packet_path": ".sdlc/task-packets/SS4.4.packet.json",
           "report_path": null,
-          "notes": ""
+          "notes": "Continue-or-stop section now reads pacing from .sdlc/project.yaml's budgets block at run time instead of hardcoding 'substantial batch' judgment: max_tasks_per_run as an in-session running-count stop trigger, max_attempts_per_task/max_verifier_retries as escalate-to-orchestrator-judgment triggers (attempt_count sourced from state.json's lease field for sdlc-tracked work, in-session count for legacy), token_or_time_budget as soft/logged-not-hard-stop. Unconditional-stop list now names design-spec §7's concrete triggers (phase boundary, plan divergence, unexpected file outside open write_paths, test regression, acceptance ambiguity not the task's to resolve) replacing the old vague examples. Applies to both tracking conventions since project.yaml is repo-wide. Existing genuine-blocker/merge-gate bullets and the closing summary+prompt structure preserved. Diff confined to exactly the Continue-or-stop subsection (65 insertions, 8 deletions), independently verified via git diff --stat and a full read of the diff. Hand-authored packet, same self-referential rationale as SS4.1-4.3. This completes Phase SS4."
         },
         {
           "id": "SS5.1",
