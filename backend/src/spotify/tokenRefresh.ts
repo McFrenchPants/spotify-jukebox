@@ -77,7 +77,7 @@ export async function refreshAccessToken(): Promise<void> {
     // independently of the Web API — arms the same shared backoff the
     // automatic pollers already respect (see rateLimitBackoff.ts), so a
     // token-refresh 429 doesn't just get retried every poll tick either.
-    if (recordRateLimitFromResponse(response, "token refresh")) {
+    if (recordRateLimitFromResponse(response, "token refresh", tokenData)) {
       throw new SpotifyRateLimitedError(message);
     }
 

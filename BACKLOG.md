@@ -811,7 +811,7 @@ Implemented on `feature/reduce-nowplaying-polling` (off `master`, not yet
 merged), via two sdlc-tracked tasks (NP1.1 scheduler, NP1.2 route wiring).
 
 ## 25. rateLimitBackoff.ts doesn't distinguish QUOTA_EXCEEDED from an ordinary rate limit
-**Status:** ready
+**Status:** done
 **Type:** bug
 
 Follow-up from [analysis/22's "concrete follow-up" section](analysis/22-spotify-api-call-inventory.md#concrete-follow-up-this-unlocks).
@@ -844,3 +844,16 @@ the raw 429 body (truncated) whenever one occurs, regardless of whether
 Spotify's actual shape empirically rather than guessing again. No change
 to `isRateLimited()`'s existing scope (only gates the automatic poller,
 never on-demand/user-triggered calls, per the file's own stated design).
+
+Shipped: `recordRateLimitFromResponse()` gained a third, optional `body`
+parameter (stays synchronous, never reads the body itself — each of the
+three call sites threads through whatever body they already have/parse,
+avoiding a double-read). `body.reason`/`body.error.reason ===
+'QUOTA_EXCEEDED'` arms a new 1800s (30 min, documented as an engineering
+estimate, not a confirmed reset window) backoff with distinct log wording;
+otherwise the existing Retry-After/30s-default behavior is unchanged, and
+the raw (truncated) body is now logged for evidence toward confirming
+Spotify's actual shape next time this fires for real. Routed through the
+`verifier` agent (touches `tokenRefresh.ts`, Spotify token-handling code)
+— verdict `pass`, no findings. Implemented on
+`feature/reduce-nowplaying-polling` (off `master`, not yet merged).

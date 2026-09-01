@@ -515,6 +515,29 @@ describe("pollNowPlaying", () => {
 
       vi.useRealTimers();
     });
+
+    it("threads a QUOTA_EXCEEDED 429 body through to the shared backoff as a long window, not the ordinary short one", async () => {
+      vi.useFakeTimers();
+      const getTokenFn = vi.fn().mockResolvedValue("access-token");
+      const quotaResponse = {
+        ok: false,
+        status: 429,
+        json: async () => ({ error: { message: "quota exceeded", reason: "QUOTA_EXCEEDED" } }),
+        headers: {
+          get: (name: string) => (name.toLowerCase() === "retry-after" ? "5" : null),
+        },
+      } as unknown as Response;
+
+      await pollNowPlaying(vi.fn().mockResolvedValue(quotaResponse), getTokenFn);
+      expect(isRateLimited()).toBe(true);
+
+      // The 5s Retry-After the ordinary path would have used is long past —
+      // the QUOTA_EXCEEDED window should still be active.
+      vi.advanceTimersByTime(60_000);
+      expect(isRateLimited()).toBe(true);
+
+      vi.useRealTimers();
+    });
   });
 
   describe("lyrics lookup on track change (LY1.1)", () => {

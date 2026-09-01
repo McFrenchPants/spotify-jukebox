@@ -122,6 +122,21 @@ describe("listDevices", () => {
 
     await expect(listDevices(fetchMock, getTokenFn)).rejects.toBeInstanceOf(SpotifyRateLimitedError);
   });
+
+  it("threads the parsed 429 body's QUOTA_EXCEEDED reason through to the shared backoff as a long window, reading the body exactly once", async () => {
+    const response = jsonResponse(
+      { error: { status: 429, reason: "QUOTA_EXCEEDED", message: "quota exceeded" } },
+      false,
+      429
+    );
+    const jsonSpy = vi.spyOn(response, "json");
+    const fetchMock = vi.fn().mockResolvedValue(response);
+    const getTokenFn = vi.fn().mockResolvedValue("test-token");
+
+    await expect(listDevices(fetchMock, getTokenFn)).rejects.toBeInstanceOf(SpotifyRateLimitedError);
+    expect(isRateLimited()).toBe(true);
+    expect(jsonSpy).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("resolveDevice", () => {

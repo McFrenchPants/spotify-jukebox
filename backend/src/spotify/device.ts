@@ -49,16 +49,10 @@ export async function listDevices(
   });
 
   if (!response.ok) {
-    // Arms the automatic pollers' backoff window (see rateLimitBackoff.ts)
-    // on a 429 — this call still throws below either way, so the immediate
-    // caller (an admin's manual retry, or the poller itself) still gets a
-    // real, honest error; this just stops the *automatic* pollers from
-    // continuing to hammer Spotify while the window is active.
-    const wasRateLimited = recordRateLimitFromResponse(response, "device list");
-
     let message = `${response.status}`;
+    let errBody: { error?: { message?: string } } | undefined;
     try {
-      const errBody = (await response.json()) as {
+      errBody = (await response.json()) as {
         error?: { message?: string };
       };
       if (errBody.error?.message) {
@@ -66,7 +60,15 @@ export async function listDevices(
       }
     } catch {
       // Ignore JSON parse failures on the error body; fall back to status.
+      errBody = undefined;
     }
+
+    // Arms the automatic pollers' backoff window (see rateLimitBackoff.ts)
+    // on a 429 — this call still throws below either way, so the immediate
+    // caller (an admin's manual retry, or the poller itself) still gets a
+    // real, honest error; this just stops the *automatic* pollers from
+    // continuing to hammer Spotify while the window is active.
+    const wasRateLimited = recordRateLimitFromResponse(response, "device list", errBody);
 
     if (wasRateLimited) {
       // A dedicated error type so classifySpotifyAuthError() (errors.ts) can

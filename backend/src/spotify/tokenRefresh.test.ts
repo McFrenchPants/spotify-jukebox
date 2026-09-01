@@ -171,6 +171,27 @@ describe("refreshAccessToken", () => {
     await expect(refreshAccessToken()).rejects.toBeInstanceOf(SpotifyRateLimitedError);
     expect(isRateLimited()).toBe(true);
   });
+
+  it("threads the already-parsed token response body's QUOTA_EXCEEDED reason through to the shared backoff as a long window", async () => {
+    settings.set("spotify_refresh_token", "stored-refresh-token");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ error: "rate_limited", reason: "QUOTA_EXCEEDED" }, false, 429, 20)
+      )
+    );
+
+    vi.useFakeTimers();
+    await expect(refreshAccessToken()).rejects.toBeInstanceOf(SpotifyRateLimitedError);
+    expect(isRateLimited()).toBe(true);
+
+    // The 20s Retry-After the ordinary path would have used is long past —
+    // the QUOTA_EXCEEDED window should still be active.
+    vi.advanceTimersByTime(60_000);
+    expect(isRateLimited()).toBe(true);
+    vi.useRealTimers();
+  });
 });
 
 describe("startTokenRefreshWorker", () => {

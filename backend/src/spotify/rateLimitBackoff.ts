@@ -22,6 +22,20 @@ import { logWarn } from "../logger";
 
 const DEFAULT_BACKOFF_SECONDS = 30;
 
+/**
+ * Backoff window armed when a 429's body indicates Spotify's Development
+ * Mode QUOTA_EXCEEDED condition (a broader resource-allocation exhaustion,
+ * distinct from the ordinary rolling rate limit) rather than an ordinary
+ * short rate limit. 1800s (30 minutes) is an engineering estimate, NOT a
+ * confirmed reset window — Spotify doesn't document one, and this app has
+ * never actually observed a real QUOTA_EXCEEDED response to confirm it
+ * against (see BACKLOG.md #25 / analysis/22-spotify-api-call-inventory.md).
+ * The intent is just "meaningfully longer than the ordinary 30s default so
+ * the poller stops hammering a condition that clearly won't self-clear in
+ * seconds," not a precise number.
+ */
+const QUOTA_EXCEEDED_BACKOFF_SECONDS = 1800;
+
 let blockedUntil = 0;
 
 /** True while an active backoff window (from a recent 429) is in effect. */
@@ -30,10 +44,54 @@ export function isRateLimited(): boolean {
 }
 
 /**
+ * Checks a parsed 429 response body for Spotify's QUOTA_EXCEEDED reason.
+ * The real shape isn't confirmed against this app's own traffic yet, so
+ * this checks defensively at both a plausible top-level `body.reason` and a
+ * plausible nested `body.error.reason` rather than assuming one.
+ */
+function isQuotaExceededBody(body: unknown): boolean {
+  if (!body || typeof body !== "object") {
+    return false;
+  }
+  const record = body as Record<string, unknown>;
+  if (record.reason === "QUOTA_EXCEEDED") {
+    return true;
+  }
+  const error = record.error;
+  if (error && typeof error === "object" && (error as Record<string, unknown>).reason === "QUOTA_EXCEEDED") {
+    return true;
+  }
+  return false;
+}
+
+/** Truncates a value to a JSON string safe to log, never throwing. */
+function safeTruncatedBody(body: unknown, maxLength = 500): string {
+  try {
+    const text = JSON.stringify(body);
+    if (text === undefined) {
+      return String(body);
+    }
+    return text.length > maxLength ? `${text.slice(0, maxLength)}…` : text;
+  } catch {
+    return "<unstringifiable body>";
+  }
+}
+
+/**
  * Inspects a fetch Response for a 429 and, if found, arms the backoff window
  * — using Spotify's `Retry-After` header (seconds) when present, or a
  * default otherwise. No-ops (returns false) for any other status. Safe to
  * call on every Spotify response; only actually does anything on a 429.
+ *
+ * `body` is the already-parsed response body, if the caller happens to have
+ * it (this function stays synchronous and never reads/awaits the response
+ * body itself, to avoid double-reading a body each call site handles
+ * differently). When `body` indicates Spotify's QUOTA_EXCEEDED condition
+ * (see isQuotaExceededBody), a much longer backoff window is armed instead
+ * of the ordinary Retry-After/default logic, with distinct log wording.
+ * Otherwise, the ordinary logic runs unchanged, and — when `body` is
+ * present — its raw (truncated) contents are also logged, so a real future
+ * 429 builds an evidence trail of Spotify's actual response shape.
  *
  * Logs a warning whenever this actually arms the window. This case used to
  * be entirely silent by design (a single expected 429 isn't worth logging
@@ -49,10 +107,21 @@ export function recordRateLimitFromResponse(
     status: number;
     headers: { get(name: string): string | null };
   },
-  source = "spotify"
+  source = "spotify",
+  body?: unknown
 ): boolean {
   if (response.status !== 429) {
     return false;
+  }
+
+  if (isQuotaExceededBody(body)) {
+    const seconds = QUOTA_EXCEEDED_BACKOFF_SECONDS;
+    blockedUntil = Date.now() + seconds * 1000;
+    logWarn(
+      "rateLimitBackoff",
+      `${source} hit Spotify QUOTA_EXCEEDED — backing off for ${seconds}s (no confirmed reset window known, see BACKLOG.md #25) (until ${new Date(blockedUntil).toISOString()})`
+    );
+    return true;
   }
 
   const retryAfterHeader = response.headers.get("retry-after");
@@ -67,6 +136,9 @@ export function recordRateLimitFromResponse(
     "rateLimitBackoff",
     `${source} got a 429 from Spotify — backing off for ${seconds}s (until ${new Date(blockedUntil).toISOString()})`
   );
+  if (body !== null && body !== undefined) {
+    logWarn("rateLimitBackoff", `${source} 429 response body (for evidence, see BACKLOG.md #25): ${safeTruncatedBody(body)}`);
+  }
   return true;
 }
 
