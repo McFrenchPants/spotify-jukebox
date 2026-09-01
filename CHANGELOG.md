@@ -2,6 +2,12 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.26
+
+- Cut background Spotify API load from the now-playing poller by roughly two-thirds: instead of polling on a constant 4-second timer, it now polls right after a guest's own playback action, estimates and schedules a poll for the end of the current track, and otherwise falls back to a 15-second safety-net interval.
+- A real Spotify 429 that carries a `QUOTA_EXCEEDED` reason (developer-quota exhaustion, not an ordinary short rate limit) now triggers a much longer backoff instead of retrying every ~30s and re-tripping the same block repeatedly.
+- `GET /api/device` is now cached for 10 seconds and invalidated on real device-status changes, so multiple guests opening the app at the same time no longer means one Spotify device lookup per guest.
+
 ## 1.0.25
 
 - Fixed a live-incident bug where an artist with no genre tags (`artist.genres` undefined) crashed the entire app to a black screen with no way to recover — `getArtist()` now guards `genres` the same way it already guarded `images`/`followers`, and the Now Playing artist panel no longer reads `genres.length` unguarded.
