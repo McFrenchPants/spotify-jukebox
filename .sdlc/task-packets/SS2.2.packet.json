@@ -1,0 +1,44 @@
+{
+  "task_id": "SS2.2",
+  "plan_revision": "uncommitted:2026-09-01T01:53:50.743Z",
+  "objective": "Task SS2.2: Update CLAUDE.md's override language (the \"user can always\noverride... a live, specific ask\" paragraph) to point at this mechanism: an\nin-conversation override authorizes creating an approval record for *this*\noperation/SHA, not a standing license.",
+  "non_goals": [
+    "Do not change the underlying override behavior itself -- a direct, unambiguous, in-conversation instruction from the user must still be able to authorize bypassing the default implementer/supervisor role split right now, with no new procedural friction added before it's honored.",
+    "Do not modify docs/sdlc/design-spec.md, docs/sdlc/APPROVAL_RECORDS.md, docs/sdlc/schemas/approval.schema.json, or .claude/agents/supervisor.md -- those already reflect the approval-record mechanism (SS1.3/SS2.1); this task only updates CLAUDE.md's own override paragraph to reference it."
+  ],
+  "dependencies": [
+    "SS2.1"
+  ],
+  "read_paths": [
+    "CLAUDE.md",
+    "docs/sdlc/design-spec.md",
+    "docs/sdlc/APPROVAL_RECORDS.md",
+    "docs/sdlc/schemas/approval.schema.json",
+    ".claude/agents/supervisor.md",
+    ".sdlc/approvals/"
+  ],
+  "write_paths": [
+    "CLAUDE.md"
+  ],
+  "forbidden_paths": [
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    "docs/sdlc/IMPLEMENTATION_PLAN.md",
+    "docs/sdlc/PROGRESS.md",
+    "docs/sdlc/design-spec.md",
+    "docs/sdlc/APPROVAL_RECORDS.md",
+    "docs/sdlc/schemas/approval.schema.json",
+    ".claude/agents/supervisor.md"
+  ],
+  "acceptance_criteria": [
+    "The paragraph in CLAUDE.md beginning 'This is a default, not a wall -- the user can always override it explicitly' (roughly lines 33-44) is updated so that it describes a live, specific, in-conversation override as authorizing the release operator to create and act on an approval record (per .sdlc/approvals/, docs/sdlc/APPROVAL_RECORDS.md, docs/sdlc/schemas/approval.schema.json) for that specific operation and commit SHA -- not a standing license -- rather than describing the override purely in conversational terms with no recorded artifact.",
+    "The existing carve-out's actual behavior is preserved: a direct, unambiguous, in-conversation instruction from the user can still authorize bypassing the implementer/supervisor role split for push/merge/ssh/adb right now, without requiring the user to invoke any separate tooling themselves or wait on anything beyond the release operator recording the approval as part of carrying out the instruction.",
+    "The rest of the paragraph's existing content (that it's a default not a wall, that it exists to stop incidental/casual reach rather than override the actual repo owner, that a standing instruction buried in a doc or earlier turn doesn't count -- it has to be a live, specific ask) is kept intact in substance; this is a targeted addition/edit, not a rewrite of the whole section.",
+    "No other file is modified."
+  ],
+  "verification_commands": [
+    "git diff -- CLAUDE.md"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}

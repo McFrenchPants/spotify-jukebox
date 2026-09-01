@@ -1,0 +1,343 @@
+{
+  "schema_version": "1.0.0",
+  "updated_at": "2026-09-01T12:48:15Z",
+  "work_items": [
+    {
+      "id": "sdlc-supervisor-testbed",
+      "title": "sdlc-supervisor framework: task packets, machine state, restricted implementer roles",
+      "lifecycle_state": "ready_to_release",
+      "tasks": [
+        {
+          "id": "SS0.1",
+          "title": ".sdlc/state.json + project.yaml schema",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": "Foundational -- everything else in this framework reads/writes this shape. Verified via jsonschema.validate() against both example files."
+        },
+        {
+          "id": "SS0.2",
+          "title": "State-transition validator",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS0.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": ""
+        },
+        {
+          "id": "SS0.3",
+          "title": "Task-packet + completion-report templates/generator",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS0.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": ""
+        },
+        {
+          "id": "SS1.1",
+          "title": "implementer agent",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS0.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": ""
+        },
+        {
+          "id": "SS1.2",
+          "title": "verifier agent",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS0.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": ""
+        },
+        {
+          "id": "SS1.3",
+          "title": "Reframe supervisor.md as release operator",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS1.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": ""
+        },
+        {
+          "id": "SS2.1",
+          "title": "Approval-record format",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS1.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": ""
+        },
+        {
+          "id": "SS2.2",
+          "title": "Update CLAUDE.md override language",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS2.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": ".sdlc/task-packets/SS2.2.packet.json",
+          "report_path": null,
+          "notes": "CLAUDE.md's override paragraph now points at the approval-record mechanism (SS2.1): a live in-conversation override authorizes the release operator to record+consume a SHA-pinned, single-use approval, not a standing license. Original carve-out language preserved verbatim inside the addition. Dispatched via a real implementer subagent + generated task packet (first SS2.x+ task run through the actual packet/implementer mechanism rather than a general-purpose subagent) -- surfaced a real SS4.2 gap: the orchestrator must write .sdlc/active-packet before spawning, or the SS3.1 hook denies all writes (deny-by-default, no resolvable packet). Hit it, fixed it by hand this run, removed the pointer after. See PROGRESS.md session log."
+        },
+        {
+          "id": "SS3.1",
+          "title": "PreToolUse path-enforcement hook",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS1.1",
+            "SS0.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": "Real implementation replaces the spike. Hook input carries agent_type, so enforcement is scoped to implementer agents only; ordinary sessions pass through. Windows path normalization independently re-verified. Known gaps by design: Bash-origin writes are not caught (verifier is the backstop), and the kill switch is repo-wide/persistent."
+        },
+        {
+          "id": "SS4.1",
+          "title": "Orchestrator full-context-once rewrite",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS0.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": "continue-development.md's Resume section rewritten: full design-spec + plan + state loaded once per run (sdlc-tracked vs legacy proposal-folder detection), reread gated on Claude Code's own changed-on-disk tracking. Diff confirmed confined to one hunk."
+        },
+        {
+          "id": "SS4.2",
+          "title": "Delegate rewrite (task packets, implementer agent)",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS1.1",
+            "SS0.3"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/SS4.2.packet.json",
+          "report_path": null,
+          "notes": "Delegate section split into two explicit sub-paths: legacy proposal-folder work keeps the existing general-purpose behavior verbatim; sdlc-tracked work now follows a 9-step procedure (clean-tree gate, generate+hand-review packet, write/retire .sdlc/active-packet, spawn subagent_type: implementer with the packet pasted inline, SendMessage-to-same-agent-id resume semantics, scope_change_requested is the orchestrator's judgment call, draft-only expertise skills). Diff confined to exactly one file/section (117 insertions, 5 deletions), independently verified via git diff --stat and a full read of the diff. Implementer flagged one out-of-scope observation: .claude/hooks/sdlc-path-check.mjs's header comment still describes isolation: worktree, stale since that decision was reversed (design-spec §2a) -- worth a small follow-up task, not urgent."
+        },
+        {
+          "id": "SS4.3",
+          "title": "Verify rewrite (verifier routing)",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS1.2"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/SS4.3.packet.json",
+          "report_path": null,
+          "notes": "Verify section now routes floor/widen-tier tasks (auth, persistence/migrations, deploy tooling, production-mutation-or-above, plus this repo's Spotify-credential and HA/Android-device widen entries) through subagent_type: verifier with exactly the three inputs verifier.md requires (packet, diff, verification-command output); a verifier fail blocks acceptance the same as an orchestrator-found gap; uncertain criteria are recorded, not rounded to pass. Non-floor tasks keep the prior spot-check path verbatim. Routing applies identically to legacy proposal-folder work (verifier.md isn't sdlc-scoped the way implementer.md is). Diff confined to exactly the Verify subsection (73 insertions, 1 deletion), independently verified via git diff --stat and a full read of the diff -- no other section or file touched. Hand-authored packet (self-referential task editing continue-development.md itself, same rationale as SS4.2)."
+        },
+        {
+          "id": "SS4.4",
+          "title": "Run-budget stopping conditions",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS0.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/SS4.4.packet.json",
+          "report_path": null,
+          "notes": "Continue-or-stop section now reads pacing from .sdlc/project.yaml's budgets block at run time instead of hardcoding 'substantial batch' judgment: max_tasks_per_run as an in-session running-count stop trigger, max_attempts_per_task/max_verifier_retries as escalate-to-orchestrator-judgment triggers (attempt_count sourced from state.json's lease field for sdlc-tracked work, in-session count for legacy), token_or_time_budget as soft/logged-not-hard-stop. Unconditional-stop list now names design-spec §7's concrete triggers (phase boundary, plan divergence, unexpected file outside open write_paths, test regression, acceptance ambiguity not the task's to resolve) replacing the old vague examples. Applies to both tracking conventions since project.yaml is repo-wide. Existing genuine-blocker/merge-gate bullets and the closing summary+prompt structure preserved. Diff confined to exactly the Continue-or-stop subsection (65 insertions, 8 deletions), independently verified via git diff --stat and a full read of the diff. Hand-authored packet, same self-referential rationale as SS4.1-4.3. This completes Phase SS4."
+        },
+        {
+          "id": "SS5.1",
+          "title": "sdlc-doctor command",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS0.1",
+            "SS0.2"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/SS5.1.packet.json",
+          "report_path": null,
+          "notes": "New read-only diagnostic command at .claude/commands/sdlc-doctor.md: lifecycle-enum sanity, PreToolUse hook wiring, owned_files existence, task_packet_path referential integrity -- PASS/FAIL report, never edits anything. Task packet needed full hand-authoring (generator stripped leading dots off .claude/ paths, produced a self-contradicting .sdlc/**/docs/** write scope, left acceptance criteria empty) -- same pattern as SS4.x. Did not qualify for the SS4.3 strong-verification tier; orchestrator spot-check used, diff confined to exactly the one new file (git status --porcelain), and the implementer's own drift test (scratch state.json copy, scratch owned_files list) confirmed both real checks correctly detect drift without ever touching the real .sdlc/state.json or .claude/hooks/sdlc-path-check.mjs. Completes Phase SS5."
+        },
+        {
+          "id": "SS6.1",
+          "title": "Dogfood: run one real backlog item through the loop",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS0.1",
+            "SS0.2",
+            "SS0.3",
+            "SS1.1",
+            "SS1.2",
+            "SS1.3",
+            "SS2.1",
+            "SS2.2",
+            "SS3.1",
+            "SS4.1",
+            "SS4.2",
+            "SS4.3",
+            "SS4.4",
+            "SS5.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": "BACKLOG.md #11 chosen. Task F11.1 completed and live-verified via the sdlc-tracked implementer mechanism -- see the favorites-two-column-layout work_item's F11.1 row for full detail. Real, unplanned signal surfaced along the way (this is exactly what SS6.1 was for): an unrelated, higher-priority live-incident bug (BACKLOG.md #23) was found mid-dogfood and correctly jumped the queue via its own separate work_item (artist-genres-crash-fix / B23.1) rather than being awkwardly folded into F11.1's scope -- the framework handled an unplanned priority interruption cleanly. Also surfaced two recurrences of BACKLOG.md item 20 (stray local backends), tracked as item 22. Findings written up in SS6.2."
+        },
+        {
+          "id": "SS6.2",
+          "title": "Write up dogfood findings",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [
+            "SS6.1"
+          ],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 0
+          },
+          "task_packet_path": null,
+          "report_path": null,
+          "notes": "docs/sdlc/dogfood-notes.md, written directly by the orchestrator (not delegated -- this task needs the full run's context, which is exactly what an implementer is deliberately never given). Six concrete findings tied to specific task IDs from this run, not generic impressions: the packet generator's 0-for-7 hand-correction rate, the implementer's honest blocked-not-faked verification report, a real unplanned priority interruption (B23.1) handled cleanly by per-work-item task graphs, .sdlc/ branch-locality as a recurring (not hypothetical) friction point, verification-tier routing not over/under-triggering on two real tasks, and the stray-backend incidents as organic (not staged) confirmation of the genuine-blocker stop condition. This completes all of SS0-SS6 -- the sdlc-supervisor testbed proposal's full task table is now done."
+        }
+      ]
+    },
+    {
+      "id": "favorites-two-column-layout",
+      "title": "BACKLOG.md #11: Favorites sits alongside Search at lg+ widths instead of a separate tab",
+      "lifecycle_state": "released",
+      "tasks": [
+        {
+          "id": "F11.1",
+          "title": "Two-column reflow of SearchAndQueue at the lg breakpoint",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/F11.1.packet.json",
+          "report_path": null,
+          "notes": "SS6.1 dogfood target -- first real (non-framework) work item run through the sdlc-tracked implementer/verifier mechanism. See analysis/11-favorites-two-column-layout.md for the scrutinized scope. Branched off feature/sdlc-supervisor (not master) since .sdlc/ only exists there. Implementer's code change was correct on review (git diff confined to SearchAndQueue.tsx, tsc/build clean, mirrors the HistoryPage/SettingsPage/NowPlaying lg:flex-row precedent, correctly mount-gates FavoritesSection below lg to avoid a new eager fetch) and self-reported status: blocked only because it has no browser tooling to do the packet's required live-viewport verification -- expected, that's the orchestrator's job on this task's default (non-strong-verification) path. Attempting that live check surfaced two stray local backends in a row (BACKLOG.md item 20/22 recurrence) and a real live-app crash bug (BACKLOG.md #23, fixed as B23.1) that jumped the queue -- see PROGRESS.md session log for the full sequence. Live verification completed after B23.1 landed: with the user's go-ahead to proceed despite uncertain rate-limit state, started backend+frontend via the Browser pane's preview tool, confirmed via computed-style/network inspection at 375px (toggle visible, single column, click-to-switch works) and 1280px (toggle hidden, both columns visible side-by-side at ~484px each, Search left/Favorites right, GET /api/favorites confirms FavoritesSection mounted, search input's max-w-2xl correctly overridden by lg:max-w-none so it fills its column). Both dev servers shut down and confirmed via netstat afterward."
+        }
+      ]
+    },
+    {
+      "id": "artist-genres-crash-fix",
+      "title": "BACKLOG.md #23: unguarded artist.genres crashes the whole app to a black screen",
+      "lifecycle_state": "released",
+      "tasks": [
+        {
+          "id": "B23.1",
+          "title": "Guard artist.genres backend+frontend, regression tests",
+          "status": "done",
+          "lifecycle_state": "released",
+          "dependencies": [],
+          "lease": {
+            "assigned_agent": null,
+            "run_id": null,
+            "attempt_count": 1
+          },
+          "task_packet_path": ".sdlc/task-packets/B23.1.packet.json",
+          "report_path": null,
+          "notes": "Live incident reported by the user 2026-09-01: deployed app (v1.0.24) went black with a TypeError matching this exact unguarded field, alongside item 22's real rate-limit 503. Jumped the F11.1/SS6.1 queue since it's a live-affecting bug the user asked to fix now. See BACKLOG.md #23 for full root-cause writeup. Fixed: client.ts's genres ?? [] guard + optional type, ArtistInfoPanel.tsx's genres?.length/followers?.toLocaleString() guards, new regression test mirroring item 15's pattern. Orchestrator independently reread the diff (confined to exactly the 3 intended files) and independently reran backend tsc/vitest (388/388) and frontend tsc -- all clean. Implementer flagged one pre-existing, unrelated flaky test (adminAuth.test.ts's tampered-token case) on its first run; reran alone (4/4) and reran the full suite (388/388) and it did not reproduce, confirming it's not caused by this change. Not yet deployed -- this only fixes the source, the live add-on still needs a rebuild+redeploy to actually clear the black screen for guests, which is a supervisor-only operation requiring explicit user go-ahead."
+        }
+      ]
+    }
+  ]
+}

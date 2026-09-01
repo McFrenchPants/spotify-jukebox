@@ -1,0 +1,52 @@
+{
+  "task_id": "B23.1",
+  "plan_revision": "uncommitted:2026-09-01T00:00:00Z",
+  "objective": "Fix a live production bug (BACKLOG.md #23): backend/src/spotify/client.ts's getArtist() guards artist.images/artist.followers against Spotify sometimes omitting them for a given artist ID (fixed for BACKLOG item 15) but never applied the same guard to artist.genres -- it's passed through unguarded as `genres: artist.genres`, and SpotifyArtistResponse.genres is still typed as required string[] despite the identical reliability caveat already documented for images/followers. frontend/src/components/artist/ArtistInfoPanel.tsx:97 then calls `artist.genres.length > 0` unguarded, which throws `Cannot read properties of undefined (reading 'length')` when genres is actually undefined at runtime -- exactly the error the user reported live on the deployed app. Because no error boundary exists anywhere in this app, that one uncaught render error crashes React's entire tree, blanking the whole app to a black screen. Fix both sides: (1) backend/src/spotify/client.ts -- guard `genres: artist.genres ?? []`, matching the existing images/followers guard exactly, and update SpotifyArtistResponse's `genres` field to be typed optional (`genres?: string[]`) with the same 'observed missing/undefined for some real artist IDs' comment already on images/followers; (2) frontend/src/components/artist/ArtistInfoPanel.tsx -- defense in depth even with the backend fix in place: guard `artist.genres?.length` (instead of `artist.genres.length`) and `artist.followers?.toLocaleString()` (instead of `artist.followers.toLocaleString()`), so this decorative panel degrades gracefully on any future unguarded/malformed field instead of crashing the whole app again, consistent with its own doc comment's stated intent to fail silently rather than break the app.",
+  "non_goals": [
+    "Do not add a top-level React error boundary -- that's a separate, deliberate follow-up (flagged in BACKLOG.md #23's own 'not done here' section), not part of this fix. This task is scoped to the specific unguarded field, not general app-wide crash resilience.",
+    "Do not touch the item 22 rate-limit/stray-backend issue, or anything about /api/device -- unrelated, tracked separately.",
+    "Do not change ArtistInfoPanel's overall behavior, layout, or the rest of its rendering -- only the two specific unguarded property accesses named above.",
+    "Do not touch F11.1's SearchAndQueue.tsx changes already on this branch -- leave them exactly as they are."
+  ],
+  "dependencies": [],
+  "read_paths": [
+    "backend/src/spotify/client.ts",
+    "backend/src/spotify/client.test.ts",
+    "backend/src/routes/artist.ts",
+    "backend/src/routes/artist.test.ts",
+    "frontend/src/components/artist/ArtistInfoPanel.tsx",
+    "frontend/src/lib/api.ts",
+    "docs/TESTING.md"
+  ],
+  "write_paths": [
+    "backend/src/spotify/client.ts",
+    "backend/src/spotify/client.test.ts",
+    "frontend/src/components/artist/ArtistInfoPanel.tsx"
+  ],
+  "forbidden_paths": [
+    "BACKLOG.md",
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    "docs/sdlc/**",
+    "frontend/src/components/search/SearchAndQueue.tsx",
+    "backend/src/routes/artist.ts",
+    "backend/src/routes/artist.test.ts",
+    "frontend/src/lib/api.ts"
+  ],
+  "acceptance_criteria": [
+    "backend/src/spotify/client.ts's getArtist() no longer passes artist.genres through unguarded -- it defaults to an empty array when Spotify omits the field (`artist.genres ?? []`), matching the exact pattern already used for images/followers on the adjacent lines.",
+    "SpotifyArtistResponse's genres field is typed optional (`genres?: string[]`) with a comment matching the existing images/followers reliability comment, so the type system reflects the same real-world unreliability already documented for the other two fields.",
+    "A new backend regression test in client.test.ts mirrors the existing 'defaults followers to 0 and imageUrl to null when Spotify omits those fields' test (BACKLOG item 15's regression test) but for genres specifically: when the mocked Spotify response omits `genres` entirely, getArtist() resolves with `genres: []` instead of throwing.",
+    "frontend/src/components/artist/ArtistInfoPanel.tsx's genres check is changed from `artist.genres.length > 0` to `artist.genres?.length` (or equivalent optional-chained/defaulted form) so it does not throw if `genres` is ever undefined/missing at runtime, and the followers line is similarly guarded (`artist.followers?.toLocaleString()` or equivalent) rather than assuming it's always a number -- verify by reading the final code, not just describing the intended change.",
+    "cd backend && npx tsc --noEmit and npx vitest run both pass clean (including the new test). cd frontend && npx tsc --noEmit and npm run build both pass clean.",
+    "git diff confirms only backend/src/spotify/client.ts, backend/src/spotify/client.test.ts, and frontend/src/components/artist/ArtistInfoPanel.tsx changed -- nothing else on this branch (including F11.1's existing SearchAndQueue.tsx changes) was touched."
+  ],
+  "verification_commands": [
+    "cd backend && npx tsc --noEmit",
+    "cd backend && npx vitest run",
+    "cd frontend && npx tsc --noEmit",
+    "cd frontend && npm run build"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}

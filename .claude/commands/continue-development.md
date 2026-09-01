@@ -64,26 +64,57 @@ If there's genuinely nothing in flight, move to "Pick new work" below.
 ## Resume in-progress work
 
 This mirrors what a proposal-specific supervisor command already does —
-apply the same loop generically:
+apply the same loop generically.
+
+**Load full context once.** Unlike the subagents you delegate to (see
+"Delegate" below, which deliberately get only a narrow task packet), *you*
+— the orchestrator — need the whole picture: cross-task drift, a change
+that's locally correct for one task but globally wrong for the plan, an
+acceptance criterion elsewhere in the plan that a single task's own Notes
+don't mention. Reading only a task's own narrow slice (the old approach)
+was the wrong economy for this role — narrow-context discipline belongs to
+what you hand a subagent, not to what you read yourself.
 
 1. Checkout the branch if you're not already on it (if the branch doesn't
    exist despite tracking docs referencing it, stop and ask the user — do
    not create it yourself in this situation, something is inconsistent).
-2. Read that work's `PROGRESS.md` (proposal-specific, or the root one's
-   relevant section) — its task table and session log are the source of
-   truth for status.
-3. Pick the task: the one `$ARGUMENTS` named, or the first `todo` task in
-   the table, respecting phase order and each row's `Notes` dependency.
-4. From that work's `IMPLEMENTATION_PLAN.md`, read **only** the entry for
-   the chosen task ID (Grep for it, then read just that section) — not the
-   whole file. If it references a `DESIGN_SPEC.md` section, read **only**
-   that section too.
-5. If the task's Notes flag a dependency that isn't `done`, or something
+2. Determine which tracking convention this work uses: does
+   `.sdlc/state.json` contain a `work_items[].id` matching it? If so, this
+   is **sdlc-tracked** work. If not — true for most work today, e.g.
+   anything under `docs/proposals/<slug>/` — this is a **legacy
+   proposal-folder** work item, tracked entirely via its own
+   `DESIGN_SPEC.md`/`IMPLEMENTATION_PLAN.md`/`PROGRESS.md`, with no
+   corresponding `.sdlc/state.json` entry. Don't add one just to unify
+   this — migrating every proposal folder onto `.sdlc/state.json` is a
+   separate, not-yet-decided piece of work and out of scope here.
+3. Read, in full, once for this run:
+   - **sdlc-tracked**: the complete `docs/sdlc/design-spec.md`, the
+     complete `docs/sdlc/IMPLEMENTATION_PLAN.md`, and the complete
+     `.sdlc/state.json`.
+   - **legacy proposal-folder**: the complete
+     `docs/proposals/<slug>/DESIGN_SPEC.md`, the complete
+     `docs/proposals/<slug>/IMPLEMENTATION_PLAN.md`, and the complete
+     `docs/proposals/<slug>/PROGRESS.md` — this convention's task table and
+     session log already are the state; there is no separate state file to
+     additionally read.
+4. Don't re-read these documents before every task you pick within this
+   same run — that's the redundant-reread failure mode this replaces the
+   old narrow-read instruction with. Rely on Claude Code's own
+   changed-on-disk tracking: it will tell you when a file you've already
+   read has since changed on disk, and that notice — or a subagent's report
+   saying it touched one of these docs, or any other concrete signal — is
+   your cue to re-read that specific document, and only that one. Absent
+   such a signal, treat the copy you loaded in step 3 as still current;
+   don't re-open it "just in case" before picking the next task.
+5. Pick the task: the one `$ARGUMENTS` named, or the first `todo` task in
+   the table you already loaded, respecting phase order and each row's
+   `Notes` dependency.
+6. If the task's Notes flag a dependency that isn't `done`, or something
    only the user can decide (a visual taste call not already settled by the
    design spec, access to real hardware, credentials, an ambiguous product
    decision), stop and ask the user rather than guessing or stubbing around
    it.
-6. Delegate, verify, track, and continue/stop exactly per the **"Delegate →
+7. Delegate, verify, track, and continue/stop exactly per the **"Delegate →
    Verify → Track → Continue-or-stop" loop** below.
 
 ---
@@ -220,11 +251,18 @@ existing work or driving freshly-scaffolded new work.
 
 ### Delegate
 
-For the chosen task (or a small batch of independent tasks — check
-dependency notes first), spawn one subagent per task using the Agent tool
-(`subagent_type: general-purpose`, run in the background unless you have
-nothing else to do while waiting). Independent tasks in one batch go in a
-single message with multiple Agent calls.
+Which mechanism you use depends on which tracking convention the task
+belongs to (see "Resume in-progress work" step 2 above for how to tell
+sdlc-tracked from legacy proposal-folder work). The two paths are
+deliberately different — do not blend them.
+
+#### Legacy proposal-folder work (no `.sdlc/state.json` entry)
+
+Unchanged from before. For the chosen task (or a small batch of
+independent tasks — check dependency notes first), spawn one subagent per
+task using the Agent tool (`subagent_type: general-purpose`, run in the
+background unless you have nothing else to do while waiting). Independent
+tasks in one batch go in a single message with multiple Agent calls.
 
 Each subagent prompt must be **self-contained** and **narrow**:
 - State the task ID and paste its full scope + acceptance criteria text
@@ -252,9 +290,186 @@ Do not let a subagent read the plan/progress/spec docs — everything it
 needs should already be in the prompt you wrote. This keeps subagent
 context small and prevents drift/scope creep.
 
+#### sdlc-tracked work (`.sdlc/state.json` has this task)
+
+This path uses the sdlc-supervisor framework's task-packet + `implementer`
+subagent mechanism instead of `general-purpose`. Follow it exactly, one
+task at a time — never batch multiple sdlc-tracked tasks into concurrent
+implementer spawns, even when their dependency notes would otherwise allow
+it. `.sdlc/project.yaml`'s `budgets.max_concurrent_implementers` is `1`,
+and only one `.sdlc/active-packet` pointer can exist at a time (see step 3
+below), so there is no batching path here the way there is for legacy
+work.
+
+1. **Require a clean working tree first.** Run `git status --porcelain`.
+   If it produces any output, stop — do not spawn an implementer. The
+   implementer agent runs directly in this shared working tree, not an
+   isolated worktree, so a dirty tree is the one thing standing between
+   its edits and whatever uncommitted work (yours or the user's) is
+   already sitting there. Surface the dirty state to the user and let them
+   decide (commit, stash themselves, or explain what it is) rather than
+   proceeding around it.
+2. **Generate the task packet.** Run
+   `scripts/sdlc/generate-task-packet.mjs` with `--task-id`,
+   `--plan-entry-file`, and, if relevant, `--design-excerpt-file`/
+   `--dependencies` (see the script's own header comment for exact usage).
+   This writes `.sdlc/task-packets/<task_id>.packet.json`.
+3. **Review and correct the generated packet before using it — do not
+   trust it as-is.** The generator's `read_paths`/`write_paths` inference
+   is a documented, honest heuristic operating purely on input text, not
+   real code/semantic understanding, and it has previously produced wrong
+   output that needed hand-correction (mis-parsing a design excerpt into a
+   bogus read-path entry, dropping a leading `.` from a filename, and
+   inferring a read-only doc as a write target, in one real prior case).
+   Read through every field — `read_paths`, `write_paths`,
+   `forbidden_paths`, `acceptance_criteria`, `verification_commands` — and
+   fix anything wrong. In particular:
+   - If the packet contains the literal string `"NEEDS_MANUAL_REVIEW"`
+     anywhere, it is not ready — fill in the real paths by hand.
+   - If any path is plainly wrong on inspection (missing leading `.`,
+     wrong directory, a read-only doc listed as writable, etc.), fix it by
+     hand.
+   - When the heuristic's output needs substantial correction, it's fine
+     to just write the packet file directly (matching
+     `docs/sdlc/schemas/task-packet.schema.json`) instead of patching the
+     generated one field-by-field.
+   Never hand an implementer a packet you haven't actually reviewed.
+4. **Write the active-packet pointer.** Before spawning, write
+   `.sdlc/active-packet` in the repo root containing exactly the task's id
+   and nothing else (a single line, e.g. `SS4.2`). The committed
+   `PreToolUse` hook (`.claude/hooks/sdlc-path-check.mjs`) denies every
+   `Edit`/`Write` call from the implementer unless it can resolve exactly
+   one active packet, and this pointer file is the mechanism that
+   resolves it for a single implementer running in the shared tree. Leave
+   it in place for the duration of that implementer's work.
+5. **Spawn the implementer.** Use the Agent tool with
+   `subagent_type: implementer` (never `general-purpose` for sdlc-tracked
+   work). Paste the **full packet JSON verbatim** into the spawn prompt —
+   the implementer agent's own instructions say every invocation hands it
+   exactly one task packet pasted into its prompt at spawn time; it does
+   not read the packet file itself, and by its own rules it never reads
+   `docs/sdlc/IMPLEMENTATION_PLAN.md`, `docs/sdlc/design-spec.md`, or
+   `docs/sdlc/PROGRESS.md` directly. Don't tell it to go read the plan —
+   that's not how it's built to work, and doing so wastes the turn on a
+   refusal or a scope violation.
+6. **Resuming, not restarting, a blocked or interrupted implementer.** If
+   an implementer's completion report is `blocked`, or a run gets
+   interrupted mid-task and needs to continue, resume it with
+   `SendMessage` addressed to that exact agent's own id — it already has
+   the full packet and context in its memory. Never spin up a brand-new
+   `Agent` call that merely asserts prior progress ("you already did X,
+   now do Y") — a fresh agent has no legitimate basis to verify such a
+   claim and will correctly refuse it, wasting the spawn. If the original
+   agent is genuinely gone (session ended, its id lost), the correct
+   recovery is a brand-new `Agent` spawn with the complete packet pasted
+   inline again, as a fresh attempt — never a message asserting
+   unverifiable prior progress to a new agent.
+7. **Scope-change requests are yours to judge, not auto-approve.** A
+   completion report with `status: scope_change_requested` means the
+   implementer determined it needed to read or write outside the packet's
+   declared paths. You — not the implementer — have the full plan context
+   needed to judge whether that's a real gap in the task's scope or the
+   implementer overreaching. Never auto-approve it into more implementer
+   work, and never silently ignore it either; decide on the merits and act
+   (widen the packet and re-spawn/resume, or push back) accordingly.
+8. **Drafting, not activating, expertise skills.** You may freely write a
+   one-run inline instruction into an implementer's spawn prompt any time
+   — no review needed, and it dies with that run if not reused. If you
+   notice the *same* one-run instruction recurring across multiple tasks,
+   you may draft (write to disk, but not enable, reference, or otherwise
+   activate) a project-local expertise-skill file capturing it. Drafting
+   is not activating: turning a drafted skill into something actually used
+   in a run, or committing it into the project, requires a human check-in
+   first — the same tier as a design-spec sign-off. Never activate a
+   drafted skill unilaterally just because you drafted it.
+9. **Retire the pointer once the task is settled.** After the task's
+   completion report has been accepted (see Verify/Update-tracking below),
+   delete `.sdlc/active-packet` so it doesn't linger and get mistaken for
+   the next task's active packet. If the task is instead abandoned or left
+   blocked, still remove or overwrite the pointer once you've decided what
+   happens next — don't leave a stale pointer sitting there into the next
+   task.
+
+This mechanism is specific to sdlc-tracked work. Legacy proposal-folder
+work keeps using the `general-purpose` path above unchanged — the
+`implementer` agent is not (yet) a generic delegate target for arbitrary
+proposal folders.
+
 ### Verify
 
-When a subagent reports back, don't take "done" on faith:
+When a subagent reports back, don't take "done" on faith. First decide
+which verification tier this task gets — the routing decision below comes
+*before* the spot-check, not instead of it.
+
+**Decide whether this task needs the verifier agent.** Most tasks don't —
+for those, skip straight to "Default path (no verifier)" below and proceed
+exactly as before. A task requires spawning the separate `verifier` agent,
+not just your own spot-check, when it touches any of:
+
+- **The fixed floor** (`.sdlc/project.yaml`'s `verification_profile.floor_triggers`,
+  per design-spec.md §6): authentication/authorization, data persistence or
+  migrations, deployment/release tooling, or anything at the
+  production-mutation tier or above.
+- **This repo's widened categories** (`verification_profile.widen`):
+  Spotify credential/token handling, or Home Assistant/Android Master
+  Device access.
+
+This floor is a minimum — a project can widen it (by adding entries to
+`project.yaml`'s `widen` list) but this command's routing logic itself must
+never narrow it below the fixed `floor_triggers`. If a future edit to
+`project.yaml` adds another `widen` category, that alone should be enough
+to route more tasks to the verifier — no corresponding edit to this file
+should be needed.
+
+Which bucket a task falls into is **your own judgment call, applied
+per-task** — not a mechanical grep or automated classifier. Look at the
+task's objective/description and its packet's (or, for legacy
+proposal-folder work, its task-table row's) `write_paths`/`read_paths` for
+anything that plainly falls into one of the six categories above: auth or
+token/credential logic, a database or persistence migration, CI/CD or
+deploy tooling, `.claude/agents/supervisor.md` or any supervisor-only
+remote operation, Spotify auth/token code (e.g. `backend/src/spotify/**`
+auth flows), or anything referencing the Home Assistant host or Android
+Master Device. This applies identically to sdlc-tracked and legacy
+proposal-folder work — `verifier.md` isn't restricted to sdlc-tracked
+packets the way `implementer.md` is; for legacy work, assemble its inputs
+ad hoc from the proposal's own task-table row, a `git diff`, and test
+output, without needing any `.sdlc/*` machine-state files. When genuinely
+unsure whether a task qualifies, err toward routing it to the verifier —
+spawning it unnecessarily costs one extra subagent run, but missing a real
+hit here often isn't caught until much later, if ever.
+
+**Strong-verification path (task is in the floor/widen tier).** After the
+implementer's completion report comes back:
+1. Gather exactly the three inputs `verifier.md` requires and nothing
+   else: the task packet JSON (or, for legacy work, the assembled
+   equivalent), the actual diff (`git diff`/`git show` output for the
+   implementer's changes), and the output of running the packet's
+   `verification_commands` (or equivalent test/build output). Optionally
+   add any task-specific architectural invariants beyond `CLAUDE.md`'s
+   standing list. Never paste in the implementer's own completion-report
+   JSON or reasoning — `verifier.md` is explicit that it must not be given
+   that.
+2. Spawn `subagent_type: verifier` (never `general-purpose`) with those
+   inputs pasted into the prompt.
+3. Treat the verifier's returned verdict as the actual verification
+   outcome for this task, not merely advisory alongside your own
+   spot-check: a verifier `fail` means the task is not accepted as done,
+   exactly as if your own spot-check had found the same gap. Act on its
+   per-criterion findings, forbidden-path check, and architectural-invariant
+   findings the same way you'd act on your own.
+4. For any acceptance criterion the verifier reports as `uncertain`, apply
+   the same judgment you already apply to your own uncertain findings —
+   record it explicitly in the tracking notes, don't silently round it to
+   pass.
+5. Still do the cheap checks below yourself where they add something the
+   verifier didn't cover (e.g. a quick browser check for a UI-adjacent
+   change) — the verifier replaces the *authority* of your spot-check for
+   this task's acceptance-criteria/forbidden-path verdict, it doesn't
+   replace all the ordinary follow-up you'd otherwise do.
+
+**Default path (no verifier).** For a task outside the floor/widen tier,
+proceed exactly as before — do not spawn a verifier for it:
 - Spot-check the actual diff it produced against the acceptance criteria
   you gave it.
 - Run anything cheap yourself if the subagent didn't already (typecheck, a
@@ -289,19 +504,76 @@ Once a task is genuinely done:
 ### Continue or stop
 
 Move to the next `todo` task and repeat, batching independent tasks where
-dependency notes make it safe. Stop and summarize for the user when:
+dependency notes make it safe (legacy proposal-folder work only — see
+"Delegate" above for why sdlc-tracked work never batches). Whether to keep
+going or stop is governed by the run budgets in `.sdlc/project.yaml`'s
+`budgets` block, plus a fixed set of unconditional stop conditions — read
+this file at the top of the loop and whenever you need to check a limit;
+never hardcode the numbers below into your own reasoning, since a future
+edit to `project.yaml` should change this loop's behavior without a
+matching edit here. These budgets apply to the run as a whole, regardless
+of which tracking convention the current task uses — `.sdlc/project.yaml`
+is a single repo-wide file, not one per work item, so it paces sdlc-tracked
+and legacy proposal-folder work identically. (This is a different axis
+from the Delegate section's task-packet/implementer mechanism, which
+genuinely is sdlc-tracked-only — don't conflate the two.)
+
+**Task-count budget.** Keep a plain running count, in your own working
+context for this session, of how many tasks you've completed this run —
+this is in-session bookkeeping only, not a new persisted field (`.sdlc/state.json`
+already tracks per-task status, not a run-level tally). Once that count
+reaches `budgets.max_tasks_per_run`, stop, regardless of how much budget
+headroom or momentum remains. This is the concrete, numeric replacement
+for "don't grind through every remaining task unattended in one go": the
+trigger is a number read from config, not a judgment call about what
+counts as a "substantial batch."
+
+**Per-task and per-verifier attempt budgets.** `budgets.max_attempts_per_task`
+caps how many times a single task gets retried before you stop retrying it
+automatically and escalate to your own judgment instead — treat that
+escalation the same as hitting a genuine blocker (surface it to the user
+rather than spawning attempt after attempt). For sdlc-tracked work, track
+attempts via `.sdlc/state.json`'s `lease.attempt_count` for that task; for
+legacy work, which has no such field, keep an in-session count yourself.
+Separately, when the SS4.3 verifier-routing path is in play,
+`budgets.max_verifier_retries` caps how many times you re-send a task back
+against the verifier after a `fail` verdict — once a task hits that count,
+stop retrying it against the verifier and escalate rather than looping
+indefinitely.
+
+**Token/time budget (soft).** `budgets.token_or_time_budget.minutes` (and
+`.tokens`, if set — it may be `null`, meaning not tracked) is a soft
+budget: keep only a rough, approximate sense of it over the run — e.g.
+noticing that a run has clearly gone long relative to the configured
+minutes — and log/flag it if it looks like you're exceeding it. This is
+never a hard stop condition: Claude Code has no clean mid-run cutoff
+primitive to enforce it with, so don't overstate the precision here.
+
+**Unconditional stop conditions.** Stop regardless of remaining budget
+headroom when any of these correctness/safety triggers fire (design-spec
+§7's list):
+- A phase boundary is reached.
+- Plan divergence: a subagent's actual change doesn't match what the
+  plan/design expected — a locally-plausible change that's globally wrong.
+- An unexpected file gets touched outside every currently-open task's
+  `write_paths` — a scope-drift signal even if the hook/verifier didn't
+  already catch it.
+- A test regression: something that passed before a task now fails.
+- An acceptance-criteria ambiguity that genuinely isn't this task's to
+  resolve — it needs a product/design decision only the user can make.
 - You hit a genuine blocker (a decision only the user can make, a
-  real-hardware/credential/access dependency).
-- A phase boundary is reached and it's a reasonable point for a sanity
-  check (a visual change, a risky migration, anything worth eyeballing
-  before building further on top of it).
-- You've done a substantial batch of work and it's a reasonable point for
-  the user to review — don't grind through every remaining task unattended
-  in one go.
+  real-hardware/credential/access dependency) — same tier as an
+  exhausted per-task/per-verifier attempt budget above.
 - The work is fully done and the only remaining step is merging to the
   default branch — treat that specifically as a stopping point requiring
   explicit go-ahead, not something to do automatically just because
   everything upstream of it succeeded.
+
+**Otherwise, continue automatically.** Absent an exhausted budget or a
+fired stop condition above, move on to the next task without pausing to
+ask — that's what makes these budgets a real replacement for a vague
+"substantial batch" judgment call rather than just another check sitting
+alongside one.
 
 **End every stopping point with:**
 1. A short summary: tasks completed this run (with task IDs), current

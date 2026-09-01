@@ -90,11 +90,11 @@ export function ArtistInfoPanel({ artistId }: ArtistInfoPanelProps) {
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-body font-semibold text-text-primary">{artist.name}</p>
-          <p className="text-caption text-text-muted">{artist.followers.toLocaleString()} followers</p>
+          <p className="text-caption text-text-muted">{artist.followers?.toLocaleString()} followers</p>
         </div>
       </div>
 
-      {artist.genres.length > 0 && (
+      {artist.genres?.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
           {artist.genres.map((genre) => (
             <span

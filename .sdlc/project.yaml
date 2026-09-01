@@ -1,0 +1,45 @@
+# Project policy for the sdlc-supervisor framework.
+# Shape documented at docs/sdlc/schemas/project.schema.json.
+framework_version: "0.1.0"
+schema_version: "1.0.0"
+
+path_enforcement:
+  # Kill switch for the PreToolUse path-enforcement hook
+  # (.claude/hooks/sdlc-path-check.mjs, design-spec.md §8/§8a). The hook reads
+  # this value at runtime, on every call. It lives HERE, and not in
+  # .claude/settings.json, precisely so that turning it off never routes
+  # through the Edit/Write tools the hook itself gates -- §8a finding 2
+  # recorded a real self-lock. Flip it with Bash (sed/python), never with
+  # Edit/Write. Absent file or absent key means enforcing.
+  enforce: true
+
+budgets:
+  max_tasks_per_run: 5
+  max_concurrent_implementers: 1
+  max_attempts_per_task: 3
+  max_verifier_retries: 2
+  token_or_time_budget:
+    tokens: null
+    minutes: 120
+
+verification_profile:
+  # Fixed floor from design-spec.md §6 -- reproduced verbatim, do not edit.
+  # Widen coverage via `widen` below instead of touching this list.
+  floor_triggers:
+    - authentication_authorization
+    - data_persistence_migrations
+    - deployment_release_tooling
+    - production_mutation_tier_or_above
+  # Project-specific additions to the floor, per this repo's real risk areas
+  # (see CLAUDE.md: Spotify auth is shared with the live party deployment,
+  # and the supervisor-only boundary around the Home Assistant host / Android
+  # Master Device).
+  widen:
+    - spotify_credential_or_token_handling
+    - home_assistant_or_android_device_access
+
+owned_files:
+  - ".sdlc/**"
+  - "docs/sdlc/**"
+  - ".claude/agents/implementer.md"
+  - ".claude/agents/verifier.md"

@@ -66,10 +66,10 @@ export interface ShapedArtist {
 interface SpotifyArtistResponse {
   id: string;
   name: string;
-  genres: string[];
   // Observed missing/undefined for some real artist IDs despite Spotify's
   // documented schema marking these required; typed optional to match
   // reality and force callers to guard rather than assume.
+  genres?: string[];
   images?: Array<{ url: string; height: number | null; width: number | null }>;
   followers?: { total: number };
 }
@@ -273,11 +273,12 @@ export async function getArtist(
     return {
       id: artist.id,
       name: artist.name,
-      genres: artist.genres,
+      genres: artist.genres ?? [],
       // Spotify returns artist images sorted largest-first; use the first one.
       // Spotify's response shape for a given artist ID isn't fully reliable —
-      // `images` and `followers` have been observed missing/undefined for some
-      // artist IDs, so both are guarded rather than trusted as always-present.
+      // `genres`, `images`, and `followers` have been observed missing/undefined
+      // for some artist IDs, so all three are guarded rather than trusted as
+      // always-present.
       imageUrl: artist.images?.[0]?.url ?? null,
       followers: artist.followers?.total ?? 0,
     };

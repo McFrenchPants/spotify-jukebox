@@ -2,6 +2,11 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.25
+
+- Fixed a live-incident bug where an artist with no genre tags (`artist.genres` undefined) crashed the entire app to a black screen with no way to recover — `getArtist()` now guards `genres` the same way it already guarded `images`/`followers`, and the Now Playing artist panel no longer reads `genres.length` unguarded.
+- On wide screens (desktop/tablet, `lg` breakpoint and up), Search and Favorites now lay out in two columns instead of one long single-column list.
+
 ## 1.0.24
 
 - Added synced lyrics: tap "Lyrics" on the Now Playing screen to reveal a lyrics card that auto-scrolls in time with the song, and can be expanded to read the full lyrics freely. Lyrics come from LRCLIB, a free open lyrics database — not every song will have a match.

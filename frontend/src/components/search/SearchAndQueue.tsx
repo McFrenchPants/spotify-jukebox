@@ -22,6 +22,32 @@ import { describeQueueError } from '../../lib/queueErrors'
 
 const DEBOUNCE_MS = 380
 const SKELETON_ROWS = 4
+// Matches the `lg` Tailwind breakpoint (1024px) used for the two-column
+// reflow below.
+const LG_BREAKPOINT_QUERY = '(min-width: 1024px)'
+
+/**
+ * Tracks whether the viewport is at/above the `lg` breakpoint. Used to gate
+ * *mounting* (not just CSS visibility) of the Search/Favorites sections
+ * below `lg`, so the inactive tab's section — most commonly Favorites,
+ * which fetches on mount — doesn't eagerly fetch before the guest ever
+ * switches to it, matching today's behavior exactly at those sizes. At and
+ * above `lg` both sections are always mounted, since both render at once.
+ */
+function useIsLgViewport(): boolean {
+  const [isLg, setIsLg] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(LG_BREAKPOINT_QUERY).matches
+  )
+
+  useEffect(() => {
+    const mql = window.matchMedia(LG_BREAKPOINT_QUERY)
+    const handler = (e: MediaQueryListEvent) => setIsLg(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
+
+  return isLg
+}
 
 type ActiveTab = 'search' | 'favorites'
 
@@ -82,6 +108,7 @@ function favoriteToTrack(favorite: FavoriteTrack): Track {
 export function SearchAndQueue({ subscribe }: SearchAndQueueProps) {
   const { token } = useSession()
   const [activeTab, setActiveTab] = useState<ActiveTab>('search')
+  const isLg = useIsLgViewport()
 
   // Prefilled from ?q= when arriving via the "See more from this artist" link
   // on the expanded Now Playing card (NowPlaying.tsx) — read once on mount,
@@ -146,7 +173,11 @@ export function SearchAndQueue({ subscribe }: SearchAndQueueProps) {
 
   return (
     <div className="flex flex-col gap-4 pt-4">
-      <div className="mx-auto flex w-full max-w-2xl gap-2">
+      {/* Below lg, this toggle picks which single section renders below.
+          At lg+ both sections render side by side (see the flex-row wrapper
+          further down), so there's no single "active" tab to switch and the
+          toggle is hidden entirely. */}
+      <div className="mx-auto flex w-full max-w-2xl gap-2 lg:hidden">
         <Button
           type="button"
           variant={activeTab === 'search' ? 'primary' : 'secondary'}
@@ -165,8 +196,14 @@ export function SearchAndQueue({ subscribe }: SearchAndQueueProps) {
         </Button>
       </div>
 
-      {activeTab === 'search' && (
-        <>
+      {/* Same lg:flex-row two-column reflow used by HistoryPage/SettingsPage/
+          NowPlaying. Below lg, only the active tab's column is shown (via
+          `hidden`/`lg:flex` on each side) — behavior there is unchanged from
+          the single-section toggle this replaces. */}
+      <div className="flex flex-col gap-6 lg:flex-row">
+        <div
+          className={`flex-col gap-4 lg:flex lg:w-1/2 ${activeTab === 'search' ? 'flex' : 'hidden'}`}
+        >
           <label className="block">
             <span className="sr-only">Search for a song</span>
             <input
@@ -176,7 +213,7 @@ export function SearchAndQueue({ subscribe }: SearchAndQueueProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search for a song or artist…"
-              className="glass-inset mx-auto block h-12 w-full max-w-2xl rounded-md px-4 text-body text-text-primary placeholder:text-text-muted transition-fast focus:border-accent focus:outline-none"
+              className="glass-inset mx-auto block h-12 w-full max-w-2xl rounded-md px-4 text-body text-text-primary placeholder:text-text-muted transition-fast focus:border-accent focus:outline-none lg:mx-0 lg:max-w-none"
             />
           </label>
 
@@ -240,12 +277,19 @@ export function SearchAndQueue({ subscribe }: SearchAndQueueProps) {
                 ))}
               </div>
             )}
-        </>
-      )}
+        </div>
 
-      {activeTab === 'favorites' && (
-        <FavoritesSection subscribe={subscribe} onAdd={handleAdd} rowStatus={rowStatus} />
-      )}
+        <div
+          className={`flex-col gap-4 lg:flex lg:w-1/2 ${activeTab === 'favorites' ? 'flex' : 'hidden'}`}
+        >
+          {/* Mount-gated (not just CSS-hidden) on `isLg` so this doesn't
+              eagerly fetch favorites below `lg` before the guest switches to
+              this tab — see useIsLgViewport's doc comment. */}
+          {(activeTab === 'favorites' || isLg) && (
+            <FavoritesSection subscribe={subscribe} onAdd={handleAdd} rowStatus={rowStatus} />
+          )}
+        </div>
+      </div>
     </div>
   )
 }
@@ -353,7 +397,7 @@ function FavoritesSection({ subscribe, onAdd, rowStatus }: FavoritesSectionProps
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 sm:flex-row">
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-2 sm:flex-row lg:mx-0 lg:max-w-none">
         <input
           type="text"
           autoComplete="off"

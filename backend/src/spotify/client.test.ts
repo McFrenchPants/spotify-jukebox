@@ -262,6 +262,34 @@ describe("getArtist", () => {
     });
   });
 
+  it("defaults genres to [] when Spotify omits the field", async () => {
+    // Regression test for BACKLOG item 23: Spotify's response shape for a
+    // given artist ID isn't fully reliable — `genres` has been observed
+    // missing/undefined entirely (not just empty), which used to throw a raw
+    // TypeError (`Cannot read properties of undefined (reading 'length')`)
+    // in the frontend's ArtistInfoPanel and crash the whole React tree.
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        id: "artist-4",
+        name: "Artist Four",
+        images: [],
+        followers: { total: 0 },
+        // `genres` intentionally omitted.
+      })
+    );
+    const getTokenFn = vi.fn().mockResolvedValue("test-access-token");
+
+    const result = await getArtist("artist-4", fetchMock, getTokenFn);
+
+    expect(result).toEqual({
+      id: "artist-4",
+      name: "Artist Four",
+      genres: [],
+      imageUrl: null,
+      followers: 0,
+    });
+  });
+
   it("calls the Spotify artist endpoint with the id and bearer token", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       jsonResponse({ id: "artist-1", name: "A", genres: [], images: [], followers: { total: 0 } })
