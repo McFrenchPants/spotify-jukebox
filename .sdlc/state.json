@@ -303,17 +303,17 @@
         {
           "id": "F11.1",
           "title": "Two-column reflow of SearchAndQueue at the lg breakpoint",
-          "status": "todo",
+          "status": "blocked",
           "lifecycle_state": "approved",
           "dependencies": [],
           "lease": {
             "assigned_agent": null,
             "run_id": null,
-            "attempt_count": 0
+            "attempt_count": 1
           },
-          "task_packet_path": null,
+          "task_packet_path": ".sdlc/task-packets/F11.1.packet.json",
           "report_path": null,
-          "notes": "SS6.1 dogfood target -- first real (non-framework) work item run through the sdlc-tracked implementer/verifier mechanism. See analysis/11-favorites-two-column-layout.md for the scrutinized scope. Branched off feature/sdlc-supervisor (not master) since .sdlc/ only exists there -- see PROGRESS.md session log for the branching decision."
+          "notes": "SS6.1 dogfood target -- first real (non-framework) work item run through the sdlc-tracked implementer/verifier mechanism. See analysis/11-favorites-two-column-layout.md for the scrutinized scope. Branched off feature/sdlc-supervisor (not master) since .sdlc/ only exists there. Implementer's code change looks correct on review (git diff confined to SearchAndQueue.tsx, tsc/build clean, mirrors the HistoryPage/SettingsPage/NowPlaying lg:flex-row precedent, correctly mount-gates FavoritesSection below lg to avoid a new eager fetch) but self-reported status: blocked because it has no browser tooling to do the packet's required live-viewport verification -- expected, that's the orchestrator's job on this task's default (non-strong-verification) path. BLOCKED for a different, more serious reason found while attempting that live check: starting the frontend preview surfaced a stray local backend already LISTENING on :8085 since 2026-08-31 ~12:48pm (21+ hours), confirmed live and already showing rateLimited:true against the real Spotify account -- the exact BACKLOG.md item 20 incident recurring. Killed the stray process immediately per CLAUDE.md; did NOT start a fresh local backend for verification afterward since the account may still be mid-backoff and the live HA add-on may be affected. Live UI verification for this task is deferred until the user confirms the account's rate-limit state has cleared. See PROGRESS.md session log and a new BACKLOG.md entry for the incident itself."
         }
       ]
     }

@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Phases SS0-SS5 done. SS6.1 next (dogfood run).
+## Status: Phases SS0-SS5 done. SS6.1 in progress (dogfood run on BACKLOG.md #11), blocked pending live verification -- see session log.
 
 ## Task Table
 
@@ -35,7 +35,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS4.3 | Verify rewrite (verifier routing) | done | `.claude/commands/continue-development.md`'s "Verify" subsection now decides, per task, whether it needs the SS1.2 verifier agent before falling back to the orchestrator's own spot-check. Routing tier: the fixed floor (auth/authz, data persistence/migrations, deployment/release tooling, production-mutation-tier-or-above) plus this repo's `project.yaml` widen entries (Spotify credential/token handling, HA/Android device access) — stated as a minimum a project can widen but this file's logic can never narrow. Routing decision is explicitly the orchestrator's own per-task judgment (not an automated classifier), applied identically to sdlc-tracked and legacy proposal-folder work, erring toward routing when unsure. Strong-verification path spawns `subagent_type: verifier` with exactly the three inputs `verifier.md` requires (task packet, actual diff, verification-command output) — never the implementer's own completion-report JSON/reasoning; a verifier `fail` blocks acceptance the same as an orchestrator-found gap, and `uncertain` criteria are recorded rather than rounded to pass. Default (non-floor) path preserves the prior spot-check prose verbatim. Diff confined to exactly the Verify subsection (73 insertions, 1 deletion), independently verified via `git diff --stat` and a full read of the diff. Hand-authored packet, same rationale as SS4.2 (self-referential task, no plain-text plan-entry source to feed the generator without handing the implementer the plan itself). |
 | SS4.4 | Run-budget stopping conditions | done | "Continue or stop" now reads pacing from `.sdlc/project.yaml`'s `budgets` block at run time rather than the old subjective "substantial batch" language: `max_tasks_per_run` is an in-session running-count stop trigger; `max_attempts_per_task`/`max_verifier_retries` escalate to the orchestrator's own judgment (surfaced to the user) rather than auto-retrying, sourced from `state.json`'s `lease.attempt_count` for sdlc-tracked work and an in-session count for legacy work; `token_or_time_budget` is explicitly soft (logged/flagged, never a hard stop, since Claude Code has no mid-run cutoff primitive). Unconditional-stop list now names design-spec §7's concrete triggers (phase boundary, plan divergence, an unexpected file outside every open task's `write_paths`, a test regression, an acceptance-criteria ambiguity not the task's to resolve) in place of the old vague examples. Applies identically to sdlc-tracked and legacy proposal-folder work since `project.yaml` is repo-wide, not per-item. Existing genuine-blocker and merge-requires-go-ahead bullets, plus the closing summary+prompt structure, preserved. Diff confined to exactly the Continue-or-stop subsection (65 insertions, 8 deletions), independently verified via `git diff --stat` and a full read of the diff. Hand-authored packet, same self-referential rationale as SS4.1-4.3. **Phase SS4 (orchestrator loop rewrite) is now complete.** |
 | SS5.1 | `sdlc-doctor` command | done | `.claude/commands/sdlc-doctor.md` — read-only diagnostic slash command, four checks (lifecycle-enum sanity, PreToolUse hook wiring, `owned_files` existence, `task_packet_path` referential integrity), PASS/FAIL report format, explicit never-edit framing. Generator heuristic needed full hand-authoring for the packet (mis-stripped leading dots on `.claude/` paths, an overly broad `.sdlc/**`/`docs/**` write scope self-contradicting its own `forbidden_paths`, empty acceptance criteria) — same pattern as the SS4.x self-referential tasks. Did not qualify for SS4.3's strong-verification tier (no auth/persistence/deploy/credential/device angle) — orchestrator spot-check used. Manually re-exercised against real repo state (clean) and a deliberately drifted scratch copy (drift caught) before accepting; confirmed via `git status --porcelain` that neither `.sdlc/state.json` nor `.claude/hooks/sdlc-path-check.mjs` was actually touched during that test. Phase SS5 (bootstrap commands) is now complete. |
-| SS6.1 | Dogfood: run one real backlog item through the loop | todo | depends on all of SS0-SS5 |
+| SS6.1 | Dogfood: run one real backlog item through the loop | in-progress | Item chosen: BACKLOG.md #11 (Favorites two-column layout at lg). Analysis written, user checked in on scope (analysis/11-favorites-two-column-layout.md), scaffolded as a new sdlc-tracked work item `favorites-two-column-layout` (task F11.1) on `feature/favorites-two-column-layout` (branched off `feature/sdlc-supervisor`, not `master`, since `.sdlc/` doesn't exist there yet). F11.1's implementer completed the code change (spot-checked, looks correct) but self-reported `blocked` on the packet's live-viewport verification requirement, which is expected -- implementer has no browser tooling by design, that check is the orchestrator's job. Attempting it surfaced a real, more serious blocker: a stray local backend had been running since 2026-08-31, already rate-limited for real -- see BACKLOG.md #22 and this row's session log entry. F11.1 verification is deferred pending the user confirming the account's rate-limit state. |
 | SS6.2 | Write up dogfood findings | todo | depends on SS6.1 |
 
 ## Open Questions / Blockers
@@ -100,6 +100,99 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-09-01** — `/continue-development`: started **SS6.1** (dogfood),
+  the first real (non-framework) work item run through the sdlc-tracked
+  loop — **stopped mid-task on a genuine, urgent blocker**, not a planned
+  stopping point.
+  - Presented the 3 actionable `BACKLOG.md` items (11, 14, 18) to the user
+    via `AskUserQuestion`; **#11** (Favorites two-column layout at `lg`)
+    was chosen.
+  - Wrote `analysis/11-favorites-two-column-layout.md` per `BACKLOG.md`'s
+    own process: read the current `SearchAndQueue.tsx` implementation and
+    the existing `lg:flex-row`/`lg:w-1/2` precedent (item 2's landscape
+    work, used in `HistoryPage`/`SettingsPage`/`NowPlaying`), then checked
+    in with the user on two real scope questions before finalizing (does
+    the tab toggle disappear entirely at `lg`+, and column order) rather
+    than deciding unilaterally. Moved item 11's status `idea` → `ready`.
+  - **Judgment call, made explicitly rather than silently assumed**: SS6.1's
+    own plan text calls for running the chosen item through SS4.2's
+    implementer delegation and SS4.3's verifier routing specifically (not
+    the legacy `general-purpose` path) — which means the item needs a real
+    `.sdlc/state.json` entry, but `.sdlc/` only exists on the unmerged
+    `feature/sdlc-supervisor` branch, not `master`. Surfaced this
+    branching tension to the user via `AskUserQuestion` rather than picking
+    unilaterally; chosen: branch `feature/favorites-two-column-layout` off
+    `feature/sdlc-supervisor` (inherits `.sdlc/` for free, stays its own
+    branch/commits, can't merge to `master` independently until
+    `sdlc-supervisor` merges first — accepted as fine since this is
+    explicitly a dogfood/validation exercise). Added a new work_item
+    `favorites-two-column-layout` (task `F11.1`) to `.sdlc/state.json`;
+    judged "small" tier (single well-scoped file, reusing an established
+    pattern) so skipped the design-spec ceremony per the Scaffold section's
+    own sizing guidance.
+  - Hand-authored `F11.1`'s task packet directly against
+    `task-packet.schema.json` (same rationale as every SS4.x/SS5.1 packet
+    so far — the generator wasn't even tried given its consistent track
+    record on well-scoped tasks). Followed the active-packet lifecycle:
+    committed the scaffolding first so the tree was clean before spawning
+    (matching the established convention), wrote `.sdlc/active-packet`
+    containing `F11.1`, spawned `subagent_type: implementer`.
+  - **The implementer's own report is a clean example of the framework
+    working as designed**: it implemented the two-column reflow correctly
+    (spot-checked directly — diff confined to exactly `SearchAndQueue.tsx`,
+    `tsc`/`build` clean, mirrors the cited precedent files, and made a
+    good independent judgment call to mount-gate `FavoritesSection` below
+    `lg` so the change wouldn't introduce a new eager fetch, which the
+    packet's non-goals forbade), then correctly self-reported
+    `status: blocked` rather than claiming success it couldn't back up —
+    it has no browser/computer-use tooling by design (`implementer.md`'s
+    fixed tool grant is `Read, Grep, Glob, Edit, Write, Bash`), so the
+    packet's required live-viewport verification was never something it
+    could have done. This is expected and correct: live UI verification
+    for an sdlc-tracked task is the orchestrator's job on the default
+    (non-strong-verification) path, not the implementer's — SS4.3 never
+    routed this task to the `verifier` agent either (no auth/persistence/
+    deploy/credential/device angle), so the orchestrator's own spot-check
+    was already the right next step regardless.
+  - **Attempting that live check surfaced a real, more serious, unplanned
+    blocker**: starting the frontend preview to verify the layout showed
+    `503`s in the console, which led to discovering a stray local backend
+    (`node.exe`, PID 38052) had been `LISTENING` on `:8085` since
+    **2026-08-31 ~12:48pm — over 21 hours** — confirmed live and real by
+    hitting `/api/device`/`/api/now-playing` directly, both returning real
+    data including `rateLimited: true`. This is `BACKLOG.md` item 20's
+    exact incident shape recurring, despite that item's fix already having
+    added the "always shut down dev servers you start" rule to
+    `CLAUDE.md`. **Killed it immediately** (`Stop-Process -Id 38052
+    -Force`), confirmed via `netstat` that `:8085` has no remaining
+    `LISTENING` socket, and **deliberately did not start a fresh local
+    backend** to continue F11.1's own verification — the account may still
+    be mid rate-limit-backoff, and the live Home Assistant add-on shares
+    the same pooled quota, so starting another local instance right now
+    risks compounding whatever is currently happening on the real
+    deployment. Documented the incident itself as `BACKLOG.md` #22 (open
+    questions: which session actually left it running — the timing
+    roughly overlaps this same conversation's SS5.1 work, but that task's
+    own completion report shows only `vitest run`/`tsc --noEmit`, not
+    `npm run dev`, so it's not yet confirmed which prior step is
+    responsible; and whether the live add-on showed any real user-facing
+    impact during the window, checkable now via item 21's logging).
+  - **This is an unconditional stop condition** per design-spec §7 ("you
+    hit a genuine blocker... a real-hardware/credential/access
+    dependency") — not a task-count/attempt-budget stop. F11.1 is marked
+    `blocked` in `.sdlc/state.json` (not `done`), `.sdlc/active-packet`
+    removed. **F11.1's own code change is believed correct on inspection
+    but is NOT yet verified live** — do not mark it done without either
+    (a) the user confirming the rate-limit state has cleared and a fresh
+    local verification pass, or (b) some other live-verification path the
+    user prefers.
+  - Added a `backend` entry to `.claude/launch.json` (previously only
+    `frontend` existed) so a future session can start the backend via the
+    Browser pane's `preview_start` tool instead of ad hoc `Bash`, per this
+    project's own dev-server conventions — harmless/inert until invoked,
+    kept even though this session didn't end up using it for a completed
+    verification pass.
 
 - **2026-09-01** — `/continue-development`: implemented **SS5.1**, the
   `sdlc-doctor` command — **completing Phase SS5**. Not self-referential

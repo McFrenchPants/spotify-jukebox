@@ -665,3 +665,49 @@ state be fixed by pushing device-online changes over SSE, and (b) is there a
 genuinely dead/no-op setting in this scenario that the original report had
 in mind — worth re-confirming the specific setting/scenario with the
 reporter before scoping further.
+
+## 22. Recurrence: another stray local backend left running, tripped a real rate limit
+**Status:** idea
+**Type:** bug
+
+Found 2026-09-01 while trying to live-verify item 11's F11.1 task in the
+Browser pane: a `node.exe` process (PID 38052) had been `LISTENING` on
+`:8085` since 2026-08-31 ~12:48pm — over 21 hours — confirmed to be a real
+instance of this backend by hitting `/api/device` and `/api/now-playing`
+directly, both of which returned live data including `rateLimited: true`.
+This is the exact same failure mode as item 20 (a leftover `tsx watch`
+backend left running from an earlier agent session, polling Spotify's
+`currently-playing` endpoint every ~4s on top of whatever else is drawing
+from the same account's pooled quota) recurring for at least a second time,
+despite item 20's fix already adding the CLAUDE.md rule about always
+shutting down dev servers started during a session.
+
+**Immediate action taken:** killed PID 38052 directly
+(`Stop-Process -Id 38052 -Force`), confirmed via `netstat` that port 8085
+has no remaining `LISTENING` socket. Deliberately did **not** start a fresh
+local backend afterward to continue F11.1's live verification, since the
+account may still be in the rate-limit backoff window this stray process
+had just armed, and the live Home Assistant add-on shares the same pooled
+quota — starting another local instance right now risks compounding
+whatever's currently happening on the real deployment.
+
+**Not yet done / open questions:**
+- Which session left this running, and for how long has it actually been
+  polling — the process `StartTime` (8/31 ~12:48pm) roughly lines up with
+  this same conversation's earlier SS5.1 work, but that task's own
+  completion report only shows `vitest run`/`tsc --noEmit` being run, not
+  `npm run dev` — worth checking whether an *earlier* session/task in this
+  thread started it and never noticed, since the CLAUDE.md rule is
+  "shut down what you start," which only works if the agent that started
+  it is the one that notices it's still running.
+- Whether the live Home Assistant add-on deployment showed any real user-
+  facing impact (503s, stale Now Playing) during this window — worth
+  checking the add-on's own logs (item 21's timestamped logging should
+  make this checkable now) rather than assuming no impact.
+- Item 20's existing mitigation (a CLAUDE.md instruction to always shut
+  down dev servers) is clearly not sufficient on its own if it's recurring
+  — worth considering something more mechanical: a repo-local script/hook
+  that lists or kills anything listening on 8085 before/after a session,
+  or a periodic reminder baked into a command like `/continue-development`
+  itself to check for stray listeners on the backend's port before doing
+  any Spotify-touching verification work.

@@ -1,0 +1,50 @@
+{
+  "task_id": "F11.1",
+  "plan_revision": "uncommitted:2026-09-01T00:00:00Z",
+  "objective": "In frontend/src/components/search/SearchAndQueue.tsx, add a two-column reflow at the `lg` (1024px) Tailwind breakpoint: at lg and above, the Search tab body and the Favorites tab body (FavoritesSection) render simultaneously side-by-side (Search on the left, Favorites on the right), and the Search/Favorites toggle buttons are hidden entirely at that breakpoint since there's no longer a single active tab to switch. Below lg, behavior is completely unchanged: the toggle buttons control which single section renders, exactly as today. This follows the same responsive pattern already used three times elsewhere in this codebase for item 2 (landscape-layout): a `flex flex-col gap-6 lg:flex-row` wrapper with each side at `lg:w-1/2` (see frontend/src/pages/HistoryPage.tsx:11-16, frontend/src/pages/SettingsPage.tsx:34-51, and frontend/src/components/nowplaying/NowPlaying.tsx:262-331 for the existing precedent to match).",
+  "non_goals": [
+    "Do not change anything below the lg breakpoint -- phone-portrait tab-switching behavior must be pixel-for-pixel identical to today.",
+    "Do not add a new toggle, setting, or any way to collapse back to one column at lg+ -- both sections always render together above the breakpoint, full stop.",
+    "Do not touch SongCard.tsx, FavoriteButton, the favorites sort/filter controls, or any add-to-queue/favorite-toggle logic -- reuse them exactly as they already work today, this task only changes layout/rendering structure around them.",
+    "Do not add new features, data, or API calls -- this is a pure CSS/JSX layout reflow of the two sections that already exist."
+  ],
+  "dependencies": [],
+  "read_paths": [
+    "frontend/src/components/search/SearchAndQueue.tsx",
+    "frontend/src/pages/HistoryPage.tsx",
+    "frontend/src/pages/SettingsPage.tsx",
+    "frontend/src/components/nowplaying/NowPlaying.tsx",
+    "frontend/src/components/songs/SongCard.tsx",
+    "frontend/src/components/favorites/FavoriteButton.tsx",
+    "analysis/11-favorites-two-column-layout.md",
+    "docs/proposals/landscape-layout/DESIGN_SPEC.md",
+    "docs/TESTING.md"
+  ],
+  "write_paths": [
+    "frontend/src/components/search/SearchAndQueue.tsx"
+  ],
+  "forbidden_paths": [
+    "BACKLOG.md",
+    "analysis/11-favorites-two-column-layout.md",
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    "docs/sdlc/**",
+    "frontend/src/components/songs/SongCard.tsx",
+    "frontend/src/components/favorites/**",
+    "backend/**"
+  ],
+  "acceptance_criteria": [
+    "At viewport widths >= 1024px (lg), both the Search section (search input + results/empty/loading/error states) and the Favorites section (filter input, sort select, favorites list) render at the same time, side-by-side, Search on the left half and Favorites on the right half, each occupying roughly half the available width (lg:w-1/2, matching the existing HistoryPage/SettingsPage/NowPlaying precedent).",
+    "At viewport widths >= 1024px, the 'Search' / 'Favorites' toggle buttons (SearchAndQueue.tsx:150-166 today) are not rendered/visible at all.",
+    "At viewport widths < 1024px, behavior is unchanged from today: the toggle buttons are visible, only the active tab's section renders, and switching tabs works exactly as it does now.",
+    "The existing max-w-2xl centering constraints on the search input and the favorites filter/sort row (currently `mx-auto ... max-w-2xl`) are adapted so they don't fight the new two-column layout at lg+ -- e.g. the per-column max-width constraint should not force each half-width column back down to a narrower centered box than its lg:w-1/2 allocation intends. Verify this visually/via computed styles, not just by reading the JSX.",
+    "No change to any component this task doesn't own (SongCard, FavoriteButton, favorites sort/filter logic, add-to-queue handling) -- verify via git diff that only SearchAndQueue.tsx changed.",
+    "Verified live via the Browser pane per this project's own verification workflow: check the layout at a phone-portrait width (< 1024px, toggle still works, single column) and at a desktop width (>= 1024px, both columns visible, no toggle, Search left / Favorites right) using read_page/computed-style inspection (and a screenshot if compositing is available in the session)."
+  ],
+  "verification_commands": [
+    "cd frontend && npx tsc --noEmit",
+    "cd frontend && npm run build"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}
