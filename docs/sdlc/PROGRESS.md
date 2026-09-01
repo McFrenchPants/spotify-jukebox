@@ -140,6 +140,19 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
     (the hook's behavior is still correct for the current shared-tree
     setup; only the comment is out of date).
   - Phase SS4 continues: SS4.3 (verifier routing) is next.
+  - **Immediate follow-up, same session**: fixed the stale comment SS4.2's
+    implementer flagged (`unresolved_risks`, above) — `.claude/hooks/
+    sdlc-path-check.mjs`'s header comment described the implementer as
+    running with `isolation: worktree`. Done directly by the orchestrator
+    (comment-only, no logic change, low-risk, and directly requested — not
+    delegated to an implementer subagent given its triviality). Rewrote
+    the "WORKTREE / CONCURRENCY HONESTY" section to state the current
+    reality (implementer runs in the shared tree, `sessionRoot`/`mainRoot`
+    resolve to the same directory today) while keeping the
+    worktree-separation logic's own documentation intact for when
+    isolation is re-enabled. `node --check` confirms no syntax break;
+    hook behavior itself is unchanged (comment-only diff, verified via
+    `git diff --stat`).
 
 - **2026-09-01** — Cross-session review, no new task implemented. The user
   pasted streamed logs from the separate session that ran SS2.2 (below) for

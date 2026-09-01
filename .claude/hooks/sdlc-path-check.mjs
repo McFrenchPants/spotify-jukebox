@@ -37,27 +37,44 @@
  *       packet path, or an absolute packet path. Highest precedence; intended
  *       for a future orchestrator that can set env when spawning.
  *   (b) A pointer file `.sdlc/active-packet` -- a single line holding a task
- *       id or a packet path. Looked up FIRST in the session's own repo root
- *       (i.e. the implementer's git worktree, if it is running in one), THEN
- *       in the main repo root. The worktree-local lookup is what makes
- *       concurrent implementers separable.
+ *       id or a packet path. Looked up FIRST in the session's own repo root,
+ *       THEN in the main repo root. These two are normally the SAME
+ *       directory today (see the CURRENT STATUS note below) -- the
+ *       session-root-first lookup only does separate work once/if worktree
+ *       isolation is back in use.
  *   (c) The framework's own lease bookkeeping: `.sdlc/state.json` tasks whose
  *       `lease.assigned_agent` and `task_packet_path` are both non-null. If
  *       exactly one task is leased, that is the active packet. If zero or
  *       more than one are, this step yields nothing (ambiguous).
  *
- * WORKTREE / CONCURRENCY HONESTY: the implementer agent runs with
- * `isolation: worktree`. Path *matching* is fully worktree-correct -- the
- * target file is made relative to the session's own repo root, so a write to
+ * CURRENT STATUS (as of SS4.2, 2026-08-31): the implementer agent does NOT
+ * currently run with `isolation: worktree` -- that was tried, confirmed
+ * working end to end during SS1.1, and then deliberately dropped while
+ * scoping SS4.2 (see design-spec.md §2a): `max_concurrent_implementers` is
+ * `1`, so the concurrency problem worktree isolation solves isn't live yet,
+ * and it was costing a fresh `npm install` per spawn for no benefit. The
+ * implementer runs directly in the shared repository working tree, so
+ * `sessionRoot` and `mainRoot` resolve to the same directory in practice,
+ * and the orchestrator seeds `.sdlc/active-packet` directly in that one
+ * tree before spawning -- no propagation problem, because there's only one
+ * tree.
+ *
+ * The worktree-separation logic below is NOT dead code -- it's left in
+ * place, inert but harmless with no worktrees in play, and becomes
+ * load-bearing again the moment `isolation: worktree` is re-enabled (e.g.
+ * if `max_concurrent_implementers` is ever raised above `1`). At that
+ * point: path *matching* is already fully worktree-correct -- the target
+ * file is made relative to the session's own repo root, so a write to
  * `<worktree>/backend/src/routes/queue.ts` matches a `write_paths` entry of
  * `backend/src/routes/queue.ts`. Packet *discovery* falls back to the main
  * repo when the worktree has no pointer file of its own, because a worktree
  * is created by the harness from a committed tree and nothing gets a chance
- * to seed it first. So: N concurrent implementers are correctly separated
- * ONLY if each worktree gets its own `.sdlc/active-packet` (or its own
- * `SDLC_ACTIVE_PACKET`). Without that, they all resolve to the same
- * main-repo answer, and step (c) deliberately refuses to guess when more than
- * one task is leased. This is a real limitation, not a solved problem.
+ * to seed it first. So: N concurrent implementers would be correctly
+ * separated ONLY if each worktree got its own `.sdlc/active-packet` (or its
+ * own `SDLC_ACTIVE_PACKET`) -- without that, they'd all resolve to the same
+ * main-repo answer, and step (c) deliberately refuses to guess when more
+ * than one task is leased. That remains a real limitation to solve before
+ * isolation comes back, not a solved problem.
  *
  * ---------------------------------------------------------------------------
  * 3. FAIL-SAFE DIRECTION
