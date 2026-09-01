@@ -397,7 +397,79 @@ proposal folders.
 
 ### Verify
 
-When a subagent reports back, don't take "done" on faith:
+When a subagent reports back, don't take "done" on faith. First decide
+which verification tier this task gets — the routing decision below comes
+*before* the spot-check, not instead of it.
+
+**Decide whether this task needs the verifier agent.** Most tasks don't —
+for those, skip straight to "Default path (no verifier)" below and proceed
+exactly as before. A task requires spawning the separate `verifier` agent,
+not just your own spot-check, when it touches any of:
+
+- **The fixed floor** (`.sdlc/project.yaml`'s `verification_profile.floor_triggers`,
+  per design-spec.md §6): authentication/authorization, data persistence or
+  migrations, deployment/release tooling, or anything at the
+  production-mutation tier or above.
+- **This repo's widened categories** (`verification_profile.widen`):
+  Spotify credential/token handling, or Home Assistant/Android Master
+  Device access.
+
+This floor is a minimum — a project can widen it (by adding entries to
+`project.yaml`'s `widen` list) but this command's routing logic itself must
+never narrow it below the fixed `floor_triggers`. If a future edit to
+`project.yaml` adds another `widen` category, that alone should be enough
+to route more tasks to the verifier — no corresponding edit to this file
+should be needed.
+
+Which bucket a task falls into is **your own judgment call, applied
+per-task** — not a mechanical grep or automated classifier. Look at the
+task's objective/description and its packet's (or, for legacy
+proposal-folder work, its task-table row's) `write_paths`/`read_paths` for
+anything that plainly falls into one of the six categories above: auth or
+token/credential logic, a database or persistence migration, CI/CD or
+deploy tooling, `.claude/agents/supervisor.md` or any supervisor-only
+remote operation, Spotify auth/token code (e.g. `backend/src/spotify/**`
+auth flows), or anything referencing the Home Assistant host or Android
+Master Device. This applies identically to sdlc-tracked and legacy
+proposal-folder work — `verifier.md` isn't restricted to sdlc-tracked
+packets the way `implementer.md` is; for legacy work, assemble its inputs
+ad hoc from the proposal's own task-table row, a `git diff`, and test
+output, without needing any `.sdlc/*` machine-state files. When genuinely
+unsure whether a task qualifies, err toward routing it to the verifier —
+spawning it unnecessarily costs one extra subagent run, but missing a real
+hit here often isn't caught until much later, if ever.
+
+**Strong-verification path (task is in the floor/widen tier).** After the
+implementer's completion report comes back:
+1. Gather exactly the three inputs `verifier.md` requires and nothing
+   else: the task packet JSON (or, for legacy work, the assembled
+   equivalent), the actual diff (`git diff`/`git show` output for the
+   implementer's changes), and the output of running the packet's
+   `verification_commands` (or equivalent test/build output). Optionally
+   add any task-specific architectural invariants beyond `CLAUDE.md`'s
+   standing list. Never paste in the implementer's own completion-report
+   JSON or reasoning — `verifier.md` is explicit that it must not be given
+   that.
+2. Spawn `subagent_type: verifier` (never `general-purpose`) with those
+   inputs pasted into the prompt.
+3. Treat the verifier's returned verdict as the actual verification
+   outcome for this task, not merely advisory alongside your own
+   spot-check: a verifier `fail` means the task is not accepted as done,
+   exactly as if your own spot-check had found the same gap. Act on its
+   per-criterion findings, forbidden-path check, and architectural-invariant
+   findings the same way you'd act on your own.
+4. For any acceptance criterion the verifier reports as `uncertain`, apply
+   the same judgment you already apply to your own uncertain findings —
+   record it explicitly in the tracking notes, don't silently round it to
+   pass.
+5. Still do the cheap checks below yourself where they add something the
+   verifier didn't cover (e.g. a quick browser check for a UI-adjacent
+   change) — the verifier replaces the *authority* of your spot-check for
+   this task's acceptance-criteria/forbidden-path verdict, it doesn't
+   replace all the ordinary follow-up you'd otherwise do.
+
+**Default path (no verifier).** For a task outside the floor/widen tier,
+proceed exactly as before — do not spawn a verifier for it:
 - Spot-check the actual diff it produced against the acceptance criteria
   you gave it.
 - Run anything cheap yourself if the subagent didn't already (typecheck, a

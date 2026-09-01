@@ -1,0 +1,54 @@
+{
+  "task_id": "SS4.3",
+  "plan_revision": "uncommitted:2026-08-31T00:00:00Z",
+  "objective": "Task SS4.3: Rewrite the 'Verify' subsection of `.claude/commands/continue-development.md` (under its 'Delegate -> Verify -> Track -> Continue-or-stop loop' heading, immediately after 'Delegate') to route high-risk tasks through the SS1.2 verifier agent instead of always relying on the orchestrator's own spot-check. Condensed design context you need (do not read design-spec.md/IMPLEMENTATION_PLAN.md yourself -- this is already distilled for you):\n\n1. DEFAULT BEHAVIOR UNCHANGED: for most tasks, the orchestrator still spot-checks the implementer's diff and report against the task's acceptance criteria itself, exactly as the current 'Verify' text already describes (spot-check diff vs acceptance criteria; run cheap checks like typecheck/build itself if the subagent didn't; follow up via SendMessage or a small inline fix if short of the mark; call out a subagent's own verification blind spots explicitly). Keep that existing prose largely intact as the 'default path' -- this task adds a routing decision in front of it, it does not replace it.\n\n2. STRONG-VERIFICATION FLOOR (from `.sdlc/project.yaml`'s `verification_profile`, already in your read_paths -- read the actual file, don't guess the list): a task packet requires the separate verifier agent, not just the orchestrator's own spot-check, when it touches any of the FIXED FLOOR categories (`floor_triggers`: authentication_authorization, data_persistence_migrations, deployment_release_tooling, production_mutation_tier_or_above) OR this repo's project-specific WIDEN categories (`widen`: spotify_credential_or_token_handling, home_assistant_or_android_device_access). The floor is a minimum a project can widen but never narrow -- state this explicitly in the rewritten text, and note that `project.yaml`'s `widen` list is where a project adds to it (so a future project.yaml edit that adds a category should not require another continue-development.md edit).\n\n3. HOW THE ORCHESTRATOR DECIDES WHICH BUCKET A TASK IS IN: this is a judgment call the orchestrator makes itself before/while delegating (not a mechanical grep) -- look at the task's objective/description and its packet's `write_paths`/`read_paths` for anything that plainly falls into one of the six categories above (e.g. anything touching auth/token/credential handling, a database or persistence migration, CI/CD or deploy tooling, `.claude/agents/supervisor.md` or supervisor-only remote operations, Spotify credential/token code such as `backend/src/spotify/**` auth flows, or anything referencing the Home Assistant host or Android Master Device). State plainly in the rewritten text that this is the orchestrator's own judgment applied per-task, not an automated classifier, and that when genuinely unsure whether a task qualifies, the orchestrator should err toward running the verifier (routing a borderline task to strong verification costs a spawn; missing a real hit does not get caught until later, or not at all).\n\n4. WHAT 'ROUTING TO THE VERIFIER' ACTUALLY MEANS, MECHANICALLY: when a task falls in the strong-verification tier, the orchestrator must, after the implementer's completion report comes back: (a) gather the three required inputs the verifier agent needs (see `.claude/agents/verifier.md`, in your read_paths -- it is explicit that it must be given exactly these three and nothing else): the task packet JSON, the actual diff (e.g. `git diff`/`git show` output for the implementer's changes), and the output of running the packet's `verification_commands` (or equivalent test/build output); optionally, any additional architectural invariants specific to this task beyond `CLAUDE.md`'s standing list; (b) spawn `subagent_type: verifier` (never `general-purpose` for this) with those inputs pasted into the prompt -- never the implementer's own completion-report JSON or reasoning, since `verifier.md` explicitly says it must not be given that; (c) treat the verifier's returned overall verdict (`pass`/`fail`, per-criterion `met`/`not met`/`uncertain`, forbidden-path check, architectural-invariant findings) as the actual verification outcome for this task, not merely advisory alongside the orchestrator's own spot-check -- a verifier `fail` means the task is not accepted as done, the same as if the orchestrator's own spot-check had found a gap; (d) for `uncertain` acceptance criteria the verifier reports, apply the same judgment the orchestrator already applies to its own uncertain findings (record it, don't silently round to pass) rather than inventing new handling.\n\n5. WHAT 'NOT ROUTING' MEANS: for a task that does not fall into any floor/widen category, the section should say explicitly that the orchestrator does NOT spawn a verifier agent -- it proceeds exactly as the existing spot-check text already describes. Don't make the verifier path sound optional-but-encouraged for ordinary tasks; the existing spot-check is suffient and intentionally cheaper for the common case (per design-spec's own reasoning: running two subagents per task by default doubles cost for most changes).\n\n6. LEGACY PROPOSAL-FOLDER WORK: the verifier-routing decision applies the same way regardless of whether the task is sdlc-tracked or legacy-proposal-folder work -- `.claude/agents/verifier.md` is not restricted to sdlc-tracked packets the way `implementer.md` is scoped; nothing in verifier.md requires a `.sdlc/task-packets/*.json` file to exist, it just needs 'a task packet' (which, for legacy work, can be assembled ad hoc from the proposal's own task-table row + a `git diff` + test output, without needing the sdlc-supervisor machine-state files). State this so a future orchestrator run doesn't assume strong verification is sdlc-only.\n\nWrite the actual prose into the existing 'Verify' subsection, matching the file's existing voice/formatting conventions (bullet lists, bold lead-ins -- look at the surrounding Delegate/Update-tracking/Continue-or-stop sections for the house style, and specifically preserve the existing bullet about handling a subagent's own verification blind spots, since that's still relevant to the default path). Do not renumber or restructure sections outside 'Verify'.",
+  "non_goals": [
+    "Do not modify `.claude/agents/verifier.md`, `.claude/agents/implementer.md`, `.claude/hooks/sdlc-path-check.mjs`, or any schema file -- those are already correct and out of scope for this task.",
+    "Do not modify `.sdlc/project.yaml`'s `verification_profile` list itself -- read it, don't edit it; widening/narrowing that list is a separate decision, not part of this rewrite.",
+    "Do not modify the 'Orient', 'Resume in-progress work', 'Pick new work', 'Scaffold new work', 'Delegate', 'Update tracking', or 'Continue or stop' sections of `continue-development.md` -- those are separate tasks (SS4.4) or already done (SS4.1/SS4.2) or out of this task's scope entirely.",
+    "Do not implement SS4.4 (run-budget stopping conditions) -- this rewrite covers only verifier routing, not budgets or stopping conditions.",
+    "Do not actually spawn a real verifier agent against a live task as part of this packet's own verification -- the acceptance criteria call for a synthetic/hypothetical walk-through (does a described migration-touching packet read as routed, does a described React-component packet read as not routed), not a live spawn test; a real live-routing test is the orchestrator's own follow-up verification after accepting this task, not part of the implementer's work here."
+  ],
+  "dependencies": ["SS1.2"],
+  "read_paths": [
+    ".claude/commands/continue-development.md",
+    ".claude/agents/verifier.md",
+    ".sdlc/project.yaml",
+    "docs/sdlc/schemas/task-packet.schema.json",
+    "docs/sdlc/schemas/completion-report.schema.json",
+    "CLAUDE.md"
+  ],
+  "write_paths": [
+    ".claude/commands/continue-development.md"
+  ],
+  "forbidden_paths": [
+    "docs/sdlc/design-spec.md",
+    "docs/sdlc/IMPLEMENTATION_PLAN.md",
+    "docs/sdlc/PROGRESS.md",
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    ".sdlc/task-packets/",
+    ".claude/agents/implementer.md",
+    ".claude/agents/verifier.md",
+    ".claude/agents/supervisor.md",
+    ".claude/hooks/sdlc-path-check.mjs",
+    ".claude/settings.json",
+    ".claude/settings.local.json"
+  ],
+  "acceptance_criteria": [
+    "The 'Verify' subsection explicitly names the strong-verification floor (auth/authz, data persistence/migrations, deployment/release tooling, production-mutation-tier-or-above) plus this repo's `project.yaml` widen entries (Spotify credential/token handling, Home Assistant/Android device access), and says the floor can be widened via `project.yaml` but never narrowed below it.",
+    "The rewritten section describes the orchestrator's routing decision as its own per-task judgment call (not an automated classifier), applied to both sdlc-tracked and legacy proposal-folder work, erring toward running the verifier when genuinely unsure.",
+    "For a task in the strong-verification tier, the section specifies spawning `subagent_type: verifier` with exactly the three inputs `verifier.md` requires (task packet, actual diff, verification-command output), explicitly never the implementer's own completion-report JSON or reasoning.",
+    "The section states that a verifier `fail` blocks acceptance of the task the same way an orchestrator-found gap would (not merely advisory), and that verifier `uncertain` criteria are recorded, not silently treated as pass.",
+    "The section preserves that, for a task NOT in the strong-verification tier, the orchestrator proceeds with only its own spot-check as before -- the existing default-path prose (spot-check diff vs acceptance criteria, run cheap checks itself, follow up on gaps, flag a subagent's own verification blind spots) survives, largely intact, as the non-routed path.",
+    "A synthetic 'touches a data-persistence migration' task, read against the rewritten text, is unambiguously described as requiring verifier-agent delegation; a synthetic 'touches a React component with no auth/persistence/deploy/credential/device angle' task is unambiguously described as not requiring it.",
+    "No section of `continue-development.md` other than 'Verify' is modified (Orient, Resume in-progress work, Pick new work, Scaffold new work, Delegate, Update tracking, and Continue or stop all remain byte-for-byte unchanged).",
+    "No file other than `.claude/commands/continue-development.md` is modified."
+  ],
+  "verification_commands": [
+    "git diff --stat -- .claude/commands/continue-development.md",
+    "git diff -- .claude/commands/continue-development.md"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}

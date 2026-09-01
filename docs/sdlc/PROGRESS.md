@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Phases SS0-SS3 done. SS4.1/SS4.2/SS2.x done; SS4.3 next (Verify rewrite).
+## Status: Phases SS0-SS3 done. SS4.1/SS4.2/SS4.3/SS2.x done; SS4.4 next (run-budget stopping conditions).
 
 ## Task Table
 
@@ -32,7 +32,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS3.1 | `PreToolUse` path-enforcement hook | done | Real implementation replaces the spike. **Key discovery: the `PreToolUse` hook input carries `agent_type`** (observed live: `"implementer"`, `"general-purpose"`), so enforcement is scoped to implementer agents only — every other caller, including ordinary interactive sessions, passes through untouched. That's what makes shipping this in a *committed* `.claude/settings.json` safe. Windows backslash/drive-case normalization independently re-verified by the orchestrator (a first test pass appeared to show a normalization hole; that turned out to be shell-escaping in the test harness, not the hook — retested properly, all cases correct). |
 | SS4.1 | Orchestrator full-context-once rewrite | done | `.claude/commands/continue-development.md`'s "Resume in-progress work" section rewritten: full design-spec + full plan + full state (`.sdlc/state.json` if the work item is sdlc-tracked, else the proposal's own `PROGRESS.md`) loaded once per run, replacing the old "read only the chosen task's entry" step. Reread is gated on Claude Code's own changed-on-disk file tracking rather than a hand-rolled mtime check. Delegate/Verify/Track/Continue-or-stop/Orient untouched (confirmed via diff, scoped to one hunk). |
 | SS4.2 | Delegate rewrite (task packets, implementer agent) | done | `.claude/commands/continue-development.md`'s Delegate section split into two explicit sub-paths. Legacy proposal-folder work keeps the pre-existing `general-purpose` behavior verbatim, under its own heading. sdlc-tracked work now follows a 9-step procedure covering every requirement this row had accumulated: clean-working-tree gate before spawning; generate the packet via the SS0.3 generator and explicitly review/hand-correct it (never trust `NEEDS_MANUAL_REVIEW` or an obviously-wrong inferred path); write `.sdlc/active-packet` before spawning and retire it once the task is settled; spawn `subagent_type: implementer` with the full packet JSON pasted inline (never a pointer to go read it); resume a blocked/interrupted implementer via `SendMessage` to its own agent ID, never a fresh `Agent` call asserting unverifiable prior progress; `scope_change_requested` is the orchestrator's own judgment call; expertise skills are draft-only pending human check-in; sdlc-tracked tasks are delegated strictly one at a time (`max_concurrent_implementers: 1`, one active-packet pointer). Dispatched via a real implementer subagent + hand-authored, schema-validated task packet (the generator's heuristic wasn't run against real plan-entry text for this self-referential task; a hand-written packet was more reliable given the stakes). Diff independently verified: confined to exactly the Delegate subsection, 117 insertions/5 deletions, `git diff --stat` shows only this one file changed. Implementer flagged one out-of-scope, non-blocking observation: `.claude/hooks/sdlc-path-check.mjs`'s header comment still describes `isolation: worktree`, stale since design-spec §2a's reversal — worth a small follow-up task, not urgent, not done here (forbidden_paths). |
-| SS4.3 | Verify rewrite (verifier routing) | todo | depends on SS1.2 |
+| SS4.3 | Verify rewrite (verifier routing) | done | `.claude/commands/continue-development.md`'s "Verify" subsection now decides, per task, whether it needs the SS1.2 verifier agent before falling back to the orchestrator's own spot-check. Routing tier: the fixed floor (auth/authz, data persistence/migrations, deployment/release tooling, production-mutation-tier-or-above) plus this repo's `project.yaml` widen entries (Spotify credential/token handling, HA/Android device access) — stated as a minimum a project can widen but this file's logic can never narrow. Routing decision is explicitly the orchestrator's own per-task judgment (not an automated classifier), applied identically to sdlc-tracked and legacy proposal-folder work, erring toward routing when unsure. Strong-verification path spawns `subagent_type: verifier` with exactly the three inputs `verifier.md` requires (task packet, actual diff, verification-command output) — never the implementer's own completion-report JSON/reasoning; a verifier `fail` blocks acceptance the same as an orchestrator-found gap, and `uncertain` criteria are recorded rather than rounded to pass. Default (non-floor) path preserves the prior spot-check prose verbatim. Diff confined to exactly the Verify subsection (73 insertions, 1 deletion), independently verified via `git diff --stat` and a full read of the diff. Hand-authored packet, same rationale as SS4.2 (self-referential task, no plain-text plan-entry source to feed the generator without handing the implementer the plan itself). |
 | SS4.4 | Run-budget stopping conditions | todo | depends on SS0.1 |
 | SS5.1 | `sdlc-doctor` command | todo | depends on SS0.1, SS0.2 |
 | SS6.1 | Dogfood: run one real backlog item through the loop | todo | depends on all of SS0-SS5 |
@@ -100,6 +100,29 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-08-31** — `/continue-development`: implemented **SS4.3**, the
+  Verify-section rewrite (routing high-risk tasks to the SS1.2 verifier
+  agent). Self-referential like SS4.2 — no plain-text plan-entry file
+  existed that wouldn't have required handing the implementer the plan
+  itself, so the packet was hand-authored directly against
+  `docs/sdlc/schemas/task-packet.schema.json` and independently validated
+  with `jsonschema.validate()` before spawning (not just trusted to parse).
+  - Followed the now-established active-packet lifecycle from SS4.2's own
+    row: confirmed a clean tree (only the new packet file untracked), wrote
+    `.sdlc/active-packet` containing `SS4.3`, spawned
+    `subagent_type: implementer` with the full packet pasted inline,
+    accepted the completion report, then removed the pointer.
+  - Verified independently rather than on the subagent's report alone:
+    reran `git diff --stat` and read the full diff. Confirmed the change is
+    confined to exactly the "Verify" subsection (73 insertions, 1 deletion)
+    with the prior spot-check prose preserved verbatim inside a new
+    "Default path (no verifier)" branch, and no other file touched.
+  - This task itself did not qualify for its own strong-verification tier
+    (a command-file prose edit, no auth/persistence/deploy/credential/
+    device angle) — orchestrator spot-check was the correct path per the
+    very rule this task just wrote, and that's what was used.
+  - Phase SS4 continues: SS4.4 (run-budget stopping conditions) is next.
 
 - **2026-08-31** — `/continue-development`: implemented **SS4.2**, the
   Delegate-section rewrite. This is the first task where the packet itself
