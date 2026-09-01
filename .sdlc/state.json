@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "updated_at": "2026-09-01T02:10:00Z",
+  "updated_at": "2026-09-01T12:48:15Z",
   "work_items": [
     {
       "id": "sdlc-supervisor-testbed",
@@ -231,8 +231,8 @@
         {
           "id": "SS5.1",
           "title": "sdlc-doctor command",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [
             "SS0.1",
             "SS0.2"
@@ -240,11 +240,11 @@
           "lease": {
             "assigned_agent": null,
             "run_id": null,
-            "attempt_count": 0
+            "attempt_count": 1
           },
-          "task_packet_path": null,
+          "task_packet_path": ".sdlc/task-packets/SS5.1.packet.json",
           "report_path": null,
-          "notes": ""
+          "notes": "New read-only diagnostic command at .claude/commands/sdlc-doctor.md: lifecycle-enum sanity, PreToolUse hook wiring, owned_files existence, task_packet_path referential integrity -- PASS/FAIL report, never edits anything. Task packet needed full hand-authoring (generator stripped leading dots off .claude/ paths, produced a self-contradicting .sdlc/**/docs/** write scope, left acceptance criteria empty) -- same pattern as SS4.x. Did not qualify for the SS4.3 strong-verification tier; orchestrator spot-check used, diff confined to exactly the one new file (git status --porcelain), and the implementer's own drift test (scratch state.json copy, scratch owned_files list) confirmed both real checks correctly detect drift without ever touching the real .sdlc/state.json or .claude/hooks/sdlc-path-check.mjs. Completes Phase SS5."
         },
         {
           "id": "SS6.1",

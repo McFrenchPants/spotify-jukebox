@@ -13,7 +13,7 @@ branch before making any changes. This proposal builds project-local
 `.claude/` machinery only; packaging as a portable plugin is a separate,
 later proposal (see IMPLEMENTATION_PLAN.md's "out of scope" section).
 
-## Status: Phases SS0-SS4 done. SS5.1 next (sdlc-doctor command).
+## Status: Phases SS0-SS5 done. SS6.1 next (dogfood run).
 
 ## Task Table
 
@@ -34,7 +34,7 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | SS4.2 | Delegate rewrite (task packets, implementer agent) | done | `.claude/commands/continue-development.md`'s Delegate section split into two explicit sub-paths. Legacy proposal-folder work keeps the pre-existing `general-purpose` behavior verbatim, under its own heading. sdlc-tracked work now follows a 9-step procedure covering every requirement this row had accumulated: clean-working-tree gate before spawning; generate the packet via the SS0.3 generator and explicitly review/hand-correct it (never trust `NEEDS_MANUAL_REVIEW` or an obviously-wrong inferred path); write `.sdlc/active-packet` before spawning and retire it once the task is settled; spawn `subagent_type: implementer` with the full packet JSON pasted inline (never a pointer to go read it); resume a blocked/interrupted implementer via `SendMessage` to its own agent ID, never a fresh `Agent` call asserting unverifiable prior progress; `scope_change_requested` is the orchestrator's own judgment call; expertise skills are draft-only pending human check-in; sdlc-tracked tasks are delegated strictly one at a time (`max_concurrent_implementers: 1`, one active-packet pointer). Dispatched via a real implementer subagent + hand-authored, schema-validated task packet (the generator's heuristic wasn't run against real plan-entry text for this self-referential task; a hand-written packet was more reliable given the stakes). Diff independently verified: confined to exactly the Delegate subsection, 117 insertions/5 deletions, `git diff --stat` shows only this one file changed. Implementer flagged one out-of-scope, non-blocking observation: `.claude/hooks/sdlc-path-check.mjs`'s header comment still describes `isolation: worktree`, stale since design-spec §2a's reversal — worth a small follow-up task, not urgent, not done here (forbidden_paths). |
 | SS4.3 | Verify rewrite (verifier routing) | done | `.claude/commands/continue-development.md`'s "Verify" subsection now decides, per task, whether it needs the SS1.2 verifier agent before falling back to the orchestrator's own spot-check. Routing tier: the fixed floor (auth/authz, data persistence/migrations, deployment/release tooling, production-mutation-tier-or-above) plus this repo's `project.yaml` widen entries (Spotify credential/token handling, HA/Android device access) — stated as a minimum a project can widen but this file's logic can never narrow. Routing decision is explicitly the orchestrator's own per-task judgment (not an automated classifier), applied identically to sdlc-tracked and legacy proposal-folder work, erring toward routing when unsure. Strong-verification path spawns `subagent_type: verifier` with exactly the three inputs `verifier.md` requires (task packet, actual diff, verification-command output) — never the implementer's own completion-report JSON/reasoning; a verifier `fail` blocks acceptance the same as an orchestrator-found gap, and `uncertain` criteria are recorded rather than rounded to pass. Default (non-floor) path preserves the prior spot-check prose verbatim. Diff confined to exactly the Verify subsection (73 insertions, 1 deletion), independently verified via `git diff --stat` and a full read of the diff. Hand-authored packet, same rationale as SS4.2 (self-referential task, no plain-text plan-entry source to feed the generator without handing the implementer the plan itself). |
 | SS4.4 | Run-budget stopping conditions | done | "Continue or stop" now reads pacing from `.sdlc/project.yaml`'s `budgets` block at run time rather than the old subjective "substantial batch" language: `max_tasks_per_run` is an in-session running-count stop trigger; `max_attempts_per_task`/`max_verifier_retries` escalate to the orchestrator's own judgment (surfaced to the user) rather than auto-retrying, sourced from `state.json`'s `lease.attempt_count` for sdlc-tracked work and an in-session count for legacy work; `token_or_time_budget` is explicitly soft (logged/flagged, never a hard stop, since Claude Code has no mid-run cutoff primitive). Unconditional-stop list now names design-spec §7's concrete triggers (phase boundary, plan divergence, an unexpected file outside every open task's `write_paths`, a test regression, an acceptance-criteria ambiguity not the task's to resolve) in place of the old vague examples. Applies identically to sdlc-tracked and legacy proposal-folder work since `project.yaml` is repo-wide, not per-item. Existing genuine-blocker and merge-requires-go-ahead bullets, plus the closing summary+prompt structure, preserved. Diff confined to exactly the Continue-or-stop subsection (65 insertions, 8 deletions), independently verified via `git diff --stat` and a full read of the diff. Hand-authored packet, same self-referential rationale as SS4.1-4.3. **Phase SS4 (orchestrator loop rewrite) is now complete.** |
-| SS5.1 | `sdlc-doctor` command | todo | depends on SS0.1, SS0.2 |
+| SS5.1 | `sdlc-doctor` command | done | `.claude/commands/sdlc-doctor.md` — read-only diagnostic slash command, four checks (lifecycle-enum sanity, PreToolUse hook wiring, `owned_files` existence, `task_packet_path` referential integrity), PASS/FAIL report format, explicit never-edit framing. Generator heuristic needed full hand-authoring for the packet (mis-stripped leading dots on `.claude/` paths, an overly broad `.sdlc/**`/`docs/**` write scope self-contradicting its own `forbidden_paths`, empty acceptance criteria) — same pattern as the SS4.x self-referential tasks. Did not qualify for SS4.3's strong-verification tier (no auth/persistence/deploy/credential/device angle) — orchestrator spot-check used. Manually re-exercised against real repo state (clean) and a deliberately drifted scratch copy (drift caught) before accepting; confirmed via `git status --porcelain` that neither `.sdlc/state.json` nor `.claude/hooks/sdlc-path-check.mjs` was actually touched during that test. Phase SS5 (bootstrap commands) is now complete. |
 | SS6.1 | Dogfood: run one real backlog item through the loop | todo | depends on all of SS0-SS5 |
 | SS6.2 | Write up dogfood findings | todo | depends on SS6.1 |
 
@@ -100,6 +100,43 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 ## Session Log
 
 *(newest on top — add an entry each time a session ends, even mid-phase)*
+
+- **2026-09-01** — `/continue-development`: implemented **SS5.1**, the
+  `sdlc-doctor` command — **completing Phase SS5**. Not self-referential
+  (a new file, not an edit to `continue-development.md`), but the
+  generator's heuristic still needed full hand-correction before use, same
+  as SS4.1-4.4: it stripped leading dots off every `.claude/`-prefixed
+  path, produced an overly broad `.sdlc/**`/`docs/**` `write_paths` that
+  directly contradicted entries it also listed under `forbidden_paths`
+  (e.g. `.sdlc/project.yaml` in both), and left `acceptance_criteria`/
+  `verification_commands` empty. Wrote the packet by hand directly against
+  `docs/sdlc/schemas/task-packet.schema.json` instead of patching the
+  generated one field-by-field.
+  - Followed the established active-packet lifecycle: confirmed a clean
+    tree, wrote `.sdlc/active-packet` containing `SS5.1`, spawned
+    `subagent_type: implementer` with the full packet pasted inline,
+    accepted the completion report, then removed the pointer.
+  - This task did not qualify for SS4.3's strong-verification tier (a new
+    read-only diagnostic command, no auth/persistence/deploy/credential/
+    device angle) — orchestrator spot-check was correct and sufficient.
+    Read the new `.claude/commands/sdlc-doctor.md` in full: matches
+    `continue-development.md`'s frontmatter style, states its read-only
+    framing explicitly and repeatedly, documents all four required checks
+    precisely, and gives a concrete PASS/FAIL report format with no
+    fix-it behavior.
+  - Verified independently rather than on the implementer's report alone:
+    `git status --porcelain` confirmed only the one new file was added;
+    the implementer's own transcript showed it manually exercised checks
+    1/3/4 against both the real repo (clean on all counts) and a
+    deliberately corrupted scratch copy of `state.json`/a scratch
+    `owned_files` list (drift correctly caught in both cases), then
+    confirmed via `git status --porcelain` on `.sdlc/state.json` and
+    `.claude/hooks/sdlc-path-check.mjs` that neither real file was ever
+    modified. All four `verification_commands` (backend tsc/vitest,
+    frontend tsc/build) ran clean.
+  - Phase SS5 (bootstrap commands) is now complete. SS6.1 (dogfood: run
+    one real backlog item through the loop) is next — it depends on all
+    of SS0-SS5, all of which are now done.
 
 - **2026-08-31** — `/continue-development`: implemented **SS4.4**, the
   Continue-or-stop rewrite (run-budget stopping conditions) — **completing

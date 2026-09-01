@@ -1,0 +1,58 @@
+{
+  "task_id": "SS5.1",
+  "plan_revision": "uncommitted:2026-09-01T00:00:00Z",
+  "objective": "Write .claude/commands/sdlc-doctor.md: a read-only slash command that checks this repo's .sdlc/ state, the generated PreToolUse path-enforcement hook wiring (SS3.1), and the files listed in .sdlc/project.yaml's owned_files list for drift, then reports findings without making any changes.",
+  "non_goals": [
+    "Do not implement init/migrate/uninstall (design-spec.md §9) -- those are deferred to the eventual plugin-extraction proposal.",
+    "Do not modify .sdlc/state.json, .sdlc/project.yaml, or any other file as part of running the doctor check -- it is read-only and must never call Edit or Write on any file, including its own output."
+  ],
+  "dependencies": ["SS0.1", "SS0.2"],
+  "read_paths": [
+    ".claude/commands/continue-development.md",
+    ".claude/settings.json",
+    ".claude/hooks/sdlc-path-check.mjs",
+    ".sdlc/project.yaml",
+    ".sdlc/state.json",
+    ".sdlc/task-packets/**",
+    "scripts/sdlc/validate-state.mjs",
+    "docs/sdlc/design-spec.md",
+    "docs/sdlc/schemas/state.schema.json",
+    "docs/sdlc/schemas/project.schema.json",
+    "docs/TESTING.md",
+    "CLAUDE.md"
+  ],
+  "write_paths": [
+    ".claude/commands/sdlc-doctor.md"
+  ],
+  "forbidden_paths": [
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    ".sdlc/task-packets/**",
+    ".sdlc/evidence/**",
+    ".sdlc/approvals/**",
+    "docs/sdlc/design-spec.md",
+    "docs/sdlc/IMPLEMENTATION_PLAN.md",
+    "docs/sdlc/PROGRESS.md",
+    "docs/sdlc/schemas/**",
+    "scripts/sdlc/validate-state.mjs",
+    "scripts/sdlc/generate-task-packet.mjs",
+    ".claude/hooks/sdlc-path-check.mjs",
+    ".claude/settings.json",
+    ".claude/agents/**"
+  ],
+  "acceptance_criteria": [
+    "A new file .claude/commands/sdlc-doctor.md exists, follows this repo's existing .claude/commands/continue-development.md frontmatter style (a `description` field and, if useful, `argument-hint`), and documents itself as read-only/diagnostic-only -- it must state explicitly that it never edits files.",
+    "Instructs whoever runs it (the orchestrator persona) to check: (a) every task's lifecycle_state in .sdlc/state.json is one of the values in the LIFECYCLE_STATES enum exported by scripts/sdlc/validate-state.mjs (or null) -- a sanity check on valid enum membership, not a transition check; (b) .claude/settings.json's PreToolUse hooks still contain an entry whose command references .claude/hooks/sdlc-path-check.mjs; (c) every path listed in .sdlc/project.yaml's owned_files exists on disk (glob entries like '.sdlc/**' count as satisfied if the directory exists and is non-empty); (d) every non-null task_packet_path referenced in .sdlc/state.json points to a file that actually exists at that path.",
+    "Reports findings in a clear PASS/FAIL or clean/drift-found format per check, and explicitly must not attempt to fix anything it finds -- it only reports.",
+    "A manual run against this repo in its current state (post SS0-SS4, SS5.1 itself just added) reports clean on all four checks.",
+    "A manual run after a deliberately introduced drift (e.g. hand-editing a scratch copy of .sdlc/state.json to set some task's lifecycle_state to an invalid string not in the enum, or temporarily renaming .claude/hooks/sdlc-path-check.mjs) catches and reports that specific drift -- do this test against a scratch copy or by reverting immediately after, never leave the repo's real .sdlc/state.json or .claude/hooks/sdlc-path-check.mjs actually modified when done."
+  ],
+  "verification_commands": [
+    "cd backend && npx tsc --noEmit",
+    "cd backend && npx vitest run",
+    "cd frontend && npx tsc --noEmit",
+    "cd frontend && npm run build"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}
