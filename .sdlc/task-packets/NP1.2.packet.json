@@ -1,0 +1,53 @@
+{
+  "task_id": "NP1.2",
+  "plan_revision": "uncommitted:2026-09-01T00:00:00Z",
+  "objective": "Wire the own-action fast-path poll trigger (BACKLOG.md #24, analysis/24-event-scheduled-now-playing-poll.md) into backend/src/routes/playback.ts: after each of the pause, resume, skip, and previous route handlers' underlying Spotify call succeeds (i.e. after pausePlayback/resumePlayback/skipToNext/skipToPrevious resolves without throwing, and BEFORE or immediately alongside writing the 200 response -- do not delay/await it before responding), call the triggerImmediateNowPlayingPoll() function exported from backend/src/spotify/nowPlaying.ts (added in the just-completed NP1.1) as fire-and-forget (do not await it in the route handler -- the guest's own HTTP response for their playback action must not wait on an extra Spotify round-trip; the poll runs in the background and its result reaches clients via the existing now-playing SSE event separately). triggerImmediateNowPlayingPoll() already internally catches/logs any poll failure and never leaves a stale timer (see NP1.1's own implementation), so no additional error handling is needed around the call itself beyond making sure a synchronous throw (unlikely, but be defensive) can't crash the route handler.",
+  "non_goals": [
+    "Do not touch nowPlaying.ts itself -- NP1.1 already added and tested triggerImmediateNowPlayingPoll(); this task only calls it from playback.ts.",
+    "Do not add a trigger call to POST /volume or POST /jukebox-volume-report -- volume changes don't affect which track is playing or play/pause state, so there's nothing for an immediate poll to usefully refresh there. Only pause, resume, skip, and previous get the trigger.",
+    "Do not change any existing response shape, status code, or error-handling behavior of the four routes -- the trigger call is purely additive alongside the existing logic, not a replacement for anything.",
+    "Do not touch admin.ts's queue-moderation routes (resyncSpotifyQueue) -- out of scope for this task; queue moderation already re-fetches currently-playing internally as part of its own resync logic.",
+    "Do not implement the QUOTA_EXCEEDED-vs-rate-limit distinction or the GET /api/device caching fix from analysis/22 -- both are separate, unrelated tasks."
+  ],
+  "dependencies": ["NP1.1"],
+  "read_paths": [
+    "backend/src/routes/playback.ts",
+    "backend/src/routes/playback.test.ts",
+    "backend/src/spotify/nowPlaying.ts",
+    "analysis/24-event-scheduled-now-playing-poll.md",
+    "docs/TESTING.md"
+  ],
+  "write_paths": [
+    "backend/src/routes/playback.ts",
+    "backend/src/routes/playback.test.ts"
+  ],
+  "forbidden_paths": [
+    "backend/src/spotify/nowPlaying.ts",
+    "backend/src/spotify/nowPlaying.test.ts",
+    "backend/src/spotify/playback.ts",
+    "backend/src/routes/admin.ts",
+    "backend/src/spotify/queueSync.ts",
+    "BACKLOG.md",
+    "analysis/**",
+    ".sdlc/state.json",
+    ".sdlc/project.yaml",
+    "docs/sdlc/**"
+  ],
+  "acceptance_criteria": [
+    "POST /pause calls triggerImmediateNowPlayingPoll() (fire-and-forget, not awaited) after pausePlayback() succeeds, before or without delaying the 200 response.",
+    "POST /resume calls triggerImmediateNowPlayingPoll() the same way after resumePlayback() succeeds.",
+    "POST /skip calls triggerImmediateNowPlayingPoll() the same way after skipToNext() succeeds.",
+    "POST /previous calls triggerImmediateNowPlayingPoll() the same way after skipToPrevious() succeeds.",
+    "None of the four routes' response time is meaningfully delayed by the trigger call -- verify by reading the code (the call must not be awaited before res.status(200).json(...)) rather than only by a timing-based test.",
+    "POST /volume and POST /jukebox-volume-report are unchanged -- no trigger call added to either.",
+    "Existing error-handling paths (trust-mode 403, device-not-resolved 503, Spotify-call failure 502) are completely unchanged -- the trigger only happens on the existing success path, never instead of or intermixed with error handling.",
+    "New/updated tests in playback.test.ts confirm triggerImmediateNowPlayingPoll (mocked) is called exactly once after a successful pause/resume/skip/previous, and is NOT called when the underlying Spotify call fails or when the trust-mode/device-not-resolved checks reject the request first.",
+    "cd backend && npx tsc --noEmit and npx vitest run both pass clean."
+  ],
+  "verification_commands": [
+    "cd backend && npx tsc --noEmit",
+    "cd backend && npx vitest run"
+  ],
+  "expected_report": "docs/sdlc/schemas/completion-report.schema.json",
+  "max_attempts": 3
+}
