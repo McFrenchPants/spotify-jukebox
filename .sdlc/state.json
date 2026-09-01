@@ -5,7 +5,7 @@
     {
       "id": "sdlc-supervisor-testbed",
       "title": "sdlc-supervisor framework: task packets, machine state, restricted implementer roles",
-      "lifecycle_state": "implementing",
+      "lifecycle_state": "ready_to_release",
       "tasks": [
         {
           "id": "SS0.1",
@@ -249,8 +249,8 @@
         {
           "id": "SS6.1",
           "title": "Dogfood: run one real backlog item through the loop",
-          "status": "in-progress",
-          "lifecycle_state": "implementing",
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [
             "SS0.1",
             "SS0.2",
@@ -274,13 +274,13 @@
           },
           "task_packet_path": null,
           "report_path": null,
-          "notes": "Depends on all of SS0-SS5."
+          "notes": "BACKLOG.md #11 chosen. Task F11.1 completed and live-verified via the sdlc-tracked implementer mechanism -- see the favorites-two-column-layout work_item's F11.1 row for full detail. Real, unplanned signal surfaced along the way (this is exactly what SS6.1 was for): an unrelated, higher-priority live-incident bug (BACKLOG.md #23) was found mid-dogfood and correctly jumped the queue via its own separate work_item (artist-genres-crash-fix / B23.1) rather than being awkwardly folded into F11.1's scope -- the framework handled an unplanned priority interruption cleanly. Also surfaced two recurrences of BACKLOG.md item 20 (stray local backends), tracked as item 22. Findings written up in SS6.2."
         },
         {
           "id": "SS6.2",
           "title": "Write up dogfood findings",
-          "status": "todo",
-          "lifecycle_state": null,
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [
             "SS6.1"
           ],
@@ -291,20 +291,20 @@
           },
           "task_packet_path": null,
           "report_path": null,
-          "notes": ""
+          "notes": "docs/sdlc/dogfood-notes.md, written directly by the orchestrator (not delegated -- this task needs the full run's context, which is exactly what an implementer is deliberately never given). Six concrete findings tied to specific task IDs from this run, not generic impressions: the packet generator's 0-for-7 hand-correction rate, the implementer's honest blocked-not-faked verification report, a real unplanned priority interruption (B23.1) handled cleanly by per-work-item task graphs, .sdlc/ branch-locality as a recurring (not hypothetical) friction point, verification-tier routing not over/under-triggering on two real tasks, and the stray-backend incidents as organic (not staged) confirmation of the genuine-blocker stop condition. This completes all of SS0-SS6 -- the sdlc-supervisor testbed proposal's full task table is now done."
         }
       ]
     },
     {
       "id": "favorites-two-column-layout",
       "title": "BACKLOG.md #11: Favorites sits alongside Search at lg+ widths instead of a separate tab",
-      "lifecycle_state": "implementing",
+      "lifecycle_state": "released",
       "tasks": [
         {
           "id": "F11.1",
           "title": "Two-column reflow of SearchAndQueue at the lg breakpoint",
-          "status": "blocked",
-          "lifecycle_state": "approved",
+          "status": "done",
+          "lifecycle_state": "released",
           "dependencies": [],
           "lease": {
             "assigned_agent": null,
@@ -313,7 +313,7 @@
           },
           "task_packet_path": ".sdlc/task-packets/F11.1.packet.json",
           "report_path": null,
-          "notes": "RESUMED -- the higher-priority live-incident fix (BACKLOG.md #23, work_item artist-genres-crash-fix) that paused this task is now done (source-fixed, locally verified; not yet deployed). SS6.1 dogfood target -- first real (non-framework) work item run through the sdlc-tracked implementer/verifier mechanism. See analysis/11-favorites-two-column-layout.md for the scrutinized scope. Branched off feature/sdlc-supervisor (not master) since .sdlc/ only exists there. Implementer's code change looks correct on review (git diff confined to SearchAndQueue.tsx, tsc/build clean, mirrors the HistoryPage/SettingsPage/NowPlaying lg:flex-row precedent, correctly mount-gates FavoritesSection below lg to avoid a new eager fetch) but self-reported status: blocked because it has no browser tooling to do the packet's required live-viewport verification -- expected, that's the orchestrator's job on this task's default (non-strong-verification) path. BLOCKED for a different, more serious reason found while attempting that live check: starting the frontend preview surfaced a stray local backend already LISTENING on :8085 since 2026-08-31 ~12:48pm (21+ hours), confirmed live and already showing rateLimited:true against the real Spotify account -- the exact BACKLOG.md item 20 incident recurring. Killed the stray process immediately per CLAUDE.md; did NOT start a fresh local backend for verification afterward since the account may still be mid-backoff and the live HA add-on may be affected. Live UI verification for this task is deferred until the user confirms the account's rate-limit state has cleared. See PROGRESS.md session log and a new BACKLOG.md entry for the incident itself."
+          "notes": "SS6.1 dogfood target -- first real (non-framework) work item run through the sdlc-tracked implementer/verifier mechanism. See analysis/11-favorites-two-column-layout.md for the scrutinized scope. Branched off feature/sdlc-supervisor (not master) since .sdlc/ only exists there. Implementer's code change was correct on review (git diff confined to SearchAndQueue.tsx, tsc/build clean, mirrors the HistoryPage/SettingsPage/NowPlaying lg:flex-row precedent, correctly mount-gates FavoritesSection below lg to avoid a new eager fetch) and self-reported status: blocked only because it has no browser tooling to do the packet's required live-viewport verification -- expected, that's the orchestrator's job on this task's default (non-strong-verification) path. Attempting that live check surfaced two stray local backends in a row (BACKLOG.md item 20/22 recurrence) and a real live-app crash bug (BACKLOG.md #23, fixed as B23.1) that jumped the queue -- see PROGRESS.md session log for the full sequence. Live verification completed after B23.1 landed: with the user's go-ahead to proceed despite uncertain rate-limit state, started backend+frontend via the Browser pane's preview tool, confirmed via computed-style/network inspection at 375px (toggle visible, single column, click-to-switch works) and 1280px (toggle hidden, both columns visible side-by-side at ~484px each, Search left/Favorites right, GET /api/favorites confirms FavoritesSection mounted, search input's max-w-2xl correctly overridden by lg:max-w-none so it fills its column). Both dev servers shut down and confirmed via netstat afterward."
         }
       ]
     },

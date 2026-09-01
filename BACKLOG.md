@@ -315,9 +315,22 @@ message now share the same centered 384px column. Implemented on
 `fix/desktop-volume-slider-alignment`.
 
 ## 11. Find Music page: Favorites should sit alongside search, not in a separate tab, on wide screens
-**Status:** ready
+**Status:** done
 **Type:** enhancement
 **Analysis:** [analysis/11-favorites-two-column-layout.md](analysis/11-favorites-two-column-layout.md)
+
+Shipped: at the `lg` (1024px) breakpoint, [SearchAndQueue.tsx](frontend/src/components/search/SearchAndQueue.tsx)
+now renders Search and Favorites side-by-side (Search left, Favorites
+right, each ~half-width) with the tab toggle hidden entirely — reusing the
+same `lg:flex-row`/`lg:w-1/2` pattern already used by item 2's work
+(HistoryPage, SettingsPage, NowPlaying). Below `lg`, today's tab-switching
+behavior is unchanged. `FavoritesSection` is mount-gated (not just
+CSS-hidden) below `lg` so it doesn't eagerly fetch before a guest switches
+to that tab. Verified live via the Browser pane at both 375px and 1280px
+(computed styles + network requests, not just code review). Implemented on
+`feature/favorites-two-column-layout` (off `feature/sdlc-supervisor`, not
+yet merged), the first real (non-framework) task run through the
+sdlc-supervisor framework's implementer mechanism.
 
 On tablet/desktop widths, Favorites shouldn't be a separate tab a guest has
 to switch to — it should display side-by-side with search in a two-column
