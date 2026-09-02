@@ -78,10 +78,20 @@ So, whenever you start a backend (or frontend) dev server to test a change:
 2. Before ending your turn/session, stop it — kill the process, don't just
    let the terminal close. Don't rely on the user to notice and stop it
    later.
-3. Before finishing, re-check that nothing you started is still listening
-   (`netstat -ano | grep 8085` for the backend's default port) — a `tsx
+3. Before finishing, re-check that nothing you started is still listening —
+   run `node scripts/check-stray-backend.mjs` (add `--kill` if you do find
+   something and need to terminate it) rather than relying on memory. A `tsx
    watch` process in particular respawns on file changes and can look "gone"
-   between edits while still holding the port.
+   between edits while still holding the port. This has already happened
+   at least twice for real (BACKLOG.md items 20 and 22 — the second
+   recurrence was a stray process left listening on port 8085 for over 21
+   hours), which is why this is a script and not just an instruction to
+   remember. Under the hood it does the same thing the old manual check
+   did — parses `netstat -ano` (Windows) or `lsof -i :<port> -sTCP:LISTEN`
+   (macOS/Linux) for a `LISTENING` entry on the backend's configured port
+   (from `backend/.env`'s `PORT=`, falling back to `backend/.env.example`,
+   falling back to `8085`) — so `netstat -ano | grep 8085` still works as a
+   manual fallback if the script can't be run for some reason.
 
 If a task legitimately requires a long-running dev server (e.g. the user is
 actively iterating in the browser with you), say so explicitly and confirm

@@ -680,7 +680,7 @@ in mind — worth re-confirming the specific setting/scenario with the
 reporter before scoping further.
 
 ## 22. Recurrence: another stray local backend left running, tripped a real rate limit
-**Status:** idea
+**Status:** done
 **Type:** bug
 
 Found 2026-09-01 while trying to live-verify item 11's F11.1 task in the
@@ -724,6 +724,23 @@ whatever's currently happening on the real deployment.
   or a periodic reminder baked into a command like `/continue-development`
   itself to check for stray listeners on the backend's port before doing
   any Spotify-touching verification work.
+
+**Shipped 2026-09-02**: [scripts/check-stray-backend.mjs](scripts/check-stray-backend.mjs) —
+a real, runnable cross-platform check (Windows `netstat -ano`, macOS/Linux
+`lsof -i :<port> -sTCP:LISTEN`) replacing the memory-only CLAUDE.md
+instruction, per the "something more mechanical" option above. Reports the
+stray PID, its start time, and its process name/command line (best
+effort) so it's identifiable as this backend rather than something
+unrelated; an opt-in `--kill` flag terminates it, but report-only stays
+the default. Resolves the backend's port from `backend/.env`'s `PORT=`,
+falling back to `backend/.env.example`, falling back to `8085`.
+`CLAUDE.md`'s "Always shut down dev servers you start" section now points
+at this script as the recommended check, keeping the old manual
+`netstat`/`grep` command documented as a fallback. Scoped deliberately to
+the script alone (not wired into `/continue-development` itself) per the
+user's choice — the orchestrator suggestion above is left as a possible
+future follow-up, not done here. Implemented on
+`fix/stray-backend-check-script` (off `master`, not yet merged).
 
 ## 23. Uncaught crash on missing `artist.genres` blanks the entire live app
 **Status:** done
