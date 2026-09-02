@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "merge_to_default_branch",
+  "work_item_id": "backlog-22-stray-backend-check-script",
+  "task_id": null,
+  "target_branch": "fix/stray-backend-check-script",
+  "commit_sha": "0d9b84b6ac6cc5f3de0b7816cd946c43e426feaf",
+  "approved_at": "2026-09-02T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Repo owner, live in this conversation, said: \"please update the version so my HA server picks it up. Merge it in and push to the remote,\" referring to fix/stray-backend-check-script -- a docs+tooling-only branch (BACKLOG.md formatting fix, deferred #28 code-review notes, scripts/check-stray-backend.mjs, and a matching CLAUDE.md pointer). No changelog entry was requested for this release; the owner explicitly said none was needed.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-02T00:05:00Z",
+  "consumed_by": "supervisor-session-20260902-merge-stray-backend-check-script",
+  "notes": "Preflight before merging: full backend suite already verified by the orchestrator (417/417 vitest tests passing) plus an independent diff review of scripts/check-stray-backend.mjs and the CLAUDE.md addition (execFileSync with argument arrays throughout, no shell-string injection surface, report-only by default with opt-in --kill). Bumped config.yaml version 1.0.26 -> 1.0.27 (required for HA Supervisor to detect the update) as commit 0d9b84b on the feature branch, deliberately leaving CHANGELOG.md untouched per the owner's explicit instruction. Action taken: `git checkout master` (was at 94e6371, 3 commits ahead of origin/master locally but not yet pushed); `git merge --no-ff fix/stray-backend-check-script` -> clean merge (ort strategy, no conflicts) producing 074bc720fc0b40cfdf8fb6b5fd9568462fdad446 on master."
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "push_to_remote",
+  "work_item_id": "backlog-22-stray-backend-check-script",
+  "task_id": null,
+  "target_branch": "master",
+  "commit_sha": "074bc720fc0b40cfdf8fb6b5fd9568462fdad446",
+  "approved_at": "2026-09-02T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Same live instruction as the accompanying merge_to_default_branch record: \"please update the version so my HA server picks it up. Merge it in and push to the remote.\" Push only -- no deploy/restart/SSH requested; the owner intends to pick up the update via the HA Supervisor themselves once the version bump lands.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-02T00:06:00Z",
+  "consumed_by": "supervisor-session-20260902-merge-stray-backend-check-script",
+  "notes": "Follows a clean --no-ff merge of fix/stray-backend-check-script into master (074bc72), no conflicts. origin/master was at 144c37b before this push (local master had 3 additional prior commits -- a6282d2, fffd38f, 94e6371 -- not yet pushed, none of which are part of this task's scope but which rode along as part of the same push since master had already advanced past them locally). Action taken: `git push origin master` -> `144c37b..074bc72  master -> master`, a clean fast-forward push, no force needed. Verified independently afterward via `git fetch origin` + comparing `git rev-parse master` vs `git rev-parse origin/master`: both report 074bc720fc0b40cfdf8fb6b5fd9568462fdad446."
+}
