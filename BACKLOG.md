@@ -898,6 +898,58 @@ purpose ("the admin must be selecting from what's currently visible").
 Shipped: `getCachedDeviceResolution()` (10s TTL) added to
 [device.ts](backend/src/spotify/device.ts), wrapping `resolveDevice()` for
 `GET /api/device` only. `POST /device/select` still calls `listDevices()`
+directly, uncached, unchanged.
+
+## 27. Jukebox device card shows its "native app only" note on every device, not just the master device
+
+**Status:** idea
+**Type:** enhancement
+
+In Settings, [JukeboxDeviceCard.tsx:74-80](frontend/src/components/admin/JukeboxDeviceCard.tsx:74-80)
+renders an explanatory note — "Jukebox device mode is only available from
+the native Android app..." — whenever `!Capacitor.isNativePlatform()`, i.e.
+on every browser-based admin session, regardless of whether a Jukebox
+master device (item 8) is even configured for this deployment. Reported:
+this section shouldn't show at all except on the master device itself.
+
+Worth deciding during scoping: what "shouldn't show" should actually mean
+here — (a) hide it on every non-native/non-master session unconditionally,
+or (b) keep showing it on non-native admin sessions only until a master
+device has been registered at all (so a fresh deployment's admin still
+discovers the feature exists, matching the intent described in the
+component's own comment at
+[JukeboxDeviceCard.tsx:23-26](frontend/src/components/admin/JukeboxDeviceCard.tsx:23-26):
+"browser-only admins know the feature exists"), then hides it once one is
+registered. Whichever behavior is wanted, the card already has the data it
+needs (`registeredClientId` from `GET /api/jukebox-device`) to condition
+on "is a master device registered" — it just isn't used to gate the
+non-native branch today.
+
+## 28. "About the artist" panel always shows 0 followers
+
+**Status:** needs research
+**Type:** bug
+
+Reported: on the Now Playing page's "About the artist" panel
+([ArtistInfoPanel.tsx:93](frontend/src/components/artist/ArtistInfoPanel.tsx:93)),
+the follower count reads 0 no matter which artist is playing.
+
+The backend's `getArtist()` calls Spotify's real `GET /artists/{id}`
+endpoint (not a simplified/track-embedded artist object that would lack
+follower data) and maps `followers: artist.followers?.total ?? 0`
+([client.ts:283](backend/src/spotify/client.ts:283)) — so on its face the
+mapping looks correct. An existing comment right above it
+([client.ts:278-281](backend/src/spotify/client.ts:278-281)) already notes
+that Spotify's artist response has been observed with `genres`, `images`,
+and `followers` missing/undefined for some artist IDs, which is one
+candidate explanation (silently falling back to 0 for every artist hit so
+far) rather than a code bug — but that's not confirmed for this specific
+report. Worth checking: (a) log/inspect a raw Spotify artist response for
+an artist the reporter tested, to see whether `followers.total` is
+actually present and non-zero upstream, and (b) whether
+`withCache`'s `ENTITY_CACHE_TTL_MS` could be serving a stale cached 0 from
+an earlier bad response for the same artist id, independent of whatever
+the root cause turns out to be.
 directly, unchanged, plus now calls the new `invalidateDeviceResolutionCache()`
 on success. That same invalidation is wired into
 [nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s existing
