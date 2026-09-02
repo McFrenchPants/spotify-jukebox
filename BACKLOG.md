@@ -959,3 +959,29 @@ actually present and non-zero upstream, and (b) whether
 `withCache`'s `ENTITY_CACHE_TTL_MS` could be serving a stale cached 0 from
 an earlier bad response for the same artist id, independent of whatever
 the root cause turns out to be.
+
+**2026-09-02 code-review pass (no live Spotify access available in this
+dev environment — no `SPOTIFY_REFRESH_TOKEN` configured, and a live test
+call would draw on the same pooled quota as the production add-on, so none
+was attempted):** read the full path end to end —
+[nowPlaying.ts:156](backend/src/spotify/nowPlaying.ts:156) sources a real
+Spotify artist ID off the currently-playing track,
+[client.ts](backend/src/spotify/client.ts)'s `getArtist()` hits the correct
+`GET /artists/{id}` endpoint and maps `followers.total` correctly, the
+`/api/artist/:id` route ([artist.ts](backend/src/routes/artist.ts)) passes
+the shaped object straight through, and the frontend's `ArtistInfo` type/
+render ([ArtistInfoPanel.tsx](frontend/src/components/artist/ArtistInfoPanel.tsx))
+matches. `withCache` never caches a rejected fetch
+([cache.ts](backend/src/spotify/cache.ts)), so a transient failure can't
+get "stuck" as a cached 0 — and since the cache key is per-artist-id, a
+single stale entry couldn't explain "0 for every artist" reported across
+different tracks either. Found nothing wrong in the code itself. The
+`?? 0` fallback is separately confirmed necessary for at least one real
+artist (item 15's fix used a concrete example ID,
+`3QFXxlWMDSRABMc79TKS5U`, where Spotify genuinely omitted `followers`) —
+but that's a per-artist Spotify data-quality quirk, not something that
+would explain every artist reading 0. **Next step needs live evidence**:
+either check the "About the artist" panel on the deployed add-on for a
+well-known artist with a real, large follower count, or add temporary
+logging of the raw `artist.followers` value and check the add-on's logs
+next time the panel is opened.
