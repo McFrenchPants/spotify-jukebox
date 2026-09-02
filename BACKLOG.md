@@ -898,7 +898,16 @@ purpose ("the admin must be selecting from what's currently visible").
 Shipped: `getCachedDeviceResolution()` (10s TTL) added to
 [device.ts](backend/src/spotify/device.ts), wrapping `resolveDevice()` for
 `GET /api/device` only. `POST /device/select` still calls `listDevices()`
-directly, uncached, unchanged.
+directly, unchanged, plus now calls the new `invalidateDeviceResolutionCache()`
+on success. That same invalidation is wired into
+[nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s existing
+`device-status`-change detection (both `updateDeviceStatusFromDeviceField`
+and `checkDeviceStatusFallback`), so `DeviceSelector.tsx`'s live
+device-status refresh still sees fresh data immediately rather than a
+stale cached result. `resolveDevice()`/`listDevices()` themselves
+untouched. Implemented on `feature/reduce-nowplaying-polling` (off
+`master`, not yet merged) — completes the full set of three fixes from
+this incident's investigation (items 24, 25, 26).
 
 ## 27. Jukebox device card shows its "native app only" note on every device, not just the master device
 
@@ -950,13 +959,3 @@ actually present and non-zero upstream, and (b) whether
 `withCache`'s `ENTITY_CACHE_TTL_MS` could be serving a stale cached 0 from
 an earlier bad response for the same artist id, independent of whatever
 the root cause turns out to be.
-directly, unchanged, plus now calls the new `invalidateDeviceResolutionCache()`
-on success. That same invalidation is wired into
-[nowPlaying.ts](backend/src/spotify/nowPlaying.ts)'s existing
-`device-status`-change detection (both `updateDeviceStatusFromDeviceField`
-and `checkDeviceStatusFallback`), so `DeviceSelector.tsx`'s live
-device-status refresh still sees fresh data immediately rather than a
-stale cached result. `resolveDevice()`/`listDevices()` themselves
-untouched. Implemented on `feature/reduce-nowplaying-polling` (off
-`master`, not yet merged) — completes the full set of three fixes from
-this incident's investigation (items 24, 25, 26).
