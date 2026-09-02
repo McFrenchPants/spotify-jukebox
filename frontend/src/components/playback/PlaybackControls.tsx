@@ -71,7 +71,7 @@ const VOLUME_UNSUPPORTED_COPY =
   "This device's volume can't be controlled remotely — adjust the phone or speaker directly."
 
 const JUKEBOX_OFFLINE_COPY =
-  'The Jukebox device is offline — playback controls are paused until it reconnects.'
+  "The Jukebox device is offline — volume control is paused until it reconnects."
 
 /**
  * Maps a playback-action failure to distinct, guest-facing copy. Mirrors
@@ -293,14 +293,17 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
   const deviceSupportsVolume = device != null && device.supports_volume
   const jukeboxDevice = permissions?.jukeboxDevice
   const jukeboxOnline = Boolean(jukeboxDevice?.registered && jukeboxDevice?.online)
-  // A Jukebox device that's registered but currently offline is a distinct,
-  // temporary state: it's the designated volume path, so nothing should be
-  // usable until it reconnects (not just volume) — same spirit as this
-  // component's other disabled states.
+  // A Jukebox device that's registered but currently offline only affects
+  // volume: the backend (backend/src/routes/playback.ts) only routes volume
+  // commands to the Jukebox device, and falls back to the Spotify Volume API
+  // when it's offline — pause/resume/skip always go through Spotify
+  // regardless of the Jukebox device's connection state, so they must not be
+  // disabled by it (this used to incorrectly disable all controls whenever
+  // a Jukebox device was registered but momentarily offline).
   const jukeboxOffline = Boolean(jukeboxDevice?.registered && !jukeboxDevice?.online)
 
-  const pauseResumeAllowed = (permissions?.pauseResume ?? false) && !jukeboxOffline
-  const skipAllowed = (permissions?.skip ?? false) && !jukeboxOffline
+  const pauseResumeAllowed = permissions?.pauseResume ?? false
+  const skipAllowed = permissions?.skip ?? false
   const volumeAllowed = (permissions?.volume ?? false) && (deviceSupportsVolume || jukeboxOnline) && !jukeboxOffline
 
   return (
@@ -355,19 +358,15 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
       {!permissions && (
         <p className="text-caption text-text-muted">Checking playback permissions&hellip;</p>
       )}
-      {jukeboxOffline ? (
-        <p className="text-caption text-text-muted">{JUKEBOX_OFFLINE_COPY}</p>
-      ) : (
-        <>
-          {permissions && !pauseResumeAllowed && !skipAllowed && !permissions.volume && (
-            <p className="text-caption text-text-muted">
-              Playback controls are restricted right now — ask the host to enable them.
-            </p>
-          )}
-          {permissions?.volume && !deviceSupportsVolume && !jukeboxOnline && (
-            <p className="text-caption text-text-muted lg:mx-auto lg:max-w-sm">{VOLUME_UNSUPPORTED_COPY}</p>
-          )}
-        </>
+      {permissions && !pauseResumeAllowed && !skipAllowed && !permissions.volume && (
+        <p className="text-caption text-text-muted">
+          Playback controls are restricted right now — ask the host to enable them.
+        </p>
+      )}
+      {permissions?.volume && !volumeAllowed && (
+        <p className="text-caption text-text-muted lg:mx-auto lg:max-w-sm">
+          {jukeboxOffline ? JUKEBOX_OFFLINE_COPY : VOLUME_UNSUPPORTED_COPY}
+        </p>
       )}
     </Card>
   )
