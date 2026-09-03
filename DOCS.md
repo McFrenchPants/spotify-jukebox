@@ -6,26 +6,28 @@ A self-hosted, LAN-only party music queueing app: guests browse and add songs to
 
 Fill in all four options on the add-on's **Configuration** tab before pressing Start:
 
-- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` — from a Spotify Developer app you create at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard).
-- `SPOTIFY_REDIRECT_URI` — leave as the default (`http://127.0.0.1:8085/api/auth/callback`) unless you have a reason to change it, and add this exact URI to your Spotify app's Redirect URIs list in its dashboard settings. Spotify only accepts the literal `127.0.0.1` loopback address for plain-HTTP redirects — this is a Spotify platform restriction, not something this add-on can work around.
-- `ADMIN_PIN` — a real PIN, not the `change-me` default. Guests never see this; only whoever opens the admin panel needs it.
-- `SPOTIFY_REFRESH_TOKEN` — **optional, but recommended if you're avoiding SSH.** See below.
+- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` — from a Spotify Developer app you create at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard). Add `https://mcfrenchpants.github.io/spotify-jukebox/` as that app's Redirect URI (a fixed, shared value — see "Option A" below for why).
+- `SPOTIFY_REDIRECT_URI` — leave as the default. It's only used by the SSH-based fallback (Option B below); the recommended path (Option A) doesn't touch it.
+- `ADMIN_PIN` — a real PIN, not the `change-me` default. Guests never see this; only whoever opens the admin panel needs it. **This can't be changed later** through the Configuration tab — it's only ever read on the very first login attempt (hashed once and stored), so get it right before pressing Start.
+- `SPOTIFY_REFRESH_TOKEN` — leave blank; Option A below fills it in for you.
 
 ## One-time Spotify login — two ways to do it
 
 The app needs one Spotify login to authorize itself. There are two ways to complete it:
 
-**Option A — no SSH needed, if you already have a working local setup.** If you've already connected this app to Spotify somewhere else (e.g. running it locally on your computer during development/testing) **using the same `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` you're entering here**, that setup already has a `spotify_refresh_token` value stored. Paste that same value into this add-on's `SPOTIFY_REFRESH_TOKEN` option before starting it, and the add-on reuses that authorization directly — no browser consent flow, no SSH, nothing else to do. (Where to find it: it's stored in that other setup's local SQLite database, under `app_settings` → `spotify_refresh_token`.)
+**Option A — recommended, no SSH, no localhost, works from any device.** Open [mcfrenchpants.github.io/spotify-jukebox](https://mcfrenchpants.github.io/spotify-jukebox/) in any browser — your phone, your laptop, whatever's convenient, doesn't need to be anywhere near the Home Assistant box. Paste in your `SPOTIFY_CLIENT_ID` from above, click **Authorize with Spotify**, and log in when Spotify prompts you. That page then hands you a refresh token to copy — paste it into this add-on's `SPOTIFY_REFRESH_TOKEN` option and start (or restart) the add-on.
 
-  ⚠️ **Only do this if that other setup won't keep running alongside the add-on.** A refresh token is tied to the Spotify app (client ID) that issued it, and Spotify's rate limit is bucketed *per client ID*, shared across every instance using it. If your local dev backend and this add-on both poll Spotify at once under the same client ID, a 429 on one can effectively rate-limit both — this has happened in practice. If you plan to keep developing locally while this add-on runs, register a **separate** Spotify Developer app for the add-on (its own client ID/secret) and use Option B below instead — the redirect URI can stay `http://127.0.0.1:8085/api/auth/callback` either way, only the client ID/secret (and each one's own refresh token) need to differ.
+That page runs entirely in your browser (a static page, no server behind it) using Spotify's own "Authorization Code with PKCE" flow, which is specifically designed not to need a client secret at all — nothing about your Spotify credentials ever leaves your browser except the request to Spotify itself. It's shared, fixed infrastructure used identically by every self-hosted install of this app; it doesn't know or care which specific add-on instance you're setting up, which is why you paste the resulting token in yourself rather than it happening automatically.
 
-**Option B — via SSH tunnel, if you don't have that.** Leave `SPOTIFY_REFRESH_TOKEN` blank, start the add-on, and visit:
+  ⚠️ **Don't reuse a refresh token you already generated for a different running instance** (e.g. a local dev setup) unless that other instance won't keep polling Spotify at the same time — a refresh token is tied to the Spotify app (client ID) that issued it, and Spotify's rate limit is bucketed *per client ID*, shared across every instance using it. If you're keeping a dev/staging setup running alongside this one, register a **separate** Spotify Developer app (its own client ID/secret, same fixed Redirect URI) and get a fresh token for each via Option A.
+
+**Option B — via SSH tunnel, if you'd rather not depend on the hosted page above.** Set `SPOTIFY_REDIRECT_URI` to `http://127.0.0.1:8085/api/auth/callback` (this exact value must also be added to your Spotify app's Redirect URIs — matching Option A's URI too is fine, apps can have multiple), leave `SPOTIFY_REFRESH_TOKEN` blank, start the add-on, and visit:
 
 ```
 http://127.0.0.1:8085/api/auth/login
 ```
 
-Because of the `127.0.0.1`-only redirect restriction above, this has to be done from a browser running on the Home Assistant host itself, or by SSH-tunneling port 8085 from your own machine to the HA box and visiting the URL locally (`ssh -L 8085:localhost:8085 <user>@<ha-host>`, then open that URL in a normal browser on your own machine). This step only needs to happen once; after it completes, the app keeps itself logged in.
+Because Spotify only accepts the literal `127.0.0.1` loopback address for plain-HTTP redirects, this has to be done from a browser running on the Home Assistant host itself, or by SSH-tunneling port 8085 from your own machine to the HA box and visiting the URL locally (`ssh -L 8085:localhost:8085 <user>@<ha-host>`, then open that URL in a normal browser on your own machine). This step only needs to happen once; after it completes, the app keeps itself logged in.
 
 ## Guest access
 

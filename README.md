@@ -41,8 +41,10 @@ there works anywhere, but does involve a bit more of a technical setup.
    [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard),
    log in with your Spotify account, and create an app. You'll get a
    **Client ID** and **Client Secret** — copy both somewhere handy. In the
-   app's settings, add `http://127.0.0.1:8085/api/auth/callback` as a
-   Redirect URI (this is a fixed, required value — no need to change it).
+   app's settings, add
+   `https://mcfrenchpants.github.io/spotify-jukebox/` as a Redirect URI
+   (this is a fixed, shared value used by every self-hosted install of this
+   app — see step 4, no need to change it).
 2. **Add this project to Home Assistant.** In Home Assistant, go to
    **Settings → Add-ons → Add-on Store → ⋮ (top right) → Repositories**,
    and add this project's GitHub URL. "Guest Jukebox" will then show up in
@@ -51,16 +53,22 @@ there works anywhere, but does involve a bit more of a technical setup.
    add-on's **Configuration** tab and fill in:
    - `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` — from step 1.
    - `ADMIN_PIN` — a PIN of your choosing (not the `change-me` default).
-     This is what unlocks the admin panel — guests never see it.
+     This is what unlocks the admin panel — guests never see it, and it
+     can't be changed later through the Configuration tab once set (only
+     matters on the very first start), so pick a real one now.
    - Leave `SPOTIFY_REDIRECT_URI` and `SPOTIFY_REFRESH_TOKEN` as-is.
 
    Then press **Start**.
-4. **Connect your Spotify account (one-time only).** From a browser on the
-   same computer running Home Assistant, visit
-   `http://127.0.0.1:8085/api/auth/login` and log into Spotify when
-   prompted. This is a one-time step — after it, the app stays connected on
-   its own. (If you can't get to that URL directly, `DOCS.md` — shown in
-   the add-on's own page in Home Assistant — has a couple of alternatives.)
+4. **Connect your Spotify account (one-time only).** Open
+   [mcfrenchpants.github.io/spotify-jukebox](https://mcfrenchpants.github.io/spotify-jukebox/)
+   in any browser, on any device — your phone, your laptop, doesn't matter,
+   no need to be near the Home Assistant box at all. Paste in your Client ID
+   from step 1, click **Authorize with Spotify**, and log in when prompted.
+   It'll hand you back a refresh token — paste that into the add-on's
+   `SPOTIFY_REFRESH_TOKEN` field (Configuration tab) and restart the add-on.
+   This is a one-time step; after it, the app stays connected on its own.
+   (Prefer not to depend on that page? `DOCS.md` — shown in the add-on's own
+   page in Home Assistant — documents an SSH-based alternative too.)
 5. **Share the link with your guests.** Open the admin panel (find your
    Home Assistant box's address on your network, followed by `:8085`,
    e.g. `http://192.168.1.50:8085`) and look for the QR code / guest link
