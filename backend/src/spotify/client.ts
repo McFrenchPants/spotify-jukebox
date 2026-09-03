@@ -1,6 +1,7 @@
 import { getSetting } from "../db";
 import { refreshAccessToken } from "./tokenRefresh";
 import { withCache } from "./cache";
+import { logWarn } from "../logger";
 
 const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
@@ -269,6 +270,18 @@ export async function getArtist(
     }
 
     const artist = (await response.json()) as SpotifyArtistResponse;
+
+    // BACKLOG.md item 28: the "About the song" panel has been reported
+    // showing 0 followers for artists that plausibly have real ones, but no
+    // root cause was ever confirmed for lack of live evidence in dev. This
+    // logs the raw value whenever it's falsy so the next real occurrence
+    // shows up in the add-on's own logs instead of needing to be reproduced.
+    if (!artist.followers || artist.followers.total === 0) {
+      logWarn(
+        "spotify:getArtist",
+        `Artist ${artistId} (${artist.name ?? "unknown"}) has followers.total=${artist.followers?.total ?? "undefined"} — raw followers field: ${JSON.stringify(artist.followers)}`
+      );
+    }
 
     return {
       id: artist.id,

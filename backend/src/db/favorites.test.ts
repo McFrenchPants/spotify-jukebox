@@ -93,9 +93,9 @@ describe("getFavoriteStatusForTracks", () => {
       "track-nobody",
     ]);
 
-    expect(status["track-mine"]).toEqual({ favoritedByMe: true, favoritedByAnyone: true });
-    expect(status["track-other"]).toEqual({ favoritedByMe: false, favoritedByAnyone: true });
-    expect(status["track-nobody"]).toEqual({ favoritedByMe: false, favoritedByAnyone: false });
+    expect(status["track-mine"]).toEqual({ favoritedByMe: true, favoritedByAnyone: true, favoriteCount: 1 });
+    expect(status["track-other"]).toEqual({ favoritedByMe: false, favoritedByAnyone: true, favoriteCount: 1 });
+    expect(status["track-nobody"]).toEqual({ favoritedByMe: false, favoritedByAnyone: false, favoriteCount: 0 });
   });
 
   it("treats every track as not-favorited-by-me when no guestSessionId is provided", () => {
@@ -103,7 +103,7 @@ describe("getFavoriteStatusForTracks", () => {
 
     const status = getFavoriteStatusForTracks(undefined, ["track-1"]);
 
-    expect(status["track-1"]).toEqual({ favoritedByMe: false, favoritedByAnyone: true });
+    expect(status["track-1"]).toEqual({ favoritedByMe: false, favoritedByAnyone: true, favoriteCount: 1 });
   });
 
   it("returns {} for an empty trackIds array without querying", () => {

@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { addFavorite, getFavoritesStatus, removeFavorite, type Track } from '../lib/api'
 import { useSession } from '../context/SessionContext'
 
-export type FavoriteStatusEntry = { favoritedByMe: boolean; favoritedByAnyone: boolean }
+export type FavoriteStatusEntry = { favoritedByMe: boolean; favoritedByAnyone: boolean; favoriteCount: number }
 export type FavoritesStatusMap = Record<string, FavoriteStatusEntry>
 
-const EMPTY_STATUS: FavoriteStatusEntry = { favoritedByMe: false, favoritedByAnyone: false }
+const EMPTY_STATUS: FavoriteStatusEntry = { favoritedByMe: false, favoritedByAnyone: false, favoriteCount: 0 }
 
 /**
  * Tracks favorites status ({favoritedByMe, favoritedByAnyone}) for a set of
@@ -83,6 +83,7 @@ export function useFavoritesStatus(
     const optimistic: FavoriteStatusEntry = {
       favoritedByMe: nextFavoritedByMe,
       favoritedByAnyone: nextFavoritedByMe ? true : current.favoritedByAnyone,
+      favoriteCount: Math.max(0, current.favoriteCount + (nextFavoritedByMe ? 1 : -1)),
     }
 
     setStatus((prev) => ({ ...prev, [track.id]: optimistic }))

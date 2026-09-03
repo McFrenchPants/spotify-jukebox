@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Capacitor } from '@capacitor/core'
-import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import {
   ApiError,
@@ -74,9 +73,6 @@ function SkipPreviousIcon() {
 
 const VOLUME_UNSUPPORTED_COPY =
   "This device's volume can't be controlled remotely — adjust the phone or speaker directly."
-
-const JUKEBOX_OFFLINE_COPY =
-  "The Jukebox device is offline — volume control is paused until it reconnects."
 
 /**
  * Maps a playback-action failure to distinct, guest-facing copy. Mirrors
@@ -355,7 +351,7 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
     : (permissions?.volume ?? false) && (deviceSupportsVolume || jukeboxOnline) && !jukeboxOffline
 
   return (
-    <Card className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-center gap-3">
         <Button
           variant="secondary"
@@ -411,11 +407,6 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
           Playback controls are restricted right now — ask the host to enable them.
         </p>
       )}
-      {permissions?.volume && !volumeAllowed && (
-        <p className="text-caption text-text-muted lg:mx-auto lg:max-w-sm">
-          {jukeboxOffline ? JUKEBOX_OFFLINE_COPY : VOLUME_UNSUPPORTED_COPY}
-        </p>
-      )}
-    </Card>
+    </div>
   )
 }

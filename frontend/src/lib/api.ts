@@ -796,7 +796,7 @@ export async function removeFavorite(trackId: string, guestToken: string): Promi
 export async function getFavoritesStatus(
   trackIds: string[],
   guestToken?: string | null
-): Promise<Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean }>> {
+): Promise<Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean; favoriteCount: number }>> {
   if (trackIds.length === 0) return {}
 
   const res = await fetch(apiUrl(`/api/favorites/status?trackIds=${trackIds.map(encodeURIComponent).join(',')}`), {
@@ -808,7 +808,7 @@ export async function getFavoritesStatus(
     throw new ApiError(res.status, body.error, body.message ?? `Failed to load favorite status: ${res.status}`)
   }
 
-  return (await res.json()) as Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean }>
+  return (await res.json()) as Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean; favoriteCount: number }>
 }
 
 /** PATCH /api/session/me — requires the guest token from useSession(). Response mirrors POST /api/session's shape. */

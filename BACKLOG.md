@@ -367,7 +367,7 @@ via the Browser pane's `read_page`. Implemented on
 `fix/nav-me-after-settings`.
 
 ## 14. Now Playing expanded card: add more track stats (favorite count, etc.)
-**Status:** needs research
+**Status:** done
 **Type:** enhancement
 **Analysis:** analysis/14-now-playing-more-stats.md (not yet written)
 
@@ -379,6 +379,13 @@ artist/genre block at [NowPlaying.tsx:288-329](frontend/src/components/nowplayin
 Requested: show how many guests have favorited the current track (data we
 already have via the favorites feature, item 3), plus whatever other
 interesting stats are feasible.
+
+**2026-09-03: done.** `ArtistInfoPanel.tsx` replaced by
+[SongInfoPanel.tsx](frontend/src/components/artist/SongInfoPanel.tsx) ("About
+the song"): play count, favorite count (new —
+`getFavoriteStatusForTracks` gained a `favoriteCount` field), plus the
+existing artist photo/name/followers/genres, consolidating what used to be
+two separate duplicate artist-fetching code paths into one.
 
 Spotify API research (as of 2026): Spotify deprecated `audio-features`,
 `audio-analysis`, `recommendations`, and `related-artists` for apps without
@@ -953,12 +960,29 @@ non-native branch today.
 
 ## 28. "About the artist" panel always shows 0 followers
 
-**Status:** needs research
+**Status:** done — confirmed a genuine Spotify API gap, not an app bug
 **Type:** bug
 
-Reported: on the Now Playing page's "About the artist" panel
-([ArtistInfoPanel.tsx:93](frontend/src/components/artist/ArtistInfoPanel.tsx:93)),
+Reported: on the Now Playing page's "About the artist" panel (now "About
+the song", see item 14; was
+[ArtistInfoPanel.tsx:93](frontend/src/components/artist/ArtistInfoPanel.tsx:93),
+now [SongInfoPanel.tsx](frontend/src/components/artist/SongInfoPanel.tsx)),
 the follower count reads 0 no matter which artist is playing.
+
+**2026-09-03: root-caused with real live evidence.** Added temporary
+diagnostic logging to `getArtist()`
+([client.ts](backend/src/spotify/client.ts)) that logs the raw
+`artist.followers` value whenever it's falsy, then hit it against this dev
+environment's real (apparently now-working) Spotify session while two
+well-known, high-listener-count bands were playing (Bad Company, Fleetwood
+Mac). Both came back with `followers` completely `undefined` — not
+`{total: 0}`, the field itself absent from Spotify's response — confirming
+this is a genuine gap in what Spotify's `GET /artists/{id}` returns to
+this app, not a code bug. `getArtist()`'s existing `artist.followers?.total
+?? 0` fallback is already the correct handling for this; nothing further
+to fix code-side. The diagnostic log line was left in place (low-noise,
+only fires on the falsy case) so any future pattern in *which* artists
+this affects becomes visible in the add-on's logs over time.
 
 The backend's `getArtist()` calls Spotify's real `GET /artists/{id}`
 endpoint (not a simplified/track-embedded artist object that would lack
@@ -979,7 +1003,7 @@ the root cause turns out to be.
 
 ## 29. Now Playing card: default to expanded on large screens (desktop)
 
-**Status:** idea
+**Status:** done
 **Type:** enhancement
 
 Reported: on large screens (desktop), the Now Playing song info card should
@@ -989,6 +1013,10 @@ phone. The expand/collapse toggle already exists
 but starts collapsed regardless of viewport width; on desktop there's
 generally more room for the expanded stats (play count, artist/genre
 details — see item 14) to show by default without an extra tap.
+
+**2026-09-03: done.** `NowPlaying.tsx`'s `expanded` state now initializes
+from `window.matchMedia('(min-width: 1024px)').matches` — a one-time check
+at mount, not a live-resizing subscription.
 
 **2026-09-02 code-review pass (no live Spotify access available in this
 dev environment — no `SPOTIFY_REFRESH_TOKEN` configured, and a live test
@@ -1200,3 +1228,28 @@ way the existing tick interval already does. Backend + frontend typecheck
 clean, frontend production build clean, backend `vitest run` (417 tests)
 clean — no frontend unit test suite exists per
 [docs/TESTING.md](docs/TESTING.md).
+
+## 34. Lyrics auto-scroll forces the page back to the active lyric line
+**Status:** idea
+**Type:** bug
+**Analysis:** not yet written
+
+Reported 2026-09-03: while a song is playing with lyrics shown, scrolling
+away to a different part of the page gets forced back to the active lyric
+line. Suspected side effect of the active-line auto-scroll/highlight
+behavior (likely in the lyrics panel component, see
+[analysis/01-lyrics-integration.md](analysis/01-lyrics-integration.md) for
+the original feature) re-scrolling on every synced-line update rather than
+only when the user hasn't manually scrolled away. User wants the forced
+scroll to stop.
+
+## 35. Master Device volume slider defaults to max on first launch
+**Status:** idea
+**Type:** bug
+**Analysis:** not yet written
+
+Reported 2026-09-03: on first launch of the Android app on the Master
+Device, the volume slider shows 100% regardless of the device's actual
+current volume level (e.g. shows 100% when the device is actually at 30%)
+until the user manually adjusts it. Likely the slider's initial state isn't
+being seeded from the actual system/Spotify volume before first render.

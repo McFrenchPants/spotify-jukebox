@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import { Card } from '../ui/Card'
-import { getArtist, getTrackPlayCount, getNowPlaying, type ArtistInfo, type NowPlayingState, type Track } from '../../lib/api'
+import { getNowPlaying, type NowPlayingState, type Track } from '../../lib/api'
 import { formatDuration } from '../../lib/format'
 import type { EventStream } from '../../hooks/useEventStream'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useFavoritesStatus } from '../../hooks/useFavoritesStatus'
 import { FavoriteButton } from '../favorites/FavoriteButton'
+import { PlaybackControls } from '../playback/PlaybackControls'
 
 /** Matches --duration-slow in index.css — the crossfade should ride the same token. */
 const CROSSFADE_MS = 320
@@ -22,9 +22,7 @@ export interface NowPlayingProps {
   refreshKey: number
   /** Reports the current track's art URL up so RootLayout.tsx can thread it into AppShell's background. */
   onAlbumArtChange?: (albumArt: string | null) => void
-  /** Reports the current play state up so RootLayout.tsx can thread it into PlaybackControls (P4.5). */
-  onIsPlayingChange?: (isPlaying: boolean) => void
-  /** Reports the current track's primary artist id up (P4.8), for ArtistInfoPanel. */
+  /** Reports the current track's primary artist id up (P4.8), for SongInfoPanel. */
   onArtistIdChange?: (artistId: string | null) => void
   /** Reports the current track's id up so the parent can key/feed a sibling LyricsPanel section. */
   onTrackIdChange?: (trackId: string | null) => void
@@ -62,7 +60,6 @@ export function NowPlaying({
   subscribe,
   refreshKey,
   onAlbumArtChange,
-  onIsPlayingChange,
   onArtistIdChange,
   onTrackIdChange,
   onProgressChange,
@@ -73,9 +70,11 @@ export function NowPlaying({
   const [displaySnapshot, setDisplaySnapshot] = useState<NowPlayingState | null>(null)
   const [visible, setVisible] = useState(true)
   const [progressMs, setProgressMs] = useState(0)
-  const [expanded, setExpanded] = useState(false)
-  const [detailArtist, setDetailArtist] = useState<ArtistInfo | null>(null)
-  const [detailPlayCount, setDetailPlayCount] = useState<number | null>(null)
+  // Defaults to expanded on desktop widths (BACKLOG.md item 29) — a one-time
+  // check at mount, not a live-resizing subscription; a guest resizing the
+  // window mid-session keeps whatever they last toggled, same as the
+  // existing click-to-expand affordance elsewhere in this component.
+  const [expanded, setExpanded] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
   const pendingRef = useRef<NowPlayingState | null>(null)
   const syncRef = useRef<{ progressMs: number; at: number } | null>(null)
   const prefersReducedMotion = usePrefersReducedMotion()
@@ -117,10 +116,6 @@ export function NowPlaying({
     if (!snapshot) return
     onAlbumArtChange?.(snapshot.albumArt ?? null)
   }, [snapshot, onAlbumArtChange])
-
-  useEffect(() => {
-    onIsPlayingChange?.(snapshot?.isPlaying ?? false)
-  }, [snapshot, onIsPlayingChange])
 
   useEffect(() => {
     onArtistIdChange?.(snapshot?.artistId || null)
@@ -195,40 +190,6 @@ export function NowPlaying({
     return () => clearInterval(interval)
   }, [displaySnapshot])
 
-  // Fetches the expanded section's extra data (play count + artist info)
-  // only once it's actually expanded, keyed to the track it opened for — a
-  // stale response for a track the guest has since navigated away from is
-  // simply ignored via the `cancelled` flag, same pattern as the effects above.
-  useEffect(() => {
-    if (!expanded || !displaySnapshot?.trackId) return
-    let cancelled = false
-    setDetailArtist(null)
-    setDetailPlayCount(null)
-
-    if (displaySnapshot.artistId) {
-      getArtist(displaySnapshot.artistId)
-        .then((data) => {
-          if (!cancelled) setDetailArtist(data)
-        })
-        .catch(() => {
-          // Decorative — silently leave the artist section out.
-        })
-    }
-
-    getTrackPlayCount(displaySnapshot.trackId)
-      .then((playCount) => {
-        if (cancelled) return
-        setDetailPlayCount(playCount)
-      })
-      .catch(() => {
-        // Leave null — the play-count line just stays hidden.
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [expanded, displaySnapshot?.trackId, displaySnapshot?.artistId])
-
   const favoritesTrackIds = displaySnapshot?.trackId ? [displaySnapshot.trackId] : []
   const { status: favoritesStatus, toggle: toggleFavorite } = useFavoritesStatus(favoritesTrackIds, subscribe)
 
@@ -265,15 +226,7 @@ export function NowPlaying({
   return (
     <Card
       className={`cursor-pointer transition-slow active:scale-[0.99] ${visible ? 'opacity-100' : 'opacity-0'}`}
-      onClick={(e) => {
-        // The artist link inside the expanded section (below) needs its own
-        // click to navigate rather than toggle this card — checking the
-        // actual click target here (rather than relying solely on the
-        // link's own stopPropagation) means any future interactive element
-        // added inside the card is safe by default too.
-        if ((e.target as HTMLElement).closest('a')) return
-        setExpanded((prev) => !prev)
-      }}
+      onClick={() => setExpanded((prev) => !prev)}
       role="button"
       tabIndex={0}
       aria-expanded={expanded}
@@ -285,16 +238,8 @@ export function NowPlaying({
         }
       }}
     >
-      {/* At lg+, once the artist detail section has data, split the card
-          art/track-info and artist/genre sections side by side rather than
-          stacked — the wide lg content column (up to 1200px) otherwise
-          leaves the track-info column and its progress bar stretched far
-          past their natural content width, reading as dead space rather
-          than the "breathing room" sibling Card-row layouts get away with.
-          Below lg (and while the detail section hasn't loaded yet) this
-          stays a plain stacked column, pixel-identical to before. */}
-      <div className={expanded && detailArtist ? 'lg:flex lg:items-start lg:gap-6' : ''}>
-        <div className={`flex items-center gap-4 ${expanded && detailArtist ? 'lg:w-1/2' : ''}`}>
+      <div className="flex flex-col">
+        <div className="flex items-center gap-4">
           {displaySnapshot.albumArt ? (
             <img
               src={displaySnapshot.albumArt}
@@ -352,57 +297,16 @@ export function NowPlaying({
               <span>{formatDuration(progressMs)}</span>
               <span>-{formatDuration(remaining)}</span>
             </div>
-
-            {expanded && detailPlayCount !== null && (
-              <p className="mt-3 inline-block rounded-full bg-surface-overlay px-3 py-1 text-caption text-text-secondary">
-                Played {detailPlayCount} {detailPlayCount === 1 ? 'time' : 'times'}
-              </p>
-            )}
           </div>
         </div>
 
-        {expanded && detailArtist && (
-          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 text-left lg:mt-0 lg:w-1/2 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
-            {/* The whole row (not just the name text) is the tap target — a
-                thin one-line link was easy to miss by a few pixels on a phone,
-                landing the tap on this card's own expand/collapse handler
-                instead (well below the 44px touch-target minimum Button.tsx
-                uses elsewhere). min-h-11 plus -m-2/p-2 keeps the visual layout
-                unchanged while growing the actual hit area around it. */}
-            <Link
-              to={`/search?q=${encodeURIComponent(detailArtist.name)}`}
-              onClick={(e) => e.stopPropagation()}
-              className="-m-2 flex min-h-11 items-center gap-3 rounded-md p-2 transition-fast active:bg-white/5"
-            >
-              {detailArtist.imageUrl ? (
-                <img
-                  src={detailArtist.imageUrl}
-                  alt=""
-                  className="h-12 w-12 shrink-0 rounded-full bg-surface-overlay object-cover"
-                />
-              ) : null}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-body font-semibold text-accent underline-offset-2 hover:underline">
-                  {detailArtist.name}
-                </p>
-                <p className="text-caption text-text-muted">{detailArtist.followers.toLocaleString()} followers</p>
-              </div>
-            </Link>
-
-            {detailArtist.genres.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {detailArtist.genres.map((genre) => (
-                  <span
-                    key={genre}
-                    className="rounded-full bg-surface-overlay px-2.5 py-1 text-caption text-text-secondary"
-                  >
-                    {genre}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* Playback controls live inside this same card rather than a
+            separate sibling Card — a click/drag anywhere in here must not
+            also toggle this card's own expand/collapse (the surrounding
+            Card's onClick above), so the whole section stops propagation. */}
+        <div className="mt-4 border-t border-border pt-4" onClick={(e) => e.stopPropagation()}>
+          <PlaybackControls isPlaying={displaySnapshot.isPlaying} subscribe={subscribe} />
+        </div>
       </div>
     </Card>
   )
