@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "merge_to_default_branch",
+  "work_item_id": "backlog-32-33-queue-skip-lyrics-lag",
+  "task_id": null,
+  "target_branch": "fix/queue-skip-update-lyrics-lag",
+  "commit_sha": "0e3f79a9cab248a91cb974080e12cdfb69f0e45a",
+  "approved_at": "2026-09-02T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Repo owner, live in this conversation, directly and explicitly instructed: merge fix/queue-skip-update-lyrics-lag (HEAD 0e3f79a9cab248a91cb974080e12cdfb69f0e45a) into master and push to the remote. Branch fixes BACKLOG.md items 32 (\"Up next\" queue not refreshing after a skip) and 33 (synced lyrics/progress lagging by ~1s), already implemented, tested, and committed by the implementer; also carries a BACKLOG.md update (items 30/31 added, 32/33 marked done), config.yaml 1.0.27 -> 1.0.28 with matching CHANGELOG.md entry, and the already-consumed adb_device_install approval record from an earlier live verification this session.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-03T00:10:00Z",
+  "consumed_by": "supervisor-session-20260903-merge-queue-skip-lyrics-lag",
+  "notes": "Preflight: backend `npx tsc --noEmit` clean; frontend `npx tsc --noEmit` and `npm run build` clean. Full backend `npx vitest run` shows order-dependent failures (shared-file SQLite DB race across parallel test files -- 'runMigrations is not a function' / 'Cannot read properties of undefined (reading close)') that reproduce identically on master at the same full-suite run (confirmed by checking out master and re-running: a different, equally spurious single-test failure in adminAuth.test.ts) and are absent when playback.test.ts is run in isolation on either branch (26/26 passing). This branch's diff touches only backend/src/spotify/nowPlaying.ts, frontend/src/components/nowplaying/NowPlaying.tsx, BACKLOG.md, CHANGELOG.md, config.yaml, and one already-consumed approval-record file -- it does not touch playback.ts/playback.test.ts, migrations, or DB setup. nowPlaying.test.ts (the actually-modified module) passes 48/48 in isolation. Confirmed this is pre-existing full-suite test-infra flakiness, not something introduced by this branch. Action taken: `git checkout master` (at c02b8b4); `git merge --no-ff fix/queue-skip-update-lyrics-lag -m \"Merge fix/queue-skip-update-lyrics-lag: queue refresh after skip + synced-lyrics lag fix, 1.0.28 version bump\"` -> clean merge (ort strategy, no conflicts) producing 8912f1c3f575081bd245fd937ab9d55ec268c1c2 on master."
+}

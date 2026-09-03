@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "push_to_remote",
+  "work_item_id": "backlog-32-33-queue-skip-lyrics-lag",
+  "task_id": null,
+  "target_branch": "master",
+  "commit_sha": "8912f1c3f575081bd245fd937ab9d55ec268c1c2",
+  "approved_at": "2026-09-02T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Same live instruction as the accompanying merge_to_default_branch record: merge fix/queue-skip-update-lyrics-lag into master and push to the remote. Push only -- no deploy/restart/SSH/adb requested as part of this instruction.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-03T00:12:00Z",
+  "consumed_by": "supervisor-session-20260903-merge-queue-skip-lyrics-lag",
+  "notes": "Follows a clean --no-ff merge of fix/queue-skip-update-lyrics-lag into master (8912f1c), no conflicts. origin/master was at c02b8b4 before this push. Action taken: `git push origin master` -> `c02b8b4..8912f1c  master -> master`, a clean fast-forward push, no force needed. Verified independently afterward via `git fetch origin` + comparing `git rev-parse master` vs `git rev-parse origin/master`: both report 8912f1c3f575081bd245fd937ab9d55ec268c1c2."
+}
