@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "adb_device_install",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "master",
+  "commit_sha": "c02b8b41c5c79df7ccb4361bd5ecc579839f1668",
+  "approved_at": "2026-09-02T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "User asked, live in this conversation, to build the Android APK fresh from current master (c02b8b41c5c79df7ccb4361bd5ecc579839f1668) and push/install it via adb onto the physical Master Device to check whether a stale APK's SSE reconnect logic is why guest volume control shows the Jukebox device offline.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-02T21:19:30Z",
+  "consumed_by": "supervisor-session-20260902-android-rebuild",
+  "notes": "Preconditions checked before acting: git status showed only an unrelated, non-code BACKLOG.md doc edit (item 29 addition) unstaged -- frontend/android sources at HEAD were clean; HEAD confirmed at c02b8b41c5c79df7ccb4361bd5ecc579839f1668 on master. JDK 21 (Temurin) present and on JAVA_HOME. Android SDK present at C:\\Dev Android SDK. Exactly one adb device attached (Pixel 7 Pro / cheetah). Actions run: `cd frontend && npm install && npm run build` (tsc -b && vite build, succeeded), `npx cap sync android` (succeeded), `JAVA_HOME=Eclipse Adoptium jdk-21.0.12.101-hotspot ANDROID_HOME=C:/Dev/Android SDK ./gradlew.bat assembleDebug` (BUILD SUCCESSFUL in 1m 16s, 93 tasks), `adb install -r frontend/android/app/build/outputs/apk/debug/app-debug.apk` (Success), `adb shell am start -n com.mcfrench.guestjukebox/.MainActivity` to bring the app to foreground, confirmed via `adb shell dumpsys activity activities` (topResumedActivity=com.mcfrench.guestjukebox/.MainActivity). Live check: `curl http://homeassistant.local:8085/api/trust-mode` went from jukeboxDevice.online=false (pre-launch) to online=true (post-launch) -- single before/after check, not polled."
+}
