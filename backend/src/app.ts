@@ -16,6 +16,7 @@ import { queueRouter } from "./routes/queue";
 import { recentRouter } from "./routes/recent";
 import { searchRouter } from "./routes/search";
 import { sessionRouter } from "./routes/session";
+import { spotifyConnectionRouter } from "./routes/spotifyConnection";
 import { trustModeRouter } from "./routes/trustMode";
 
 export function createApp(): Express {
@@ -63,6 +64,7 @@ export function createApp(): Express {
   app.use("/api/queue", queueRouter);
   app.use("/api/recent", recentRouter);
   app.use("/api/session", sessionRouter);
+  app.use("/api/spotify-connection", spotifyConnectionRouter);
   app.use("/api/trust-mode", trustModeRouter);
 
   // Serve the frontend's built static assets in production (single-origin

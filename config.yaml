@@ -13,7 +13,7 @@ name: "Guest Jukebox (Staging)"
 # offer an update at all (it won't rebuild on unchanged version + repo push
 # alone) -- ALWAYS add a matching entry to CHANGELOG.md in the same change,
 # or the add-on's "Changelog" tab shows "No changelog found."
-version: "1.0.30-staging"
+version: "1.0.31-staging"
 slug: "guest_jukebox_staging"
 description: "STAGING build -- self-hosted, LAN-only party music queueing app for guests, powered by Spotify. Uses its own separate Spotify developer account/app; never point this at the production Spotify credentials."
 url: "https://github.com/McFrenchPants/spotify-jukebox"
