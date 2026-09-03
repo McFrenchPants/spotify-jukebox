@@ -17,6 +17,7 @@ const NAMED_EVENTS = [
   'lyrics-update',
   'jukebox-volume-command',
   'jukebox-volume-status',
+  'jukebox-device-status',
 ] as const
 
 /** How long the connection must be non-open before we surface the manual-refresh fallback. */

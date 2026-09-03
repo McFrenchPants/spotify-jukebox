@@ -138,6 +138,11 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
   // latest value that arrived mid-drag, applied once the guest releases.
   const isDraggingRef = useRef(false)
   const pendingIncomingRef = useRef<number | null>(null)
+  // Live jukebox-device online/offline flip (JR2.1): null means "no live
+  // update received yet, defer entirely to the one-time trust-mode fetch".
+  // Once an event arrives, it takes priority over the trust-mode snapshot's
+  // jukeboxDevice.online for the rest of this mount.
+  const [jukeboxOnlineOverride, setJukeboxOnlineOverride] = useState<boolean | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -237,6 +242,18 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
     })
   }, [subscribe])
 
+  // Live-sync jukebox-device online/offline (JR2.1): the one-time
+  // GET /api/trust-mode fetch above only reflects the state at mount time,
+  // so without this a device flipping online/offline mid-session wouldn't
+  // be reflected here until a page reload.
+  useEffect(() => {
+    return subscribe('jukebox-device-status', (data) => {
+      const payload = data as { online?: unknown } | undefined
+      if (typeof payload?.online !== 'boolean') return
+      setJukeboxOnlineOverride(payload.online)
+    })
+  }, [subscribe])
+
   async function runAction(key: ActionKey, action: () => Promise<void>) {
     setPending((prev) => ({ ...prev, [key]: true }))
     try {
@@ -292,7 +309,12 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
   // commands to it over SSE instead of Spotify's Volume API.
   const deviceSupportsVolume = device != null && device.supports_volume
   const jukeboxDevice = permissions?.jukeboxDevice
-  const jukeboxOnline = Boolean(jukeboxDevice?.registered && jukeboxDevice?.online)
+  // Prefer a live jukebox-device-status event over the one-time trust-mode
+  // snapshot once one has arrived (JR2.1) — registration status itself still
+  // only comes from the trust-mode fetch, so an unregistered device stays
+  // irrelevant regardless of any stray event.
+  const effectiveJukeboxOnline = jukeboxOnlineOverride ?? jukeboxDevice?.online
+  const jukeboxOnline = Boolean(jukeboxDevice?.registered && effectiveJukeboxOnline)
   // A Jukebox device that's registered but currently offline only affects
   // volume: the backend (backend/src/routes/playback.ts) only routes volume
   // commands to the Jukebox device, and falls back to the Spotify Volume API
@@ -300,7 +322,7 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
   // regardless of the Jukebox device's connection state, so they must not be
   // disabled by it (this used to incorrectly disable all controls whenever
   // a Jukebox device was registered but momentarily offline).
-  const jukeboxOffline = Boolean(jukeboxDevice?.registered && !jukeboxDevice?.online)
+  const jukeboxOffline = Boolean(jukeboxDevice?.registered && !effectiveJukeboxOnline)
 
   const pauseResumeAllowed = permissions?.pauseResume ?? false
   const skipAllowed = permissions?.skip ?? false
