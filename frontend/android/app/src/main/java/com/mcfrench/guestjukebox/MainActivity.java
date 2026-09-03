@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(VolumeControlPlugin.class);
+        registerPlugin(AppPinningPlugin.class);
         super.onCreate(savedInstanceState);
         // Debug-build-only diagnostic aid: lets a USB-connected dev machine
         // open chrome://inspect and see the WebView's real Network-tab
