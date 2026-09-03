@@ -2,6 +2,11 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.30
+
+- On wide screens (desktop, `lg` breakpoint and up), Now Playing and its playback controls now form a left column next to the Up Next queue as a right column, instead of everything stacking in one long list.
+- Lyrics now open in their own section below Now Playing/Up Next instead of inside the Now Playing card itself — consistent at every screen size, not just desktop.
+
 ## 1.0.29
 
 - The Master Device (the phone connected to the speakers) can now check whether Android's screen-pinning is turned on, and turn it on with one tap right from the Connect page — this keeps the app locked in the foreground so it doesn't get bumped offline by another app or the phone's screen sleeping.

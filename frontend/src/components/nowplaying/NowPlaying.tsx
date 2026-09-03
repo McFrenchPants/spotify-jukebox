@@ -7,7 +7,6 @@ import type { EventStream } from '../../hooks/useEventStream'
 import { usePrefersReducedMotion } from '../../hooks/usePrefersReducedMotion'
 import { useFavoritesStatus } from '../../hooks/useFavoritesStatus'
 import { FavoriteButton } from '../favorites/FavoriteButton'
-import { LyricsPanel } from './LyricsPanel'
 
 /** Matches --duration-slow in index.css — the crossfade should ride the same token. */
 const CROSSFADE_MS = 320
@@ -27,6 +26,14 @@ export interface NowPlayingProps {
   onIsPlayingChange?: (isPlaying: boolean) => void
   /** Reports the current track's primary artist id up (P4.8), for ArtistInfoPanel. */
   onArtistIdChange?: (artistId: string | null) => void
+  /** Reports the current track's id up so the parent can key/feed a sibling LyricsPanel section. */
+  onTrackIdChange?: (trackId: string | null) => void
+  /** Reports the locally-ticked playback position up, for the same sibling LyricsPanel. */
+  onProgressChange?: (progressMs: number) => void
+  /** Whether the lyrics section is currently shown — lifted to the parent so LyricsPanel can render as its own section instead of nested in this card. */
+  showLyrics: boolean
+  /** Toggles `showLyrics` in the parent. */
+  onToggleLyrics: () => void
 }
 
 function PlaceholderArt({ className }: { className: string }) {
@@ -57,13 +64,16 @@ export function NowPlaying({
   onAlbumArtChange,
   onIsPlayingChange,
   onArtistIdChange,
+  onTrackIdChange,
+  onProgressChange,
+  showLyrics,
+  onToggleLyrics,
 }: NowPlayingProps) {
   const [snapshot, setSnapshot] = useState<NowPlayingState | null>(null)
   const [displaySnapshot, setDisplaySnapshot] = useState<NowPlayingState | null>(null)
   const [visible, setVisible] = useState(true)
   const [progressMs, setProgressMs] = useState(0)
   const [expanded, setExpanded] = useState(false)
-  const [showLyrics, setShowLyrics] = useState(false)
   const [detailArtist, setDetailArtist] = useState<ArtistInfo | null>(null)
   const [detailPlayCount, setDetailPlayCount] = useState<number | null>(null)
   const pendingRef = useRef<NowPlayingState | null>(null)
@@ -115,6 +125,14 @@ export function NowPlaying({
   useEffect(() => {
     onArtistIdChange?.(snapshot?.artistId || null)
   }, [snapshot, onArtistIdChange])
+
+  useEffect(() => {
+    onTrackIdChange?.(displaySnapshot?.trackId ?? null)
+  }, [displaySnapshot?.trackId, onTrackIdChange])
+
+  useEffect(() => {
+    onProgressChange?.(progressMs)
+  }, [progressMs, onProgressChange])
 
   // Crossfade the displayed content whenever the underlying track (or
   // play/pause state) changes, rather than cutting hard to the new data.
@@ -302,7 +320,7 @@ export function NowPlaying({
                   aria-pressed={showLyrics}
                   onClick={(e) => {
                     e.stopPropagation()
-                    setShowLyrics((prev) => !prev)
+                    onToggleLyrics()
                   }}
                 >
                   Lyrics
@@ -386,15 +404,6 @@ export function NowPlaying({
           </div>
         )}
       </div>
-
-      {showLyrics && displaySnapshot.trackId && (
-        <LyricsPanel
-          key={displaySnapshot.trackId}
-          trackId={displaySnapshot.trackId}
-          subscribe={subscribe}
-          progressMs={progressMs}
-        />
-      )}
     </Card>
   )
 }
