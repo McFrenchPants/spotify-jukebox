@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "push_to_remote",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "master",
+  "commit_sha": "2cbd6ece0ba9a7b8c4456a5c86b18255faad040e",
+  "approved_at": "2026-09-03T12:04:41Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Same live instruction as the accompanying merge_to_default_branch record: update the changelog and version, commit that, merge feature/now-playing-desktop-layout into master, and push to the remote.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-03T12:05:30Z",
+  "consumed_by": "supervisor-session-20260903-now-playing-desktop-layout",
+  "notes": "Follows a clean --no-ff merge of feature/now-playing-desktop-layout into master (2cbd6ec), no conflicts. origin/master was at 7fe1318 before this push. Action taken: `git push origin master` -> `7fe1318..2cbd6ec  master -> master`, a clean fast-forward push, no force needed. Verified independently afterward via `git fetch origin` + comparing `git rev-parse master` vs `git rev-parse origin/master`: both report 2cbd6ece0ba9a7b8c4456a5c86b18255faad040e."
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "merge_to_default_branch",
+  "work_item_id": null,
+  "task_id": null,
+  "target_branch": "feature/now-playing-desktop-layout",
+  "commit_sha": "6c69d97bbf397962d50f8f32aa5ae0818bf2fe51",
+  "approved_at": "2026-09-03T12:04:41Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Repo owner, live in this conversation, directly and explicitly instructed: update the change log and the version, commit that, then merge this branch (feature/now-playing-desktop-layout) into master and push to the remote. Branch rearranges the Now Playing page's desktop layout (Now Playing + PlaybackControls as a left column, Up Next as a right column at lg+) and pulls the lyrics panel out into its own section at every breakpoint instead of nesting it inside the Now Playing card. Includes a commit (6c69d97) bumping config.yaml 1.0.29 -> 1.0.30 with a matching CHANGELOG.md entry.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-03T12:05:00Z",
+  "consumed_by": "supervisor-session-20260903-now-playing-desktop-layout",
+  "notes": "Preflight before this record: backend `npx tsc --noEmit` clean; backend `npx vitest run` 417/417 passing; frontend `npx tsc --noEmit` clean; frontend `npm run build` clean. Layout visually verified in the Browser pane against the local dev servers at desktop (two-column) and mobile (375px, single-column stacked) widths; both dev servers stopped afterward and `scripts/check-stray-backend.mjs` confirmed nothing left listening. master HEAD at time of this record: 7fe13181ff727a1e2b71a9f59c0e9550fdfd1b9d. Action taken: `git checkout master`; `git merge --no-ff feature/now-playing-desktop-layout -m \"Merge feature/now-playing-desktop-layout: Now Playing desktop grid layout + standalone lyrics section, 1.0.30 version bump\"` -> clean merge (ort strategy, no conflicts), producing 2cbd6ece0ba9a7b8c4456a5c86b18255faad040e on master."
+}
