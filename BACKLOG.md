@@ -1230,7 +1230,7 @@ clean — no frontend unit test suite exists per
 [docs/TESTING.md](docs/TESTING.md).
 
 ## 34. Lyrics auto-scroll forces the page back to the active lyric line
-**Status:** idea
+**Status:** done
 **Type:** bug
 **Analysis:** not yet written
 
@@ -1242,6 +1242,16 @@ behavior (likely in the lyrics panel component, see
 the original feature) re-scrolling on every synced-line update rather than
 only when the user hasn't manually scrolled away. User wants the forced
 scroll to stop.
+
+**2026-09-03: done.** Root cause:
+[LyricsPanel.tsx](frontend/src/components/nowplaying/LyricsPanel.tsx)'s
+auto-scroll effect called `scrollIntoView()`, which walks every scrollable
+ancestor — including the browser window — to bring the active line into
+view, and the existing manual-scroll guard only tracked scrolls on the
+inner lyrics container, not the outer page. Fixed by computing the active
+line's offset within the container and calling `scrollTo()` directly on
+the container element, which never propagates to ancestor scroll
+containers. Implemented on `fix/lyrics-autoscroll-page-jump`.
 
 ## 35. Master Device volume slider defaults to max on first launch
 **Status:** idea

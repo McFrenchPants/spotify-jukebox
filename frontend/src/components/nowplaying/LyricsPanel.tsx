@@ -88,8 +88,19 @@ export function LyricsPanel({ trackId, subscribe, progressMs }: LyricsPanelProps
   useEffect(() => {
     if (activeIndex < 0) return
     if (expanded && Date.now() - lastManualScrollRef.current < MANUAL_SCROLL_PAUSE_MS) return
+    const container = containerRef.current
+    const activeLine = activeLineRef.current
+    if (!container || !activeLine) return
     isAutoScrollingRef.current = true
-    activeLineRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    // Scroll only the inner lyrics container (containerRef), never the page:
+    // scrollIntoView() walks *every* scrollable ancestor (including the
+    // browser window) to bring the target into view, which was yanking
+    // guests back down to Now Playing any time they'd scrolled elsewhere on
+    // the page. Computing the offset within containerRef and calling
+    // scrollTo() on that element directly stays confined to it.
+    const targetTop =
+      activeLine.offsetTop - container.clientHeight / 2 + activeLine.offsetHeight / 2
+    container.scrollTo({ top: targetTop, behavior: 'smooth' })
     // Smooth scrolling fires a burst of scroll events over its animation —
     // clear the flag once that's had time to settle, rather than on the
     // very next tick, so none of those get misread as manual scrolling.
