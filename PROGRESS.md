@@ -61,6 +61,7 @@ MVP is done — this section replaces the phased task table for tracking new wor
 
 | Item | Status | Notes |
 |---|---|---|
+| Jukebox device resilience: screen-pinning helper + live online-status (BACKLOG.md items 30, 31) | done | Master Device screen-pinning query/enable UI (new native `AppPinning` plugin), a real fixed bug (backend already emitted `jukebox-device-status` over SSE but the frontend never actually subscribed to it), and the Master Device now controls its own volume directly instead of round-tripping through the backend. Full history in `docs/proposals/jukebox-device-resilience/`. Implemented on `feature/jukebox-device-resilience`, not yet merged. |
 | sdlc-supervisor framework (testbed) | done | Not a BACKLOG.md item — a portable Claude Code lifecycle/supervisor framework (task packets, machine state via `.sdlc/state.json`, restricted `implementer`/`verifier` agent roles), built and dogfooded here before ever moving to its own project. **This entry is not in the usual `docs/proposals/<slug>/` location** — its analysis/design-spec/implementation-plan/progress-tracker live in `docs/sdlc/` instead (deliberate: it's project-local `.claude/` tooling work, not an app feature). Full history: [docs/sdlc/design-spec.md](docs/sdlc/design-spec.md), [docs/sdlc/IMPLEMENTATION_PLAN.md](docs/sdlc/IMPLEMENTATION_PLAN.md), [docs/sdlc/PROGRESS.md](docs/sdlc/PROGRESS.md). All of SS0–SS6 done and merged into `master` (this row was stale — previously said "not yet merged"; confirmed via `git log`/`git branch --no-merged master` on 2026-09-02 that `feature/sdlc-supervisor` is fully an ancestor of `master`). Since dogfooded twice more on real backlog items (#11, #24/#25/#26) as sdlc-tracked work, tracked in `.sdlc/state.json` rather than this table. |
 | Reduce now-playing polling load + quota/rate-limit distinction (BACKLOG.md items 24/25/26) | done | Event-scheduled now-playing polling (replacing the constant 4s tick), `QUOTA_EXCEEDED` vs. ordinary-rate-limit distinction in `rateLimitBackoff.ts`, and a short-TTL cache for `GET /api/device`. First real sdlc-tracked work run through the full framework outside its own dogfood task. Implemented on `feature/reduce-nowplaying-polling`, merged to `master`, released as add-on `1.0.26`. Full history in `.sdlc/state.json` (work items `reduce-nowplaying-polling`, `quota-exceeded-detection`, `device-endpoint-caching`) — not duplicated here. |
 | Favorites two-column layout at `lg` (BACKLOG.md item 11) | done | Reflows Find Music's Favorites section alongside Search at `lg`+ instead of a separate tab, reusing the `lg:flex-row`/`lg:w-1/2` precedent from the landscape-layout work (item 2). First real (non-framework) backlog item dogfooded through the sdlc-supervisor framework end to end. Implemented on `feature/favorites-two-column-layout` (off `feature/sdlc-supervisor`, since it needed `.sdlc/`), merged to `master`. |
@@ -84,6 +85,70 @@ MVP is done — this section replaces the phased task table for tracking new wor
 ## Session Log
 
 Newest entry on top. One entry per work session — what got done, what's next, anything a future session needs to know that isn't obvious from the task table.
+
+### 2026-09-03 — Post-launch: shipped Jukebox device resilience (BACKLOG.md items 30 & 31)
+- `/continue-development` — orientation found everything from the prior
+  session already merged/pushed (`fix/queue-skip-update-lyrics-lag`,
+  BACKLOG.md items 32/33, add-on `1.0.28`), with two approval-record files
+  left uncommitted (`consumed: false`); a concurrent session finished that
+  exact bookkeeping mid-turn, so no action was needed there beyond
+  confirming it.
+- User picked backlog items 30 (Jukebox device SSE dies on Android
+  backgrounding) and 31 (Master Device shows a confusing "offline" message
+  about itself) together — both center on the same component
+  (`PlaybackControls.tsx`) and the same underlying gap. Investigated
+  directly before scoping (item 30 was `needs research`): confirmed no
+  `WAKE_LOCK`/foreground service in `AndroidManifest.xml`, no
+  resume-triggered SSE reconnect logic, and — a real bug found along the
+  way — the backend's `jukebox-device-status` SSE event was never actually
+  in the frontend's event allowlist, only referenced by a stale comment.
+  Checked in with the user on two scope questions before writing the design
+  spec: pinned-foreground confirmed as the accepted deployment mode (no
+  foreground-service/wake-lock work — deferred), and item 31 got the deeper
+  fix (Master Device controls its own volume directly) over just improving
+  the message copy.
+  See [analysis in the design spec](docs/proposals/jukebox-device-resilience/DESIGN_SPEC.md)
+  (reviewed and approved by the user) and
+  [IMPLEMENTATION_PLAN.md](docs/proposals/jukebox-device-resilience/IMPLEMENTATION_PLAN.md)
+  for the full scoping trail.
+- Scaffolded as significant-tier (native Android + multiple frontend
+  concerns + an architectural decision), full proposal folder, flat 4-task
+  plan in two batches. Each task delegated to a narrowly-scoped
+  `general-purpose` subagent, diff independently reviewed against the plan
+  before committing — full task-by-task history in
+  `docs/proposals/jukebox-device-resilience/PROGRESS.md`, not duplicated
+  here.
+- **A subagent (JR2.1) correctly found and reported a real plan gap instead
+  of guessing past it**: the design spec assumed `JukeboxDeviceCard.tsx`
+  (the admin panel's device card) had an existing online/offline field to
+  wire a live update into — it doesn't, only registration status. Rather
+  than inventing new admin UI on its own judgment, it stopped and reported.
+  Decided to leave that out of scope — both backlog items' actual asks
+  (guest-facing correctness, the Master Device's own self-view) are fully
+  covered by the `PlaybackControls.tsx` change alone; a live admin badge is
+  a reasonable future idea, not something to build unasked.
+- **JR1.2's subagent found and cleaned up an unrelated stray local backend**
+  (PID on port 8085, left over from an earlier session) via
+  `scripts/check-stray-backend.mjs --kill` as part of its own routine
+  cleanup — another real recurrence of the item 20/22 class of issue,
+  caught before it could interfere with anything.
+- **JR2.1 was live-verified end-to-end against the real dev backend**, not
+  just simulated: opened a genuine SSE connection as the registered device
+  via `curl`, confirmed the backend's actual `jukebox-device-status` event
+  flipped an already-loaded page's UI (offline message disappeared, slider
+  re-enabled) with zero reload.
+- Orchestrator independently verified the whole branch after all four
+  tasks: `git diff --stat` against `master` confirms no backend changes at
+  all and every touched file matches the plan; backend `tsc --noEmit`
+  clean; frontend `tsc -b`/`npm run build` clean;
+  `npm run lint` shows only the pre-existing warning baseline.
+- Marked BACKLOG.md items 30 and 31 `done`. **Not yet merged to `master`**
+  — merging needs explicit user go-ahead per process. Native Java changes
+  (the new `AppPinning` plugin) are unverified beyond code review — no
+  Android SDK in this dev environment, same known gap as prior Master
+  Device Mode native work (items 8, 19); a real on-device test (pinning
+  button, master-device volume slider genuinely moving system volume with
+  no round trip) is worth doing before this ships in a release.
 
 ### 2026-09-02 — Post-launch: `/continue-development` orientation catch-up + shipped stray-backend check (BACKLOG.md item 22)
 - Orientation found this root `PROGRESS.md` well behind reality: `git log`/`.sdlc/state.json` showed the sdlc-supervisor framework fully merged and done (SS0–SS6), plus two more real work items (reduce-nowplaying-polling/#24-26, favorites-two-column-layout/#11) already shipped and merged since the last entry here — all tracked in `.sdlc/state.json` per the framework's own convention, never written up in this file. Backfilled three Post-Launch rows and corrected the stale sdlc-supervisor row (previously said "in-progress"/"not yet merged").

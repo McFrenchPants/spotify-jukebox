@@ -2,6 +2,12 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.29
+
+- The Master Device (the phone connected to the speakers) can now check whether Android's screen-pinning is turned on, and turn it on with one tap right from the Connect page — this keeps the app locked in the foreground so it doesn't get bumped offline by another app or the phone's screen sleeping.
+- The Master Device no longer shows itself the confusing "The Jukebox device is offline" message about itself — and its own volume slider now changes the phone's volume directly instead of round-tripping through the backend first.
+- Every connected device — guests and admins alike — now sees the Master Device come back online right away, without needing to reload the page.
+
 ## 1.0.28
 
 - Fixed the "Up next" queue not updating after skipping a track — it now refreshes on skip, previous, and natural track-end, not just when a guest adds a song or an admin removes one.

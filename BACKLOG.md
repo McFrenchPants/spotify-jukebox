@@ -1017,9 +1017,9 @@ logging of the raw `artist.followers` value and check the add-on's logs
 next time the panel is opened.
 
 ## 30. Jukebox device's SSE connection doesn't survive Android backgrounding
-**Status:** needs research
+**Status:** done
 **Type:** bug
-**Analysis:** not yet written
+**Analysis:** [docs/proposals/jukebox-device-resilience/DESIGN_SPEC.md](docs/proposals/jukebox-device-resilience/DESIGN_SPEC.md)
 
 Reported 2026-09-02: guest-facing volume control went offline
 ("The Jukebox device is offline — volume control is paused until it
@@ -1052,8 +1052,31 @@ declared in `frontend/android/app/src/main/AndroidManifest.xml`; and
 whether this reproduces with screen-pinning alone or requires the phone to
 also stay unlocked/screen-on.
 
+**2026-09-03: scoped and fixed together with item 31** — see
+[docs/proposals/jukebox-device-resilience/](docs/proposals/jukebox-device-resilience/).
+User check-in confirmed pinned-foreground is the accepted deployment mode
+(no foreground-service/wake-lock work); the phone won't be powered 24/7, so
+the fix direction was: (a) make pinning easy to set up/verify from within
+the app, (b) make every client recognize the device's online/offline state
+live instead of only via a page reload. Shipped: a new native `AppPinning`
+Capacitor plugin (`isPinned()`/`enablePinning()` via
+`ActivityManager.getLockTaskModeState()`/`Activity.startLockTask()`)
+surfaced as a status card + "Enable pinning" button on the Master-Device-only
+Connect page; and — a real bug found while investigating — the backend
+already emitted a `jukebox-device-status` SSE event that the frontend never
+actually subscribed to (only a stale code comment referenced it, not the
+real event allowlist). Fixed and live-verified end-to-end against the real
+dev backend (a genuine SSE connection flipped the already-loaded page's UI
+with zero reload). `JukeboxDeviceCard.tsx` (the admin panel's device card)
+was found to have no online/offline concept at all today, only
+registration status — adding one would be a new UI decision, deliberately
+left out of this fix's scope; worth a future item if actually wanted.
+Native Java changes unverified beyond code review (no Android SDK in this
+dev environment, same known gap as prior Master Device Mode native work).
+Implemented on `feature/jukebox-device-resilience`, not yet merged.
+
 ## 31. Master Device shows itself as "the Jukebox device is offline"
-**Status:** idea
+**Status:** done
 **Type:** bug
 
 Reported 2026-09-02, found while investigating item 30: the confusing
@@ -1080,6 +1103,23 @@ guest-style through the backend (`POST /api/volume` → SSE
 class of message entirely for the Master Device (no network round trip
 needed to change its own system volume) and likely also be more robust/less
 latent than looping through the backend.
+
+**2026-09-03: fixed with the deeper option** (user's explicit choice over
+just improving the copy) — see
+[docs/proposals/jukebox-device-resilience/](docs/proposals/jukebox-device-resilience/),
+scoped and fixed together with item 30. `PlaybackControls.tsx` now computes
+`isMasterDevice` via the existing `useIsJukeboxDevice()` hook; when true,
+the volume slider calls `VolumeControl.setVolume()` directly (the existing
+native plugin) instead of the guest-facing `POST /api/volume` round trip,
+then reports the new value via the existing `reportJukeboxVolume()` call so
+other guests' sliders still sync through the existing broadcast.
+`volumeAllowed` for the master device is now gated only by the trust-mode
+permission, never by `deviceSupportsVolume`/`jukeboxOnline`/`jukeboxOffline`
+— those describe other clients' view of this device, not its own — so the
+confusing self-referential "offline" message can no longer render on the
+device's own screen. Guest-path behavior is unchanged. Live-verified both
+branches in the Browser pane. Implemented on
+`feature/jukebox-device-resilience`, not yet merged.
 
 ## 32. "Up next" queue doesn't update after a skip
 **Status:** done
