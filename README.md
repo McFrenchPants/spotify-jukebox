@@ -59,16 +59,25 @@ there works anywhere, but does involve a bit more of a technical setup.
    - Leave `SPOTIFY_REDIRECT_URI` and `SPOTIFY_REFRESH_TOKEN` as-is.
 
    Then press **Start**.
-4. **Connect your Spotify account (one-time only).** Open
+4. **Connect your Spotify account (one-time only).** Open the app's own
+   Settings page (find your Home Assistant box's address on your network,
+   followed by `:8085`, e.g. `http://192.168.1.50:8085`, then Settings) and
+   log in with the PIN from step 3. The app checks its own Spotify
+   connection automatically — if it isn't connected yet, a "Spotify
+   connection" card at the top of Settings tells you so and walks you
+   through the rest: open
    [mcfrenchpants.github.io/spotify-jukebox/oauth-callback](https://mcfrenchpants.github.io/spotify-jukebox/oauth-callback/)
-   in any browser, on any device — your phone, your laptop, doesn't matter,
-   no need to be near the Home Assistant box at all. Paste in your Client ID
-   from step 1, click **Authorize with Spotify**, and log in when prompted.
-   It'll hand you back a refresh token — paste that into the add-on's
-   `SPOTIFY_REFRESH_TOKEN` field (Configuration tab) and restart the add-on.
-   This is a one-time step; after it, the app stays connected on its own.
-   (Prefer not to depend on that page? `DOCS.md` — shown in the add-on's own
-   page in Home Assistant — documents an SSH-based alternative too.)
+   in any browser, on any device (your phone, your laptop — doesn't need to
+   be near the Home Assistant box at all), paste in your Client ID from
+   step 1, click **Authorize with Spotify**, log in when prompted, and paste
+   the refresh token it hands back into that same card in Settings. It takes
+   effect immediately — **no add-on restart needed**, unlike editing the
+   Configuration tab directly. Spotify still requires an actual human login
+   somewhere (that part can't be automated away), but this is otherwise a
+   one-time step; after it, the app stays connected on its own and the
+   Settings card just shows "Connected" from then on. (Prefer not to depend
+   on that page? `DOCS.md` — shown in the add-on's own page in Home
+   Assistant — documents an SSH-based alternative too.)
 5. **Share the link with your guests.** Open the admin panel (find your
    Home Assistant box's address on your network, followed by `:8085`,
    e.g. `http://192.168.1.50:8085`) and look for the QR code / guest link

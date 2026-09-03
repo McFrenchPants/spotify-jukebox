@@ -15,6 +15,7 @@ import {
   refreshAccessToken,
   startTokenRefreshWorker,
   stopTokenRefreshWorker,
+  validateAndStoreRefreshToken,
 } from "./tokenRefresh";
 import { SpotifyRateLimitedError, SpotifyReauthRequiredError } from "./errors";
 import { isRateLimited, resetRateLimitForTests } from "./rateLimitBackoff";
@@ -191,6 +192,84 @@ describe("refreshAccessToken", () => {
     vi.advanceTimersByTime(60_000);
     expect(isRateLimited()).toBe(true);
     vi.useRealTimers();
+  });
+});
+
+describe("validateAndStoreRefreshToken", () => {
+  beforeEach(() => {
+    settings.clear();
+    process.env.SPOTIFY_CLIENT_ID = "test-client-id";
+    process.env.SPOTIFY_CLIENT_SECRET = "test-client-secret";
+    vi.restoreAllMocks();
+  });
+
+  it("exchanges the candidate token and persists it, along with the fresh access token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      jsonResponse({
+        access_token: "brand-new-access-token",
+        refresh_token: "rotated-refresh-token",
+        expires_in: 3600,
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await validateAndStoreRefreshToken("pasted-candidate-token");
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.body).toBe(
+      new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: "pasted-candidate-token",
+      }).toString()
+    );
+
+    expect(getSetting("spotify_access_token")).toBe("brand-new-access-token");
+    // Spotify returned a refresh_token in this response — that one should
+    // win over the raw candidate that was pasted in.
+    expect(getSetting("spotify_refresh_token")).toBe("rotated-refresh-token");
+  });
+
+  it("falls back to persisting the candidate token itself when Spotify doesn't return a new one", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(jsonResponse({ access_token: "brand-new-access-token", expires_in: 3600 }))
+    );
+
+    await validateAndStoreRefreshToken("pasted-candidate-token");
+
+    expect(getSetting("spotify_refresh_token")).toBe("pasted-candidate-token");
+  });
+
+  it("throws and does NOT persist anything when Spotify rejects the candidate token", async () => {
+    settings.set("spotify_refresh_token", "previously-working-token");
+    settings.set("spotify_access_token", "previously-working-access-token");
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        jsonResponse({ error: "invalid_grant", error_description: "Invalid refresh token" }, false, 400)
+      )
+    );
+
+    await expect(validateAndStoreRefreshToken("a-typo-riddled-token")).rejects.toThrow(
+      /Spotify rejected this refresh token/
+    );
+
+    // A bad paste must not clobber whatever was already working.
+    expect(getSetting("spotify_refresh_token")).toBe("previously-working-token");
+    expect(getSetting("spotify_access_token")).toBe("previously-working-access-token");
+  });
+
+  it("throws when SPOTIFY_CLIENT_ID/SECRET aren't configured, without calling fetch", async () => {
+    delete process.env.SPOTIFY_CLIENT_ID;
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(validateAndStoreRefreshToken("any-token")).rejects.toThrow(
+      /SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET/
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

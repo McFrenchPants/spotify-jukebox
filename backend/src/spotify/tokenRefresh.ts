@@ -99,6 +99,63 @@ export async function refreshAccessToken(): Promise<void> {
 }
 
 /**
+ * Validates a refresh token an admin pasted in (from the browser-based PKCE
+ * auth page, see docs/oauth-callback/index.html) by actually exchanging it
+ * with Spotify, and only persists it if that succeeds — deliberately does
+ * NOT call setSetting up front, so a bad paste (typo, expired/already-used
+ * code, wrong token) can't clobber a previously-working stored token.
+ *
+ * Throws a plain Error with a message suitable for surfacing directly to the
+ * admin (e.g. "invalid_grant ...") on any failure — this is a fresh token an
+ * admin just supplied, not the app's own stored one, so the
+ * SpotifyReauthRequiredError/SpotifyRateLimitedError distinctions
+ * refreshAccessToken() makes for its own stored-token failures don't apply
+ * the same way here (there's nothing to silently retry later; the admin
+ * needs to know right away and try again).
+ */
+export async function validateAndStoreRefreshToken(candidateToken: string): Promise<void> {
+  const clientId = process.env.SPOTIFY_CLIENT_ID;
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
+
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      "SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET must be set in the environment before connecting Spotify."
+    );
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "refresh_token",
+    refresh_token: candidateToken,
+  });
+
+  const response = await fetch(SPOTIFY_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+    },
+    body: body.toString(),
+  });
+
+  const tokenData = (await response.json()) as SpotifyTokenResponse;
+
+  if (!response.ok || !tokenData.access_token) {
+    throw new Error(
+      `Spotify rejected this refresh token: ${tokenData.error ?? response.status} ${
+        tokenData.error_description ?? ""
+      }`.trim()
+    );
+  }
+
+  const expiresAt = Date.now() + (tokenData.expires_in ?? 3600) * 1000;
+
+  // Only reached on a confirmed-working exchange — safe to persist now.
+  setSetting("spotify_access_token", tokenData.access_token);
+  setSetting("spotify_token_expires_at", String(expiresAt));
+  setSetting("spotify_refresh_token", tokenData.refresh_token ?? candidateToken);
+}
+
+/**
  * Starts a background interval that refreshes the Spotify access token every
  * `intervalMs` (default 50 minutes). Errors from individual refresh attempts
  * are caught and logged so a single failure (e.g. no token stored yet,

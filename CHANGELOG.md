@@ -1,6 +1,12 @@
 # Changelog
 
-All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`. Entries with a `-staging` version are staging-only identity changes on the `develop` branch (see CLAUDE.md's "Branch strategy" section) — not part of production's own history.
+All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`. Entries with a `-staging` version are changes released to the staging deployment on the `develop` branch (see CLAUDE.md's "Branch strategy" section) ahead of a production release — not yet part of production's own history.
+
+## 1.0.31-staging
+
+- Replaced the SSH-tunnel-only one-time Spotify login with a browser-based authorization page (docs/oauth-callback/index.html, hosted on GitHub Pages) — works from any device, any network, no SSH or localhost access required. The old SSH-tunnel method is still documented as a fallback.
+- Spotify authorization is now checked automatically every time the admin Settings page loads — if it isn't connected yet (or a previous connection expired), a "Spotify connection" card explains that and walks you through reconnecting right there, instead of only surfacing as a broken Now Playing screen with no explanation.
+- Reconnecting Spotify now takes effect immediately — paste the refresh token from the authorization page into the new Settings card and it's applied live, no add-on restart needed.
 
 ## 1.0.30-staging
 

@@ -5,6 +5,7 @@ import { SettingsForm } from '../components/admin/SettingsForm'
 import { QueueModeration } from '../components/admin/QueueModeration'
 import { DeviceSelector } from '../components/admin/DeviceSelector'
 import { JukeboxDeviceCard } from '../components/admin/JukeboxDeviceCard'
+import { SpotifyConnectionCard } from '../components/admin/SpotifyConnectionCard'
 import { GuestUrlCard } from '../components/GuestUrlCard'
 import { AdminAuthProvider, useAdminAuth } from '../context/AdminAuthContext'
 import type { RootLayoutContext } from '../components/RootLayout'
@@ -30,6 +31,8 @@ function AdminPanel() {
           Log out
         </Button>
       </div>
+
+      <SpotifyConnectionCard token={token} />
 
       <div className="flex flex-col gap-6 lg:flex-row">
         <div className="lg:w-1/2">

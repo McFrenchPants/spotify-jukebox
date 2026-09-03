@@ -590,6 +590,47 @@ export async function selectDevice(token: string, deviceId: string): Promise<Dev
 }
 
 /* -------------------------------------------------------------------- */
+/* Spotify connection status + browser-based auth handoff.              */
+/* -------------------------------------------------------------------- */
+
+export type SpotifyConnectionStatus =
+  | { connected: true }
+  | { connected: false; reason: 'not_connected' | 'reauth_required' | 'rate_limited' }
+
+/** GET /api/spotify-connection/status — public, unauthenticated. */
+export async function getSpotifyConnectionStatus(): Promise<SpotifyConnectionStatus> {
+  const res = await fetch(apiUrl('/api/spotify-connection/status'))
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to load Spotify connection status: ${res.status}`)
+  }
+
+  return (await res.json()) as SpotifyConnectionStatus
+}
+
+/**
+ * POST /api/spotify-connection/connect — requires the admin token. Applies a
+ * refresh token pasted in from the browser-based PKCE auth page
+ * (docs/oauth-callback/index.html) live, no HA add-on restart needed.
+ */
+export async function connectSpotify(token: string, refreshToken: string): Promise<void> {
+  const res = await fetch(apiUrl('/api/spotify-connection/connect'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      [ADMIN_TOKEN_HEADER]: token,
+    },
+    body: JSON.stringify({ refreshToken }),
+  })
+
+  if (!res.ok) {
+    const body = await parseErrorBody(res)
+    throw new ApiError(res.status, body.error, body.message ?? `Failed to connect Spotify: ${res.status}`)
+  }
+}
+
+/* -------------------------------------------------------------------- */
 /* M3.2 — Jukebox device (native Android bridge) registration.          */
 /* -------------------------------------------------------------------- */
 
