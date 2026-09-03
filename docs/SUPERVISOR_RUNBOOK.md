@@ -51,6 +51,66 @@ poll with.
    already has a strong convention of documenting incidents and fixes this
    way (see BACKLOG.md items 9, 20, 21).
 
+## Staging: one-time Home Assistant setup
+
+Do this once to get the staging add-on installed and running for the first
+time; skip it once it's already set up.
+
+1. **Add a second, separate add-on repository** pointing at `develop`,
+   alongside your existing production repository entry (don't replace it).
+   In Home Assistant: **Settings → Add-ons → Add-on Store → ⋮ (top-right
+   menu) → Repositories**, add:
+   ```
+   https://github.com/McFrenchPants/spotify-jukebox#develop
+   ```
+   Since `develop`'s `config.yaml` has a different `name`/`slug` than
+   production's (see "Staging identity" below), this shows up as a
+   distinct installable add-on — "Guest Jukebox (Staging)" — not a
+   duplicate of the existing production one. If a push to `develop`
+   doesn't show up as an available update, the Supervisor's cached clone
+   is stale — remove and re-add this repository entry to force a refresh
+   (a smaller hammer than uninstall/reinstall; confirmed to work in
+   practice, see root `PROGRESS.md`'s 2026-08-25 session log entry).
+2. **Register a new Spotify Developer app** for staging at
+   [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard),
+   under a Spotify account dedicated to this deployment — never production's
+   credentials (see CLAUDE.md's Spotify-credentials section). Add
+   `http://127.0.0.1:8086/api/auth/callback` as its Redirect URI (port
+   `8086`, not `8085` — staging's add-on maps to a different host port so
+   it can run alongside production, see "Staging identity" below).
+3. **Fill in the Configuration tab before pressing Start**:
+   `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` from step 2, and a real
+   `ADMIN_PIN` (not the `change-me` default) — **this has to happen before
+   the first login attempt, not after**. The PIN hash is lazily created
+   once, ever, on first use (`ensureAdminPinHash()` in
+   `backend/src/auth/adminToken.ts`) — there's no "change PIN" endpoint
+   anywhere in the app, so editing `ADMIN_PIN` in the Configuration tab
+   after that first login has no effect at all. (If this is ever missed,
+   the only fix is deleting the stored `admin_pin_hash` row directly from
+   the add-on's persisted SQLite `app_settings` table, same as the real
+   incident documented in `docs/proposals/master-device-mode/PROGRESS.md`.)
+4. **Complete the one-time Spotify consent.** Leave `SPOTIFY_REFRESH_TOKEN`
+   blank, start the add-on, then from a browser on the HA host itself (or
+   via `ssh -L 8086:localhost:8086 <user>@<ha-host>` and a browser on your
+   own machine — Spotify only accepts the literal `127.0.0.1` loopback for
+   plain-HTTP redirects), visit:
+   ```
+   http://127.0.0.1:8086/api/auth/login
+   ```
+   and log in with the new dedicated Spotify account when prompted. One-time
+   only — the app stays authorized on its own afterward (see `DOCS.md` for
+   the equivalent production instructions and the "Option A" refresh-token
+   alternative, which does not apply here since staging needs its own
+   fresh consent, not production's).
+
+### Staging identity
+
+See `config.yaml`'s own header comment — `develop`'s `name`, `slug`,
+`version`, and host port (`8086`) are deliberately different from
+`master`'s production values, so the two add-ons can coexist on the same
+Home Assistant server. Never let these leak into `master` on a promotion
+— see Stage 2 below and `scripts/check-config-identity.mjs`.
+
 ## Merge & push workflow
 
 Two-stage, per [CLAUDE.md](../CLAUDE.md)'s "Branch strategy" section:
