@@ -151,6 +151,15 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
   // whether it ends up used below.
   const isJukeboxDevice = useIsJukeboxDevice()
   const isMasterDevice = Capacitor.isNativePlatform() && isJukeboxDevice
+  // isMasterDevice itself only becomes true after useIsJukeboxDevice's own
+  // async registration check resolves (it starts false), so the getDevice
+  // effect below — which only runs once on mount — would otherwise close
+  // over a stale `false` by the time its own fetch resolves. Mirror the
+  // current value into a ref, updated every render, so that effect's async
+  // callback can read the up-to-date value without needing to be re-run
+  // (and re-fetching the device) every time isMasterDevice changes.
+  const isMasterDeviceRef = useRef(isMasterDevice)
+  isMasterDeviceRef.current = isMasterDevice
 
   useEffect(() => {
     let cancelled = false
@@ -186,7 +195,15 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
         // (see jukeboxOnline below) has its own separate seed effect further
         // down (BACKLOG.md item 19), since Spotify has no visibility into
         // that device's real volume at all.
-        if (data.resolved?.volume_percent != null) {
+        //
+        // On the Master Device itself, `data.resolved` IS this device (it's
+        // the active Spotify Connect receiver), so its `volume_percent` is
+        // whatever Spotify defaults a freshly-connected receiver to (observed
+        // as 100) — not this phone's actual system volume. Skip this seed
+        // entirely on the Master Device; the isMasterDevice effect below
+        // reads the real value directly from the native volume plugin
+        // instead (BACKLOG.md item 35).
+        if (!isMasterDeviceRef.current && data.resolved?.volume_percent != null) {
           setVolumeValue(data.resolved.volume_percent)
         }
       })
@@ -229,6 +246,33 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
       cancelled = true
     }
   }, [])
+
+  // Seed the slider directly from this phone's real system volume when this
+  // client IS the Master Device (BACKLOG.md item 35). The other three seed
+  // paths in this file either describe a *different* device's Spotify-
+  // tracked volume (getDevice above, now skipped for the Master Device) or
+  // depend on this device having already reported its own volume to the
+  // backend at least once in a *previous* session (getJukeboxVolume below,
+  // and the live jukebox-volume-status subscription further down) — on a
+  // genuinely first-ever launch there's nothing stored yet, so both of those
+  // can only resolve to null/no-op, leaving whichever stale/wrong value the
+  // getDevice effect raced in. Reading straight from the native volume
+  // plugin has no such dependency: it reflects real hardware state
+  // immediately, without waiting on any prior report round-trip.
+  useEffect(() => {
+    if (!isMasterDevice) return
+    let cancelled = false
+    VolumeControl.getVolume()
+      .then(({ percent }) => {
+        if (!cancelled) setVolumeValue(percent)
+      })
+      .catch(() => {
+        // Non-fatal — the slider just keeps whatever value it already has.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isMasterDevice])
 
   // Live-sync the slider while mounted (BACKLOG.md item 19): the native
   // Jukebox device's system volume can change out-of-band (hardware
