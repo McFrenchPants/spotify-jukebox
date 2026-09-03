@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { Card } from '../ui/Card'
 import { Button } from '../ui/Button'
 import {
@@ -8,6 +9,7 @@ import {
   getTrustMode,
   pausePlayback,
   previousPlayback,
+  reportJukeboxVolume,
   resumePlayback,
   skipPlayback,
   setVolume,
@@ -16,6 +18,9 @@ import {
 } from '../../lib/api'
 import { useToast } from '../../context/ToastContext'
 import type { EventStream } from '../../hooks/useEventStream'
+import { useIsJukeboxDevice } from '../../hooks/useIsJukeboxDevice'
+import { VolumeControl } from '../../lib/volumeControlPlugin'
+import { getOrCreateClientId } from '../../lib/clientId'
 
 const VOLUME_DEBOUNCE_MS = 300
 
@@ -143,6 +148,13 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
   // Once an event arrives, it takes priority over the trust-mode snapshot's
   // jukeboxDevice.online for the rest of this mount.
   const [jukeboxOnlineOverride, setJukeboxOnlineOverride] = useState<boolean | null>(null)
+  // JR3.1: when this client IS the registered Jukebox device (native build,
+  // Master Device Mode), it can set its own system volume directly instead
+  // of round-tripping the change through the backend/SSE to itself. Hooks
+  // must be called unconditionally, so this is computed here regardless of
+  // whether it ends up used below.
+  const isJukeboxDevice = useIsJukeboxDevice()
+  const isMasterDevice = Capacitor.isNativePlatform() && isJukeboxDevice
 
   useEffect(() => {
     let cancelled = false
@@ -281,7 +293,15 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
     setVolumeValue(next)
     if (volumeDebounceRef.current) clearTimeout(volumeDebounceRef.current)
     volumeDebounceRef.current = setTimeout(() => {
-      void runAction('volume', () => setVolume(next))
+      if (isMasterDevice) {
+        void runAction('volume', () =>
+          VolumeControl.setVolume({ percent: next }).then(() =>
+            reportJukeboxVolume(getOrCreateClientId(), next),
+          ),
+        )
+      } else {
+        void runAction('volume', () => setVolume(next))
+      }
     }, VOLUME_DEBOUNCE_MS)
   }
 
@@ -326,7 +346,13 @@ export function PlaybackControls({ isPlaying, subscribe }: PlaybackControlsProps
 
   const pauseResumeAllowed = permissions?.pauseResume ?? false
   const skipAllowed = permissions?.skip ?? false
-  const volumeAllowed = (permissions?.volume ?? false) && (deviceSupportsVolume || jukeboxOnline) && !jukeboxOffline
+  // JR3.1: the master device controls its own hardware directly, so the
+  // deviceSupportsVolume/jukeboxOnline/jukeboxOffline gates — which all
+  // describe *other* clients' view of this device's connection — don't apply
+  // to it. Only the trust-mode permission still matters.
+  const volumeAllowed = isMasterDevice
+    ? (permissions?.volume ?? false)
+    : (permissions?.volume ?? false) && (deviceSupportsVolume || jukeboxOnline) && !jukeboxOffline
 
   return (
     <Card className="flex flex-col gap-4">
