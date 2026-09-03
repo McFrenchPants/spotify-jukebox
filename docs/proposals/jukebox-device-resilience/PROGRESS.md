@@ -11,11 +11,33 @@ Legend: `todo` / `in-progress` / `blocked` / `done`
 | JR1.1 | Native: screen-pinning query + enable methods | done | Unverified beyond code review (no Android SDK) |
 | JR2.1 | Frontend: live jukebox-device online/offline status | done | Live-verified end-to-end against real dev backend. `JukeboxDeviceCard.tsx` deliberately left untouched — see session log |
 | JR1.2 | Frontend: pinning status UI on Connect page | done | Verified live in Browser pane via a temporary, fully-reverted plugin mock |
-| JR3.1 | Frontend: Master Device controls its own volume directly | in-progress | |
+| JR3.1 | Frontend: Master Device controls its own volume directly | done | Live-verified both branches in Browser pane |
 
 ## Session Log
 
 Newest entry on top.
+
+### 2026-09-03 — All tasks done, BACKLOG.md items 30 & 31 marked done
+- **JR3.1** (Master Device controls its own volume directly): diff confined
+  to exactly `PlaybackControls.tsx`, matches the plan (`isMasterDevice` gate
+  on both the volume-change handler and `volumeAllowed`; guest path
+  byte-identical). Live-verified both branches in the Browser pane via
+  temporary, fully-reverted instrumentation (confirmed via `git diff`).
+- **Orchestrator ran full verification independently** after all four
+  tasks: `git diff --stat master...feature/jukebox-device-resilience`
+  confirms the whole branch touches exactly the planned files (no backend
+  changes at all); backend `tsc --noEmit` clean; frontend `tsc -b`/
+  `npm run build` clean; frontend `npm run lint` shows only the existing
+  pre-task warning baseline (no new categories).
+- Marked BACKLOG.md items 30 and 31 `done`, each with a summary of what
+  shipped and a pointer back to this proposal.
+- **Not yet merged to `master`** — merging needs explicit user go-ahead per
+  process. No native-hardware verification was possible in this dev
+  environment (no Android SDK, no physical device) — same known gap as
+  prior Master Device Mode native work (items 8, 19); worth a real
+  on-device test (pinning button, and the master device's own volume slider
+  genuinely moving system volume with no round trip) before this ships in a
+  release.
 
 ### 2026-09-03 — Batch 1 done (JR1.1, JR1.2, JR2.1)
 All three delegated to `general-purpose` subagents, each diff independently
