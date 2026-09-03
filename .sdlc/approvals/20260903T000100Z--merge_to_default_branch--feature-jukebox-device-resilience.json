@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "merge_to_default_branch",
+  "work_item_id": "backlog-30-31-jukebox-device-resilience",
+  "task_id": null,
+  "target_branch": "feature/jukebox-device-resilience",
+  "commit_sha": "ddc6aed0e54dfbad9e06eea27abf8382b7b575d2",
+  "approved_at": "2026-09-03T00:01:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Repo owner, live in this conversation, directly and explicitly instructed: build the Android app, install on the connected Master Device if present, then merge feature/jukebox-device-resilience into master, update the changelog and version, and push to the remote. Branch implements BACKLOG.md items 30 (Jukebox device SSE connection not surviving Android backgrounding -- fixed via a new native AppPinning Capacitor plugin + status/enable UI, and the frontend actually subscribing to the jukebox-device-status SSE event it already received but ignored) and 31 (Master Device showing a confusing self-referential offline message -- fixed by having PlaybackControls use useIsJukeboxDevice() and control volume directly via the existing native VolumeControl plugin instead of round-tripping through the backend). Includes a commit (ddc6aed) bumping config.yaml 1.0.28 -> 1.0.29 with a matching CHANGELOG.md entry.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-03T00:03:00Z",
+  "consumed_by": "supervisor-session-20260903-jukebox-device-resilience",
+  "notes": "Preflight before this record: backend `npx tsc --noEmit` clean; frontend `npx tsc --noEmit` clean; backend `npx vitest run` 417/417 passing; frontend `npm run build` clean; frontend `npm run lint` shows only the pre-existing warning baseline. `git diff --stat master...feature/jukebox-device-resilience` confirmed touching only the planned files, no backend changes. Android APK built and installed on the Master Device (Pixel 7 Pro) per the separate 20260903T000000Z--adb_device_install--feature-jukebox-device-resilience.json record, already consumed. master HEAD at time of this record: 03a7fd3c4c69618d8225d5469c970e6ca1fcb327. Action taken: `git checkout master`; `git merge --no-ff feature/jukebox-device-resilience -m \"Merge feature/jukebox-device-resilience: jukebox device resilience (BACKLOG.md items 30/31) + 1.0.29 version bump\"` -> clean merge (ort strategy, no conflicts), producing 627eb56ca2e5a678a8108b13601d0a5b08390f3b on master."
+}

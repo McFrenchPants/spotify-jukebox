@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "adb_device_install",
+  "work_item_id": "backlog-30-31-jukebox-device-resilience",
+  "task_id": null,
+  "target_branch": "feature/jukebox-device-resilience",
+  "commit_sha": "16b370ab9c9eb542ef29ac67c1eea57091b6bb49",
+  "approved_at": "2026-09-03T00:00:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "User asked, live in this conversation: \"make sure you run a new build for the Android app. And check the ADB devices to see if the master device (Pixel 7 Pro) is connected. It's probably the only device, if it's there, you can push the latest build to that device. And then make sure you merge into master, update the change log and the version, and push to the remote.\" This record covers the build-and-install portion, from feature/jukebox-device-resilience (HEAD 16b370ab9c9eb542ef29ac67c1eea57091b6bb49) implementing BACKLOG.md items 30/31.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-03T00:05:00Z",
+  "consumed_by": "supervisor-session-20260903-jukebox-device-resilience",
+  "notes": "Preflight before writing this record: backend `npx tsc --noEmit` clean; frontend `npx tsc --noEmit` clean; backend `npx vitest run` 417/417 passing (45 test files); frontend `npm run build` clean; frontend `npm run lint` shows only the pre-existing warning baseline (only-export-components, set-state-in-effect, exhaustive-deps -- no new categories). Android build: `cd frontend && npm run build:android` -> BUILD SUCCESSFUL in 1m 26s, APK at frontend/android/app/build/outputs/apk/debug/app-debug.apk. `adb devices -l` showed exactly one attached device: adb-2B151FDH30062U-DDJPYX._adb-tls-connect._tcp, product:cheetah model:Pixel_7_Pro transport_id:429 -- matches the user's expectation of the Master Device. Action taken: `adb install -r frontend/android/app/build/outputs/apk/debug/app-debug.apk` -> \"Performing Streamed Install / Success\"."
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0.0",
+  "operation": "push_to_remote",
+  "work_item_id": "backlog-30-31-jukebox-device-resilience",
+  "task_id": null,
+  "target_branch": "master",
+  "commit_sha": "627eb56ca2e5a678a8108b13601d0a5b08390f3b",
+  "approved_at": "2026-09-03T00:02:00Z",
+  "approved_by": "mcfrench@gmail.com",
+  "instruction": "Same live instruction as the accompanying merge_to_default_branch record: merge feature/jukebox-device-resilience into master, update changelog/version, and push to the remote. Push only -- no further deploy/restart/SSH/adb requested as part of this instruction beyond the already-completed device install.",
+  "single_use": true,
+  "consumed": true,
+  "consumed_at": "2026-09-03T00:04:00Z",
+  "consumed_by": "supervisor-session-20260903-jukebox-device-resilience",
+  "notes": "Follows a clean --no-ff merge of feature/jukebox-device-resilience into master (627eb56), no conflicts. origin/master was at 03a7fd3 before this push. Action taken: `git push origin master` -> `03a7fd3..627eb56  master -> master`, a clean fast-forward push, no force needed. Verified independently afterward via `git fetch origin` + comparing `git rev-parse master` vs `git rev-parse origin/master`: both report 627eb56ca2e5a678a8108b13601d0a5b08390f3b."
+}
