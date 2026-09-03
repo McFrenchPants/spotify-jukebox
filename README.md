@@ -42,7 +42,7 @@ there works anywhere, but does involve a bit more of a technical setup.
    log in with your Spotify account, and create an app. You'll get a
    **Client ID** and **Client Secret** — copy both somewhere handy. In the
    app's settings, add
-   `https://mcfrenchpants.github.io/spotify-jukebox/` as a Redirect URI
+   `https://mcfrenchpants.github.io/spotify-jukebox/oauth-callback/` as a Redirect URI
    (this is a fixed, shared value used by every self-hosted install of this
    app — see step 4, no need to change it).
 2. **Add this project to Home Assistant.** In Home Assistant, go to
@@ -60,7 +60,7 @@ there works anywhere, but does involve a bit more of a technical setup.
 
    Then press **Start**.
 4. **Connect your Spotify account (one-time only).** Open
-   [mcfrenchpants.github.io/spotify-jukebox](https://mcfrenchpants.github.io/spotify-jukebox/)
+   [mcfrenchpants.github.io/spotify-jukebox/oauth-callback](https://mcfrenchpants.github.io/spotify-jukebox/oauth-callback/)
    in any browser, on any device — your phone, your laptop, doesn't matter,
    no need to be near the Home Assistant box at all. Paste in your Client ID
    from step 1, click **Authorize with Spotify**, and log in when prompted.

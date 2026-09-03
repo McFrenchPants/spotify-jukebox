@@ -6,7 +6,7 @@ A self-hosted, LAN-only party music queueing app: guests browse and add songs to
 
 Fill in all four options on the add-on's **Configuration** tab before pressing Start:
 
-- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` — from a Spotify Developer app you create at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard). Add `https://mcfrenchpants.github.io/spotify-jukebox/` as that app's Redirect URI (a fixed, shared value — see "Option A" below for why).
+- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` — from a Spotify Developer app you create at [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard). Add `https://mcfrenchpants.github.io/spotify-jukebox/oauth-callback/` as that app's Redirect URI (a fixed, shared value — see "Option A" below for why).
 - `SPOTIFY_REDIRECT_URI` — leave as the default. It's only used by the SSH-based fallback (Option B below); the recommended path (Option A) doesn't touch it.
 - `ADMIN_PIN` — a real PIN, not the `change-me` default. Guests never see this; only whoever opens the admin panel needs it. **This can't be changed later** through the Configuration tab — it's only ever read on the very first login attempt (hashed once and stored), so get it right before pressing Start.
 - `SPOTIFY_REFRESH_TOKEN` — leave blank; Option A below fills it in for you.
@@ -15,7 +15,7 @@ Fill in all four options on the add-on's **Configuration** tab before pressing S
 
 The app needs one Spotify login to authorize itself. There are two ways to complete it:
 
-**Option A — recommended, no SSH, no localhost, works from any device.** Open [mcfrenchpants.github.io/spotify-jukebox](https://mcfrenchpants.github.io/spotify-jukebox/) in any browser — your phone, your laptop, whatever's convenient, doesn't need to be anywhere near the Home Assistant box. Paste in your `SPOTIFY_CLIENT_ID` from above, click **Authorize with Spotify**, and log in when Spotify prompts you. That page then hands you a refresh token to copy — paste it into this add-on's `SPOTIFY_REFRESH_TOKEN` option and start (or restart) the add-on.
+**Option A — recommended, no SSH, no localhost, works from any device.** Open [mcfrenchpants.github.io/spotify-jukebox/oauth-callback](https://mcfrenchpants.github.io/spotify-jukebox/oauth-callback/) in any browser — your phone, your laptop, whatever's convenient, doesn't need to be anywhere near the Home Assistant box. Paste in your `SPOTIFY_CLIENT_ID` from above, click **Authorize with Spotify**, and log in when Spotify prompts you. That page then hands you a refresh token to copy — paste it into this add-on's `SPOTIFY_REFRESH_TOKEN` option and start (or restart) the add-on.
 
 That page runs entirely in your browser (a static page, no server behind it) using Spotify's own "Authorization Code with PKCE" flow, which is specifically designed not to need a client secret at all — nothing about your Spotify credentials ever leaves your browser except the request to Spotify itself. It's shared, fixed infrastructure used identically by every self-hosted install of this app; it doesn't know or care which specific add-on instance you're setting up, which is why you paste the resulting token in yourself rather than it happening automatically.
 
