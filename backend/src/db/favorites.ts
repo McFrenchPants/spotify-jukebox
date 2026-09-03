@@ -105,15 +105,18 @@ export function listFavoritesForGuest(guestSessionId: string): Favorite[] {
 export function getFavoriteStatusForTracks(
   guestSessionId: string | undefined,
   trackIds: string[]
-): Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean }> {
-  const result: Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean }> = {};
+): Record<string, { favoritedByMe: boolean; favoritedByAnyone: boolean; favoriteCount: number }> {
+  const result: Record<
+    string,
+    { favoritedByMe: boolean; favoritedByAnyone: boolean; favoriteCount: number }
+  > = {};
 
   if (trackIds.length === 0) {
     return result;
   }
 
   for (const trackId of trackIds) {
-    result[trackId] = { favoritedByMe: false, favoritedByAnyone: false };
+    result[trackId] = { favoritedByMe: false, favoritedByAnyone: false, favoriteCount: 0 };
   }
 
   const placeholders = trackIds.map(() => "?").join(",");
@@ -129,6 +132,7 @@ export function getFavoriteStatusForTracks(
       continue;
     }
     entry.favoritedByAnyone = true;
+    entry.favoriteCount += 1;
     if (guestSessionId !== undefined && row.guest_session_id === guestSessionId) {
       entry.favoritedByMe = true;
     }

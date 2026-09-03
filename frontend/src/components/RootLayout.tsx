@@ -14,8 +14,6 @@ export interface RootLayoutContext {
   subscribe: EventStream['subscribe']
   /** Bumped by the manual-refresh fallback affordance to force a re-fetch. */
   refreshKey: number
-  isPlaying: boolean
-  onIsPlayingChange: (isPlaying: boolean) => void
   onAlbumArtChange: (albumArt: string | null) => void
   artistId: string | null
   onArtistIdChange: (id: string | null) => void
@@ -24,7 +22,7 @@ export interface RootLayoutContext {
 /**
  * Owns the single `useEventStream()` instance (only one EventSource may be
  * open at a time — see useEventStream's doc comment) plus the album-art /
- * isPlaying / artistId / refreshKey state that used to live in App.tsx.
+ * artistId / refreshKey state that used to live in App.tsx.
  * Renders the persistent AppShell (background art + bottom nav) and hands
  * the shared bits down to whichever page is routed via Outlet context,
  * mirroring today's prop-drilling but across routes instead of components.
@@ -32,7 +30,6 @@ export interface RootLayoutContext {
 export function RootLayout() {
   const { subscribe, isStale, reconnectedAt } = useEventStream()
   const [albumArt, setAlbumArt] = useState<string | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
   const [artistId, setArtistId] = useState<string | null>(null)
   // Bumped to force the now-playing/queue pages to re-fetch — used by the
   // manual "tap to refresh" fallback below, not a polling loop.
@@ -114,8 +111,6 @@ export function RootLayout() {
   const context: RootLayoutContext = {
     subscribe,
     refreshKey,
-    isPlaying,
-    onIsPlayingChange: setIsPlaying,
     onAlbumArtChange: setAlbumArt,
     artistId,
     onArtistIdChange: setArtistId,

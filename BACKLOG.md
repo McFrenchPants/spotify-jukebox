@@ -953,12 +953,29 @@ non-native branch today.
 
 ## 28. "About the artist" panel always shows 0 followers
 
-**Status:** needs research
+**Status:** done — confirmed a genuine Spotify API gap, not an app bug
 **Type:** bug
 
-Reported: on the Now Playing page's "About the artist" panel
-([ArtistInfoPanel.tsx:93](frontend/src/components/artist/ArtistInfoPanel.tsx:93)),
+Reported: on the Now Playing page's "About the artist" panel (now "About
+the song", see item 14; was
+[ArtistInfoPanel.tsx:93](frontend/src/components/artist/ArtistInfoPanel.tsx:93),
+now [SongInfoPanel.tsx](frontend/src/components/artist/SongInfoPanel.tsx)),
 the follower count reads 0 no matter which artist is playing.
+
+**2026-09-03: root-caused with real live evidence.** Added temporary
+diagnostic logging to `getArtist()`
+([client.ts](backend/src/spotify/client.ts)) that logs the raw
+`artist.followers` value whenever it's falsy, then hit it against this dev
+environment's real (apparently now-working) Spotify session while two
+well-known, high-listener-count bands were playing (Bad Company, Fleetwood
+Mac). Both came back with `followers` completely `undefined` — not
+`{total: 0}`, the field itself absent from Spotify's response — confirming
+this is a genuine gap in what Spotify's `GET /artists/{id}` returns to
+this app, not a code bug. `getArtist()`'s existing `artist.followers?.total
+?? 0` fallback is already the correct handling for this; nothing further
+to fix code-side. The diagnostic log line was left in place (low-noise,
+only fires on the falsy case) so any future pattern in *which* artists
+this affects becomes visible in the add-on's logs over time.
 
 The backend's `getArtist()` calls Spotify's real `GET /artists/{id}`
 endpoint (not a simplified/track-embedded artist object that would lack
@@ -1200,3 +1217,28 @@ way the existing tick interval already does. Backend + frontend typecheck
 clean, frontend production build clean, backend `vitest run` (417 tests)
 clean — no frontend unit test suite exists per
 [docs/TESTING.md](docs/TESTING.md).
+
+## 34. Lyrics auto-scroll forces the page back to the active lyric line
+**Status:** idea
+**Type:** bug
+**Analysis:** not yet written
+
+Reported 2026-09-03: while a song is playing with lyrics shown, scrolling
+away to a different part of the page gets forced back to the active lyric
+line. Suspected side effect of the active-line auto-scroll/highlight
+behavior (likely in the lyrics panel component, see
+[analysis/01-lyrics-integration.md](analysis/01-lyrics-integration.md) for
+the original feature) re-scrolling on every synced-line update rather than
+only when the user hasn't manually scrolled away. User wants the forced
+scroll to stop.
+
+## 35. Master Device volume slider defaults to max on first launch
+**Status:** idea
+**Type:** bug
+**Analysis:** not yet written
+
+Reported 2026-09-03: on first launch of the Android app on the Master
+Device, the volume slider shows 100% regardless of the device's actual
+current volume level (e.g. shows 100% when the device is actually at 30%)
+until the user manually adjusts it. Likely the slider's initial state isn't
+being seeded from the actual system/Spotify volume before first render.

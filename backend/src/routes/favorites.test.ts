@@ -257,9 +257,9 @@ describe("GET /api/favorites/status", () => {
     const body = (await res.json()) as any;
 
     expect(res.status).toBe(200);
-    expect(body["track-1"]).toEqual({ favoritedByMe: true, favoritedByAnyone: true });
-    expect(body["track-2"]).toEqual({ favoritedByMe: false, favoritedByAnyone: true });
-    expect(body["track-nobody"]).toEqual({ favoritedByMe: false, favoritedByAnyone: false });
+    expect(body["track-1"]).toEqual({ favoritedByMe: true, favoritedByAnyone: true, favoriteCount: 1 });
+    expect(body["track-2"]).toEqual({ favoritedByMe: false, favoritedByAnyone: true, favoriteCount: 1 });
+    expect(body["track-nobody"]).toEqual({ favoritedByMe: false, favoritedByAnyone: false, favoriteCount: 0 });
   });
 
   it("returns 200 with all favoritedByMe: false when there is no x-guest-token header", async () => {
@@ -275,7 +275,7 @@ describe("GET /api/favorites/status", () => {
     const body = (await res.json()) as any;
 
     expect(res.status).toBe(200);
-    expect(body["track-1"]).toEqual({ favoritedByMe: false, favoritedByAnyone: true });
+    expect(body["track-1"]).toEqual({ favoritedByMe: false, favoritedByAnyone: true, favoriteCount: 1 });
   });
 
   it("returns an empty object for a missing trackIds param", async () => {
