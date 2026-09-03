@@ -367,7 +367,7 @@ via the Browser pane's `read_page`. Implemented on
 `fix/nav-me-after-settings`.
 
 ## 14. Now Playing expanded card: add more track stats (favorite count, etc.)
-**Status:** needs research
+**Status:** done
 **Type:** enhancement
 **Analysis:** analysis/14-now-playing-more-stats.md (not yet written)
 
@@ -379,6 +379,13 @@ artist/genre block at [NowPlaying.tsx:288-329](frontend/src/components/nowplayin
 Requested: show how many guests have favorited the current track (data we
 already have via the favorites feature, item 3), plus whatever other
 interesting stats are feasible.
+
+**2026-09-03: done.** `ArtistInfoPanel.tsx` replaced by
+[SongInfoPanel.tsx](frontend/src/components/artist/SongInfoPanel.tsx) ("About
+the song"): play count, favorite count (new —
+`getFavoriteStatusForTracks` gained a `favoriteCount` field), plus the
+existing artist photo/name/followers/genres, consolidating what used to be
+two separate duplicate artist-fetching code paths into one.
 
 Spotify API research (as of 2026): Spotify deprecated `audio-features`,
 `audio-analysis`, `recommendations`, and `related-artists` for apps without
@@ -996,7 +1003,7 @@ the root cause turns out to be.
 
 ## 29. Now Playing card: default to expanded on large screens (desktop)
 
-**Status:** idea
+**Status:** done
 **Type:** enhancement
 
 Reported: on large screens (desktop), the Now Playing song info card should
@@ -1006,6 +1013,10 @@ phone. The expand/collapse toggle already exists
 but starts collapsed regardless of viewport width; on desktop there's
 generally more room for the expanded stats (play count, artist/genre
 details — see item 14) to show by default without an extra tap.
+
+**2026-09-03: done.** `NowPlaying.tsx`'s `expanded` state now initializes
+from `window.matchMedia('(min-width: 1024px)').matches` — a one-time check
+at mount, not a live-resizing subscription.
 
 **2026-09-02 code-review pass (no live Spotify access available in this
 dev environment — no `SPOTIFY_REFRESH_TOKEN` configured, and a live test
