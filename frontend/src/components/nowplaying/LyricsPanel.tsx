@@ -105,7 +105,7 @@ export function LyricsPanel({ trackId, subscribe, progressMs }: LyricsPanelProps
   return (
     <Card
       noPadding
-      className="mt-4 cursor-pointer overflow-hidden border-t border-border bg-surface-overlay p-3 transition-slow"
+      className="cursor-pointer overflow-hidden bg-surface-overlay p-3 transition-slow"
       onClick={(e) => {
         e.stopPropagation()
         setExpanded((prev) => !prev)
