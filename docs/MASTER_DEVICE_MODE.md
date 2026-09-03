@@ -1,8 +1,8 @@
 # Master Device Mode (optional native Android build)
 
-This is a how-to for self-hosters. For the full rationale and design
-decisions, see
-[docs/proposals/master-device-mode/DESIGN_SPEC.md](proposals/master-device-mode/DESIGN_SPEC.md).
+This is a how-to for self-hosters. For the rationale and history behind
+this feature, see [docs/proposals/ARCHIVE.md](proposals/ARCHIVE.md) (item
+8).
 
 ## 1. What this is and why
 
@@ -32,7 +32,7 @@ This one command chains the web build, `cap sync android`, and the Gradle
 `assembleDebug` task, auto-detecting a JDK 21 install if needed. If you
 haven't set up the Android toolchain yet (JDK 21, Android SDK,
 `local.properties`), see
-[ANDROID_BUILD.md](proposals/master-device-mode/ANDROID_BUILD.md) for
+[ANDROID_BUILD.md](ANDROID_BUILD.md) for
 prerequisites — that doc also covers the exact error you'll hit if only
 JDK 17 is installed.
 

@@ -14,7 +14,7 @@ const SPOTIFY_API_BASE = "https://api.spotify.com/v1";
 
 /**
  * Low-frequency safety-net poll interval (BACKLOG.md #24 / see
- * analysis/24-event-scheduled-now-playing-poll.md). Always the outer bound
+ * docs/proposals/ARCHIVE.md, items 24-26). Always the outer bound
  * on how long the poller will wait before checking again, regardless of
  * what else is scheduled — catches out-of-band playback changes (a
  * hardware remote, another Spotify client, the bridge device's own
@@ -545,7 +545,7 @@ function scheduleNextPoll(poller: NowPlayingPollerHandle): void {
 
 /**
  * Starts event-scheduled polling of Spotify's currently-playing endpoint
- * (BACKLOG.md #24 / analysis/24-event-scheduled-now-playing-poll.md),
+ * (BACKLOG.md #24 / docs/proposals/ARCHIVE.md items 24-26),
  * replacing the old flat interval. After each poll, the next one is
  * scheduled at whichever is sooner: an estimate of when the currently
  * playing track will end, or the SAFETY_INTERVAL_MS (15s) safety net.

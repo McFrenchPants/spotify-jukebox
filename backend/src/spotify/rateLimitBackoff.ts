@@ -29,7 +29,7 @@ const DEFAULT_BACKOFF_SECONDS = 30;
  * short rate limit. 1800s (30 minutes) is an engineering estimate, NOT a
  * confirmed reset window — Spotify doesn't document one, and this app has
  * never actually observed a real QUOTA_EXCEEDED response to confirm it
- * against (see BACKLOG.md #25 / analysis/22-spotify-api-call-inventory.md).
+ * against (see BACKLOG.md #25 / docs/proposals/ARCHIVE.md, items 24-26).
  * The intent is just "meaningfully longer than the ordinary 30s default so
  * the poller stops hammering a condition that clearly won't self-clear in
  * seconds," not a precise number.

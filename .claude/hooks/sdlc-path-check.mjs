@@ -111,6 +111,20 @@
  * `forbidden_paths` is checked first and wins over `write_paths` on overlap.
  *
  * ---------------------------------------------------------------------------
+ * 4a. ALWAYS-FORBIDDEN PATHS (independent of any packet)
+ * ---------------------------------------------------------------------------
+ * `ALWAYS_FORBIDDEN_PATHS` (near the top of this file) is checked before a
+ * packet's own `forbidden_paths` and wins regardless of what write_paths any
+ * packet declares — a misconfigured or overly-generous packet can never grant
+ * write access to these. This is the orchestrator/supervisor's own tracking
+ * docs (`BACKLOG.md`, `PROGRESS.md`): the implementer role should never be
+ * the one updating them (see CLAUDE.md's "Update tracking" step), and this
+ * makes that an enforced rule rather than a packet-author convention. Add to
+ * that list directly; it is not sourced from `.sdlc/project.yaml`'s
+ * `owned_files` (which is metadata for the packet generator, not enforced
+ * here).
+ *
+ * ---------------------------------------------------------------------------
  * 5. KILL SWITCH
  * ---------------------------------------------------------------------------
  * `.sdlc/project.yaml`:
@@ -153,6 +167,18 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 
 const IGNORE_CASE = process.platform === "win32";
+
+/**
+ * Files the orchestrator/supervisor owns, forbidden to every implementer
+ * regardless of what any task packet's own `forbidden_paths`/`write_paths`
+ * say. These are relative to the repo root, same pattern syntax as a
+ * packet's own path lists (see §4 below). Unlike `owned_files` in
+ * `.sdlc/project.yaml` (which is metadata read by the task-packet generator,
+ * not enforced here), this list is actually checked on every write.
+ * Add to this list, don't rely on a packet author remembering to list these
+ * in `forbidden_paths` themselves.
+ */
+const ALWAYS_FORBIDDEN_PATHS = ["BACKLOG.md", "PROGRESS.md"];
 
 /** Deny the tool call with a reason, then exit. */
 function deny(reason) {
@@ -451,6 +477,18 @@ function matchesAny(patterns, rel) {
 }
 
 const packetLabel = `${taskId} (${toPosix(path.relative(mainRoot || rootAbs, packetPath)) || toPosix(packetPath)})`;
+
+if (matchesAny(ALWAYS_FORBIDDEN_PATHS, relTarget)) {
+  deny(
+    `sdlc path enforcement: "${relTarget}" is always forbidden for the ` +
+      `implementer role, regardless of what task packet ${packetLabel} says ` +
+      `(see ALWAYS_FORBIDDEN_PATHS in this hook). These files are the ` +
+      `orchestrator/supervisor's own tracking docs. If this task genuinely ` +
+      `needs a change here, report status "scope_change_requested" instead ` +
+      `of working around it — the orchestrator updates these, not the ` +
+      `implementer.`
+  );
+}
 
 if (matchesAny(forbiddenPaths, relTarget)) {
   deny(

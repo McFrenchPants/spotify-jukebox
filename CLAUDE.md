@@ -116,8 +116,7 @@ too — is shared account/developer-wide, not per process. A forgotten local
 `npm run dev` backend left running after a testing session competes with the
 live deployment for that same shared budget and can trip a real 429 during
 an actual party. This has already happened at least twice (see
-[analysis/09-spotify-429-rate-limiting.md](analysis/09-spotify-429-rate-limiting.md)
-and BACKLOG.md item 20).
+[docs/proposals/ARCHIVE.md](docs/proposals/ARCHIVE.md), item 20).
 
 So, whenever you start a backend (or frontend) dev server to test a change:
 

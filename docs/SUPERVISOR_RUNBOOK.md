@@ -88,7 +88,7 @@ time; skip it once it's already set up.
    after that first login has no effect at all. (If this is ever missed,
    the only fix is deleting the stored `admin_pin_hash` row directly from
    the add-on's persisted SQLite `app_settings` table, same as the real
-   incident documented in `docs/proposals/master-device-mode/PROGRESS.md`.)
+   incident documented in `docs/proposals/ARCHIVE.md` (item 8).)
 4. **Complete the one-time Spotify consent.** Leave `SPOTIFY_REFRESH_TOKEN`
    blank, start the add-on, then from a browser on the HA host itself (or
    via `ssh -L 8086:localhost:8086 <user>@<ha-host>` and a browser on your
