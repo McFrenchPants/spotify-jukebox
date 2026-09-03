@@ -1,6 +1,10 @@
 # Changelog
 
-All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
+All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`. Entries with a `-staging` version are staging-only identity changes on the `develop` branch (see CLAUDE.md's "Branch strategy" section) — not part of production's own history.
+
+## 1.0.30-staging
+
+- No user-facing app change — this is a staging-only identity split (name, add-on slug, and port) so the staging add-on can be installed side by side with production on the same Home Assistant server without colliding. Production is unaffected.
 
 ## 1.0.30
 

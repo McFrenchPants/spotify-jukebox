@@ -145,7 +145,7 @@ If a task legitimately requires a long-running dev server (e.g. the user is
 actively iterating in the browser with you), say so explicitly and confirm
 with the user before leaving it up across turns.
 
-## Never point local dev at the production Spotify authorization
+## Never point local dev — or staging — at the production Spotify authorization
 
 `backend/.env`'s Spotify client ID/secret are already separate from the
 Home Assistant add-on's configured client ID/secret — but `SPOTIFY_REFRESH_TOKEN`
@@ -161,6 +161,19 @@ needs a working Spotify connection, either:
   developer account, not per Client ID, as of the 2026 quota change — see
   BACKLOG.md item 20), or
 - ask the user which Spotify credentials to use before assuming.
+
+This applies just as much to the **staging deployment** (the `develop`
+branch's separate HA add-on install, see "Branch strategy" above) as it
+does to local dev — if staging polls the same Spotify account as
+production continuously, that's a persistent, worse version of the exact
+stray-backend rate-limit incidents (BACKLOG.md items 20/22) this section
+exists to prevent, not a one-off dev session. As of 2026-09-03, the user
+has registered a separate Spotify account (under their existing family
+plan) with its own new Spotify Developer app specifically for staging —
+that account's credentials are what staging's `SPOTIFY_CLIENT_ID`/
+`SPOTIFY_CLIENT_SECRET` (configured directly in the HA Supervisor's add-on
+options UI, not committed to this repo) should always use. Never suggest
+or configure staging to share production's Spotify credentials.
 
 ## Architecture note: don't add per-guest Spotify polling
 

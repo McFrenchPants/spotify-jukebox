@@ -79,16 +79,42 @@ separate staging deployment (external to this repo).
 
 ### Stage 2 — `develop` → `master` (production; requires a live instruction + approval record)
 
-```bash
-# Version bump + changelog, if the change is user-visible (see config.yaml's
-# own comment: HA Supervisor won't offer an update on an unchanged version):
-# bump config.yaml's version, add a CHANGELOG.md entry, commit that too
-# (on develop, before promoting).
+**`develop`'s `config.yaml` deliberately differs from `master`'s** (name,
+slug, version format, port — see `config.yaml`'s own comment and
+CLAUDE.md's "Branch strategy" section, staging needs a distinct HA
+Supervisor identity so it can run side by side with production). A plain
+merge silently carries `develop`'s side of those lines into `master`
+(git's 3-way merge takes the only side that changed, no conflict raised)
+— so this stage always needs one manual fix-up step after merging, before
+pushing:
 
+```bash
 git checkout master
 git merge --no-ff develop -m "Merge develop into master: <summary>"
+
+# The merge above just clobbered config.yaml's identity with develop's
+# staging values (name/slug/port) -- restore production identity by hand:
+#   name: "Guest Jukebox"
+#   slug: "guest_jukebox"
+#   ports: 8085/tcp: 8085
+#   SPOTIFY_REDIRECT_URI default: http://127.0.0.1:8085/api/auth/callback
+# Bump `version` to the next PRODUCTION version (no "-staging" suffix --
+# this is independent of whatever version string development was using on
+# `develop`), and add a matching CHANGELOG.md entry (HA Supervisor won't
+# offer an update on an unchanged version -- see config.yaml's own comment).
+
+node scripts/check-config-identity.mjs   # must print OK before proceeding
+
+git add config.yaml CHANGELOG.md
+git commit -m "Restore production identity + version bump for <summary>"
 git push origin master
 ```
+
+Never skip the `check-config-identity.mjs` run, and never push if it
+fails — that's exactly the "staging identity leaked into production" bug
+this script exists to catch (same spirit as `check-stray-backend.mjs` for
+BACKLOG.md items #20/#22: a "remember to fix it" instruction alone wasn't
+reliable, so this is a real, runnable check instead).
 
 This add-on has `auto_update: true` (confirmed via the HA check below), so
 pushing to `master` with a bumped `config.yaml` version is normally

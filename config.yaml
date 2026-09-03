@@ -1,11 +1,21 @@
-name: "Guest Jukebox"
+# STAGING IDENTITY -- name/slug/version/port below are deliberately
+# different from master's production values, so this add-on can be
+# installed side by side with production on the same Home Assistant
+# server without colliding (slug is what HA Supervisor uses as the
+# add-on's actual identity -- container name and data directory are keyed
+# off it). NEVER let these leak into master on a develop->master merge --
+# `npm run check:config-identity` (scripts/check-config-identity.mjs) is a
+# required pre-merge check for exactly this; see
+# docs/SUPERVISOR_RUNBOOK.md's Stage 2. See CLAUDE.md's "Branch strategy"
+# section for the full staging/production model.
+name: "Guest Jukebox (Staging)"
 # Bumping this is required for the Home Assistant Supervisor to detect and
 # offer an update at all (it won't rebuild on unchanged version + repo push
 # alone) -- ALWAYS add a matching entry to CHANGELOG.md in the same change,
 # or the add-on's "Changelog" tab shows "No changelog found."
-version: "1.0.30"
-slug: "guest_jukebox"
-description: "Self-hosted, LAN-only party music queueing app for guests, powered by Spotify"
+version: "1.0.30-staging"
+slug: "guest_jukebox_staging"
+description: "STAGING build -- self-hosted, LAN-only party music queueing app for guests, powered by Spotify. Uses its own separate Spotify developer account/app; never point this at the production Spotify credentials."
 url: "https://github.com/McFrenchPants/spotify-jukebox"
 arch:
   - amd64
@@ -13,15 +23,15 @@ startup: application
 boot: auto
 init: false
 ports:
-  8085/tcp: 8085
+  8085/tcp: 8086
 ports_description:
-  8085/tcp: "Guest Jukebox web app and API"
+  8085/tcp: "Guest Jukebox (Staging) web app and API"
 webui: "http://[HOST]:[PORT:8085]/"
 ingress: false
 options:
   SPOTIFY_CLIENT_ID: ""
   SPOTIFY_CLIENT_SECRET: ""
-  SPOTIFY_REDIRECT_URI: "http://127.0.0.1:8085/api/auth/callback"
+  SPOTIFY_REDIRECT_URI: "http://127.0.0.1:8086/api/auth/callback"
   ADMIN_PIN: "change-me"
   SPOTIFY_REFRESH_TOKEN: ""
 schema:
