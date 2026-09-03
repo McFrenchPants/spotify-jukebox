@@ -1244,7 +1244,7 @@ only when the user hasn't manually scrolled away. User wants the forced
 scroll to stop.
 
 ## 35. Master Device volume slider defaults to max on first launch
-**Status:** idea
+**Status:** done
 **Type:** bug
 **Analysis:** not yet written
 
@@ -1253,3 +1253,17 @@ Device, the volume slider shows 100% regardless of the device's actual
 current volume level (e.g. shows 100% when the device is actually at 30%)
 until the user manually adjusts it. Likely the slider's initial state isn't
 being seeded from the actual system/Spotify volume before first render.
+
+**2026-09-03: done.** Root cause: on the Master Device, the resolved
+Spotify device *is* the Master Device itself (the active Connect
+receiver), and Spotify reports a freshly-connected receiver's
+`volume_percent` as 100 — not the phone's real system volume — so
+`PlaybackControls.tsx`'s `getDevice()` seed effect set the slider to that
+wrong value, and on a genuinely first-ever launch the other two seed paths
+had nothing stored yet to correct it. Fixed by skipping that seed on the
+Master Device and adding a dedicated effect that seeds the slider directly
+from `VolumeControl.getVolume()` (the native plugin reading real hardware
+state). Implemented on `fix/master-device-volume-initial-seed`; the native
+hardware path itself could not be live-tested (no Android device/emulator
+in this dev environment) — verified via typecheck/build and manual trace
+only.
