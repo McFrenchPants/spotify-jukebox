@@ -7,9 +7,11 @@ design work before implementation — mirrors the process the original MVP used
 
 ## Process
 
-1. **Branch.** Create `feature/<slug>` off `master`. All of a proposal's docs and
-   code live on this branch until it ships, so `master` never carries
-   half-finished designs or in-progress features.
+1. **Branch.** Create `feature/<slug>` off `develop` (see
+   [CLAUDE.md](../../CLAUDE.md)'s "Branch strategy" section). All of a
+   proposal's docs and code live on this branch until it ships, so neither
+   `develop` nor `master` carries half-finished designs or in-progress
+   features.
 2. **Design spec.** Add `docs/proposals/<slug>/DESIGN_SPEC.md` — goals,
    non-goals, requirements, constraints, open questions. Deliberately
    low-tech: this is the document a human reviews and signs off on before any
@@ -22,9 +24,13 @@ design work before implementation — mirrors the process the original MVP used
 5. **Progress tracking.** Add `docs/proposals/<slug>/PROGRESS.md` once
    implementation starts — the supervisor agent's source of truth for task
    status, same role the root `PROGRESS.md` plays for the whole project.
-6. **Ship.** Merge `feature/<slug>` into `master` once done. Update the
-   backlog entry to `done` (or delete it) and update the root `PROGRESS.md`
-   if the change is significant enough to belong there.
+6. **Ship.** Merge `feature/<slug>` into `develop` once done — routine, the
+   supervisor does this automatically once local tests are green, no
+   separate go-ahead needed. Update the backlog entry to `done` (or delete
+   it) and update the root `PROGRESS.md` if the change is significant
+   enough to belong there. Promoting `develop` to `master` (production) is
+   a separate, later, explicitly-approved step — not part of an individual
+   proposal shipping.
 
 ## Active / past proposals
 

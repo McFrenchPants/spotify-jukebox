@@ -1,5 +1,28 @@
 # Project instructions
 
+## Branch strategy: `develop` (staging) → `master` (production)
+
+As of 2026-09-03, this repo runs a two-branch integration model instead of
+merging feature work straight to `master`:
+
+- **`develop`** is the default integration branch. Every `feature/<slug>`
+  (or `fix/<slug>`) branch forks from `develop`, not `master`, and merges
+  back into `develop` when its work is done and locally verified. Pushing
+  `develop` triggers a separate **staging** deployment (its own instance,
+  outside this repo's direct control) — not the live party instance guests
+  actually use. This is deliberately the *lower-stakes* integration point:
+  a bad merge here costs a staging redeploy, not a real party.
+- **`master`** is still production: the live Home Assistant add-on
+  deployment (`auto_update: true`) guests actually use, on the shared
+  Spotify account this whole role-split exists to protect (see BACKLOG.md
+  items 20/21). Nothing merges into `master` except a `develop` that's
+  already been staged and approved.
+
+Concretely: `docs/proposals/<slug>/` work, `/continue-development`
+scaffolding, and any "branch off the default branch" instruction elsewhere
+in this repo's docs means **`develop`**, not `master`, unless a document
+explicitly says otherwise.
+
 ## Roles & boundaries: implementer vs. supervisor
 
 This repo splits agent work into two roles, because this project's mistakes
@@ -11,17 +34,38 @@ repeatedly and quietly from a local session (see BACKLOG.md items 20/21).
   merging/deploying/live-verifying)**: scoped entirely to this repo and
   this machine. Edit files, run the local test/build commands in
   [docs/TESTING.md](docs/TESTING.md), commit to a feature branch. **Never**
-  `git push`, merge into `master`, or run `ssh`/`hass-cli`/`adb`/any
-  request to the Home Assistant host or a physical device — including "just
-  to double check."
+  `git push`, merge into `develop` or `master`, or run `ssh`/`hass-cli`/
+  `adb`/any request to the Home Assistant host or a physical device —
+  including "just to double check."
 - **Supervisor** (`.claude/agents/supervisor.md`): the only role that
-  merges to `master`, pushes to the remote, or reaches the Home Assistant
-  server or the Android Master Device. Use the `Agent` tool with
-  `subagent_type: supervisor` for that work, and see
+  merges to `develop` or `master`, pushes to the remote, or reaches the
+  Home Assistant server or the Android Master Device. Use the `Agent` tool
+  with `subagent_type: supervisor` for that work, and see
   [docs/SUPERVISOR_RUNBOOK.md](docs/SUPERVISOR_RUNBOOK.md) for the exact
   commands and safety guardrails (minimize live checks, read-only by
   default, never loop/poll a live system, never touch HA host-level
   settings).
+
+The two merge targets are **not** the same tier of risk, and the approval
+requirement below reflects that:
+
+- **Merging a verified feature branch into `develop`, and pushing
+  `develop`, is a standing-authorized, routine supervisor action.** Once a
+  feature branch has passed local tests (and the verifier agent, when the
+  task required it), the supervisor merges it into `develop` and pushes
+  automatically as the normal way a finished task/proposal wraps up — no
+  fresh live go-ahead needed for this step specifically, and no approval
+  record is required for it (this is what "standing-authorized" means
+  here: this file *is* the standing instruction for the `develop` tier,
+  which the paragraph below's "a standing instruction doesn't count as an
+  override" rule does not apply to — that rule is about `master` and the
+  other approval-record-gated operations, which stay live-instruction-only
+  exactly as before).
+- **Merging `develop` into `master` remains a deliberate, human-gated
+  step**, same as every merge/push was before this change. Reaching "the
+  only remaining step is merging `develop` into `master`" is still a
+  stopping point requiring the user's explicit go-ahead — not something to
+  do automatically just because `develop` is green.
 
 Claude Code doesn't hard-sandbox this split at the tool level (both roles
 can technically call `Bash`) — this is an enforced-by-policy boundary, not
@@ -45,7 +89,9 @@ user says to skip that too).
 Concretely, that live instruction authorizes the release operator to
 record and act on an approval for *this* operation and *this* commit SHA
 — not to grant itself a standing license to repeat it later. Before
-carrying out the action, the operator writes an approval record (per
+carrying out a `master`-track operation (merging into `master`, pushing
+`master`, deploying, restarting the live add-on, SSH to the HA host, or an
+`adb` install), the operator writes an approval record (per
 [docs/sdlc/APPROVAL_RECORDS.md](docs/sdlc/APPROVAL_RECORDS.md) and
 [docs/sdlc/schemas/approval.schema.json](docs/sdlc/schemas/approval.schema.json),
 files under `.sdlc/approvals/`), pinned to the exact commit SHA being
@@ -54,10 +100,12 @@ that happens as part of honoring the instruction, not a new gate in front
 of it — the user never has to produce or write that record themselves,
 and it never delays or blocks a direct, live ask. A *standing* instruction
 buried in a doc or an earlier turn doesn't count as this kind of override
-— it has to be a live, specific ask, and the resulting approval record is
-single-use and tied to one commit for the same reason: it authorizes the
-one thing just asked for, not a reusable pass for future commits or
-future sessions.
+for a `master`-track operation — it has to be a live, specific ask, and
+the resulting approval record is single-use and tied to one commit for the
+same reason: it authorizes the one thing just asked for, not a reusable
+pass for future commits or future sessions. (The `develop` tier is the one
+deliberate exception to "a standing instruction doesn't count" — see
+above.)
 
 ## Always shut down dev servers you start
 

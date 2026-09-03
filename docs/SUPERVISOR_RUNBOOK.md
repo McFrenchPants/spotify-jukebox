@@ -53,28 +53,49 @@ poll with.
 
 ## Merge & push workflow
 
-Only ever done after [TESTING.md](TESTING.md) is fully green on the feature
-branch.
+Two-stage, per [CLAUDE.md](../CLAUDE.md)'s "Branch strategy" section:
+feature branches fork from and merge into `develop` (staging) as a
+routine, automatic step; `develop` only promotes to `master` (production)
+on an explicit live instruction. Both stages still require
+[TESTING.md](TESTING.md) fully green first.
+
+### Stage 1 — feature branch → `develop` (routine, no approval record needed)
 
 ```bash
 # From a feature branch, tests already green:
 git add <specific files>              # never `git add -A`/`.` blindly
 git commit -m "..."
 
+git checkout develop
+git merge --no-ff <feature-branch> -m "Merge branch '<feature-branch>'"
+git push origin develop
+git branch -d <feature-branch>
+```
+
+Do this as the normal way a finished task/proposal wraps up — no need to
+wait for the user to separately ask for this merge, and no approval record
+to write for it. Pushing `develop` is what triggers this project's
+separate staging deployment (external to this repo).
+
+### Stage 2 — `develop` → `master` (production; requires a live instruction + approval record)
+
+```bash
 # Version bump + changelog, if the change is user-visible (see config.yaml's
 # own comment: HA Supervisor won't offer an update on an unchanged version):
-# bump config.yaml's version, add a CHANGELOG.md entry, commit that too.
+# bump config.yaml's version, add a CHANGELOG.md entry, commit that too
+# (on develop, before promoting).
 
 git checkout master
-git merge --no-ff <feature-branch> -m "Merge branch '<feature-branch>'"
+git merge --no-ff develop -m "Merge develop into master: <summary>"
 git push origin master
-git branch -d <feature-branch>
 ```
 
 This add-on has `auto_update: true` (confirmed via the HA check below), so
 pushing to `master` with a bumped `config.yaml` version is normally
 sufficient for the live instance to update on its own within a short
-window — no separate manual "deploy" step for the HA add-on path.
+window — no separate manual "deploy" step for the HA add-on path. This is
+the step that reaches guests at an actual party — never do it without the
+approval-record check above.
 
 ## Home Assistant: read-only checks (preferred)
 

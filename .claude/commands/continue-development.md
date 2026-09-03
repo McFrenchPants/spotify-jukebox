@@ -38,8 +38,12 @@ Check, in order, and stop at the first one that gives you a clear answer:
    with it (or straight to "Scaffold new work" if it's clearly pointing at
    new/not-yet-tracked work, like a draft spec that has no `PROGRESS.md`
    yet).
-2. **Unmerged feature branches.** `git branch --no-merged master` (or the
-   repo's actual default branch). For each, check whether it has a
+2. **Unmerged feature branches.** `git branch --no-merged develop` — this
+   repo's default integration branch is `develop`, not `master` (see
+   [CLAUDE.md](../../CLAUDE.md)'s "Branch strategy" section); `master` is
+   production and should only ever gain commits via an explicitly-approved
+   `develop` promotion, never a feature branch directly. For each, check
+   whether it has a
    `docs/proposals/<slug>/PROGRESS.md` — if so, that file's task table is
    the source of truth for whether it's actually still in progress (has any
    `todo`/`in-progress`/`blocked` row) or just merged-pending-cleanup /
@@ -204,9 +208,9 @@ proposed and approved), set it up before delegating any implementation:
    trivial fix shouldn't grow bureaucracy it doesn't need.
 
 2. **Branch.** Create (or reuse, if one already exists for this item)
-   `feature/<slug>` off the default branch. Everything for this work lives
-   on that branch until it ships — don't work on the default branch
-   directly for anything beyond the smallest one-file fix.
+   `feature/<slug>` off `develop`. Everything for this work lives on that
+   branch until it ships — don't work on `develop` (or `master`) directly
+   for anything beyond the smallest one-file fix.
 
 3. **Design spec (only for the "significant" tier).** Follow this
    project's existing proposals convention if it has one (check for a
@@ -494,12 +498,15 @@ Once a task is genuinely done:
   anything non-obvious.
 - If the task surfaced a new open question or blocker, record it.
 - Stage and commit the task's changes with a message referencing the task
-  ID. Don't push, don't merge to the default branch unless the user has
-  explicitly said to — merging (and especially pushing) is a
-  hard-to-reverse/shared-state action that needs a real go-ahead, not an
-  assumed one, even if a previous session in this same body of work was
-  told to merge. Don't commit if the working tree is unexpectedly messy —
-  investigate first.
+  ID, on the feature branch. Don't push, don't merge it yourself — that's
+  the supervisor role's job (`.claude/agents/supervisor.md`), not yours,
+  regardless of which tier is involved. Don't commit if the working tree
+  is unexpectedly messy — investigate first.
+  - Merging this feature branch into `develop` and pushing `develop` is
+    now a routine step the supervisor takes once the *whole* body of work
+    (not just one task) is done and verified — see "Continue or stop"
+    below. It doesn't need a fresh go-ahead from the user each time,
+    unlike promoting `develop` into `master`, which still does.
 
 ### Continue or stop
 
@@ -564,10 +571,22 @@ headroom when any of these correctness/safety triggers fire (design-spec
 - You hit a genuine blocker (a decision only the user can make, a
   real-hardware/credential/access dependency) — same tier as an
   exhausted per-task/per-verifier attempt budget above.
-- The work is fully done and the only remaining step is merging to the
-  default branch — treat that specifically as a stopping point requiring
-  explicit go-ahead, not something to do automatically just because
-  everything upstream of it succeeded.
+- The work is fully done and the only remaining step is **promoting
+  `develop` into `master`** — treat that specifically as a stopping point
+  requiring explicit go-ahead, not something to do automatically just
+  because everything upstream of it succeeded. This is *not* the same as
+  merging a finished feature branch into `develop`: that step is routine
+  (see below) and does not itself trigger this stop condition.
+
+**The `develop` merge is no longer a stop condition.** Once a body of
+work's tasks are all done and verified, dispatch to a `supervisor` agent
+to merge the feature branch into `develop` and push `develop`, as the
+normal way the work wraps up — this is standing-authorized by `CLAUDE.md`
+and needs no fresh go-ahead or approval record (see
+`.claude/agents/supervisor.md`'s "Two merge tiers"). Continue the run
+after that merge lands rather than stopping, unless some other stop
+condition on this list fires. Only the later `develop` → `master`
+promotion is the user's call.
 
 **Otherwise, continue automatically.** Absent an exhausted budget or a
 fired stop condition above, move on to the next task without pausing to
