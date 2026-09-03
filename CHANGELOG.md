@@ -2,6 +2,11 @@
 
 All notable changes to the Guest Jukebox Home Assistant Add-on. Version numbers match `config.yaml`.
 
+## 1.0.28
+
+- Fixed the "Up next" queue not updating after skipping a track — it now refreshes on skip, previous, and natural track-end, not just when a guest adds a song or an admin removes one.
+- Fixed synced lyrics (and the progress bar) consistently lagging the actual audio by about a second — the displayed progress now accounts for how long ago the backend actually observed it from Spotify, instead of assuming it was captured the instant it reached your device.
+
 ## 1.0.26
 
 - Cut background Spotify API load from the now-playing poller by roughly two-thirds: instead of polling on a constant 4-second timer, it now polls right after a guest's own playback action, estimates and schedules a poll for the end of the current track, and otherwise falls back to a 15-second safety-net interval.

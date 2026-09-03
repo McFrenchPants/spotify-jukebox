@@ -12,6 +12,10 @@ import { LyricsPanel } from './LyricsPanel'
 /** Matches --duration-slow in index.css — the crossfade should ride the same token. */
 const CROSSFADE_MS = 320
 const PROGRESS_TICK_MS = 1000
+// Upper bound on how much poll-staleness compensation (BACKLOG.md item 33)
+// can advance the seeded progress clock — guards against backend/frontend
+// clock skew or an unusually old snapshot producing an implausible jump.
+const MAX_POLL_STALENESS_COMPENSATION_MS = 5000
 
 export interface NowPlayingProps {
   subscribe: EventStream['subscribe']
@@ -144,9 +148,21 @@ export function NowPlaying({
   }, [snapshot, swapDelayMs])
 
   // Resync the local progress clock whenever the displayed snapshot changes.
+  // `polledAt` (BACKLOG.md item 33) is when the backend actually observed
+  // this progressMs from Spotify — by the time it reaches us (backend poll
+  // + SSE delivery + render), that's already some ms in the past, so the
+  // clock must start that far ahead rather than assuming progressMs was
+  // captured right now. Clamped to [0, MAX_POLL_STALENESS_COMPENSATION_MS]
+  // so backend/frontend clock skew or an unexpectedly old snapshot can't
+  // swing this the wrong way or jump the display implausibly far forward.
   useEffect(() => {
-    syncRef.current = { progressMs: displaySnapshot?.progressMs ?? 0, at: Date.now() }
-    setProgressMs(displaySnapshot?.progressMs ?? 0)
+    const staleness = displaySnapshot?.polledAt
+      ? Math.min(Math.max(Date.now() - displaySnapshot.polledAt, 0), MAX_POLL_STALENESS_COMPENSATION_MS)
+      : 0
+    const duration = displaySnapshot?.durationMs ?? Infinity
+    const seeded = Math.min((displaySnapshot?.progressMs ?? 0) + staleness, duration)
+    syncRef.current = { progressMs: seeded, at: Date.now() }
+    setProgressMs(seeded)
   }, [displaySnapshot])
 
   // Tick the progress clock forward locally between SSE updates.

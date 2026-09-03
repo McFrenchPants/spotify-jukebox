@@ -977,6 +977,19 @@ actually present and non-zero upstream, and (b) whether
 an earlier bad response for the same artist id, independent of whatever
 the root cause turns out to be.
 
+## 29. Now Playing card: default to expanded on large screens (desktop)
+
+**Status:** idea
+**Type:** enhancement
+
+Reported: on large screens (desktop), the Now Playing song info card should
+default to its larger/expanded size instead of starting collapsed like on
+phone. The expand/collapse toggle already exists
+([NowPlaying.tsx:60](frontend/src/components/nowplaying/NowPlaying.tsx:60)/[212](frontend/src/components/nowplaying/NowPlaying.tsx:212))
+but starts collapsed regardless of viewport width; on desktop there's
+generally more room for the expanded stats (play count, artist/genre
+details — see item 14) to show by default without an extra tap.
+
 **2026-09-02 code-review pass (no live Spotify access available in this
 dev environment — no `SPOTIFY_REFRESH_TOKEN` configured, and a live test
 call would draw on the same pooled quota as the production add-on, so none
@@ -1002,3 +1015,148 @@ either check the "About the artist" panel on the deployed add-on for a
 well-known artist with a real, large follower count, or add temporary
 logging of the raw `artist.followers` value and check the add-on's logs
 next time the panel is opened.
+
+## 30. Jukebox device's SSE connection doesn't survive Android backgrounding
+**Status:** needs research
+**Type:** bug
+**Analysis:** not yet written
+
+Reported 2026-09-02: guest-facing volume control went offline
+("The Jukebox device is offline — volume control is paused until it
+reconnects.") even though the Master Device phone was confirmed running the
+app and on wifi (still the active Spotify Connect device, keeping song
+info/pause/skip in sync throughout — those go through Spotify's Web API,
+unaffected by this). A fresh `master` build was installed via `adb install
+-r` and did **not** come back online on its own; it only flipped to online
+after explicitly foregrounding the app (`adb shell am start`). So this
+isn't primarily a stale-build issue — even a freshly-installed build had a
+dead SSE connection until put in the foreground.
+
+Suspected root cause: the SSE connection
+([backend/src/events/jukeboxDeviceOnline.ts](backend/src/events/jukeboxDeviceOnline.ts)
+tracks it purely as "is there an open `GET /api/events` connection") doesn't
+survive Android backgrounding — either Doze/App Standby network restrictions
+suspending the connection, or the lack of a foreground service/wake lock
+letting the OS pause the WebView's JS timers/network once the activity isn't
+resumed. The user has since pinned the app via Android's screen-pinning to
+keep it forced in the foreground as a workaround, which should rule out
+"another app took focus" but may not rule out Doze kicking in once the
+screen itself sleeps/locks — worth confirming whether pinning alone is
+sufficient or whether a real fix (foreground service, wake lock, and/or an
+app-side reconnect-on-resume handler) is needed.
+
+Worth checking as part of the eventual analysis: whether the app's SSE
+client re-establishes on `onResume`/visibility-change at all, or only
+connects once at cold start; whether `WAKE_LOCK`/a foreground service is
+declared in `frontend/android/app/src/main/AndroidManifest.xml`; and
+whether this reproduces with screen-pinning alone or requires the phone to
+also stay unlocked/screen-on.
+
+## 31. Master Device shows itself as "the Jukebox device is offline"
+**Status:** idea
+**Type:** bug
+
+Reported 2026-09-02, found while investigating item 30: the confusing
+"The Jukebox device is offline — volume control is paused until it
+reconnects." copy also renders on the Master Device's own screen — i.e. the
+phone that *is* the registered Jukebox device sees a message about itself
+being disconnected from itself. Nonsensical to show on the one client where
+it's least meaningful.
+
+Root cause: [PlaybackControls.tsx](frontend/src/components/playback/PlaybackControls.tsx)
+derives `jukeboxOffline`/`volumeAllowed` purely from the generic
+`GET /api/trust-mode` `jukeboxDevice.registered`/`online` snapshot, with no
+special-casing for "this client itself is the registered Jukebox device."
+That check already exists elsewhere —
+[useIsJukeboxDevice.ts](frontend/src/hooks/useIsJukeboxDevice.ts) — and
+drives the nav swap ("Me" → "Connect") on
+[ConnectPage.tsx](frontend/src/pages/ConnectPage.tsx), but `PlaybackControls`
+doesn't use it at all. Worth deciding the actual fix during design, not just
+better copy: today even the Master Device's own volume slider round-trips
+guest-style through the backend (`POST /api/volume` → SSE
+`jukebox-volume-command` → itself), instead of using
+[volumeControlPlugin.ts](frontend/src/lib/volumeControlPlugin.ts)'s
+`VolumeControl.setVolume` directly on-device — which would sidestep this
+class of message entirely for the Master Device (no network round trip
+needed to change its own system volume) and likely also be more robust/less
+latent than looping through the backend.
+
+## 32. "Up next" queue doesn't update after a skip
+**Status:** done
+**Type:** bug
+
+Reported 2026-09-02: after skipping to the next track, the guest-facing
+"Up next" list keeps showing stale entries (e.g. still shows the
+just-started track, or doesn't drop off the track that was skipped past)
+until something unrelated happens to refresh it.
+
+Root cause found in code:
+[QueueList.tsx:113](frontend/src/components/queue/QueueList.tsx:113)
+only re-fetches `GET /api/queue` on mount and on the `queue-update` SSE
+event. `queue-update` is emitted from exactly two places —
+[queue.ts:140](backend/src/routes/queue.ts:140) (a guest adds a track) and
+[admin.ts:107](backend/src/routes/admin.ts:107)/[112](backend/src/routes/admin.ts:112)
+(admin removes/clears) — neither of which fires on skip. Meanwhile
+`POST /api/playback/skip` ([playback.ts:122](backend/src/routes/playback.ts:122))
+only triggers an immediate now-playing poll
+(`triggerNowPlayingPollFireAndForget`), and that poller *does* mutate the
+local queue mirror on a detected track change — it calls
+`dequeueBySpotifyTrackId` at
+[nowPlaying.ts:403](backend/src/spotify/nowPlaying.ts:403) — but never
+emits `queue-update` afterward, only `leaderboard-update` and
+`now-playing`. So the backend's queue data is actually correct after a
+skip; the frontend just never learns to re-fetch it. Fix should be a
+one-line addition: emit `queue-update` alongside the existing
+`leaderboard-update` right after the `dequeueBySpotifyTrackId` call in
+nowPlaying.ts, so it fires on every detected track change (skip, previous,
+and natural track-end alike), not just guest add/admin remove.
+
+**Fixed 2026-09-02:** added the one-line `emitEvent("queue-update", {
+trackId: nextState.trackId })` right after `dequeueBySpotifyTrackId` in
+[nowPlaying.ts](backend/src/spotify/nowPlaying.ts) as diagnosed above.
+Backend typecheck + full `vitest run` (417 tests) clean.
+
+## 33. Synced lyrics highlight consistently lags the actual audio by ~1s
+**Status:** done
+**Type:** bug
+
+Reported 2026-09-02: the highlighted lyric line in the lyrics panel is
+consistently a second or so behind what's actually playing.
+
+Root cause found in code: the local progress clock that both the progress
+bar and [useSyncedLyrics.ts](frontend/src/hooks/useSyncedLyrics.ts) derive
+from is resynced in
+[NowPlaying.tsx:147-150](frontend/src/components/nowplaying/NowPlaying.tsx:147)
+as `syncRef.current = { progressMs: displaySnapshot?.progressMs ?? 0, at:
+Date.now() }` — i.e. it treats the snapshot's `progressMs` as if it were
+captured at the instant the frontend received it, then ticks forward from
+there every `PROGRESS_TICK_MS`. In reality that `progressMs` value is
+whatever Spotify reported as of the backend's *last completed poll*, which
+is already some amount old by the time it reaches the frontend (backend
+poll round-trip to Spotify + SSE emission + delivery), so the local clock
+starts behind and stays behind by that same fixed offset for the rest of
+the track. The one field that could correct for this,
+`polledAt` ([api.ts:88](frontend/src/lib/api.ts:88), added for BACKLOG.md
+item 9's staleness detection), is documented as REST-only and isn't even
+present on the `now-playing` SSE event payload
+([nowPlaying.ts:428](backend/src/spotify/nowPlaying.ts:428) emits
+`nextState` without it) — so there's currently no way for the frontend to
+compensate even if it wanted to. Fix likely needs two parts: include a
+poll timestamp on the SSE payload too (not just the REST response), and
+have the resync effect add `Date.now() - polledAt` to the seeded
+`progressMs` before starting the local tick, rather than assuming the
+snapshot was captured at the moment it arrived.
+
+**Fixed 2026-09-02:** both parts landed. Backend now emits `polledAt`
+(the module-level `lastPolledAt`) on the SSE `now-playing` payload too, not
+just the REST response
+([nowPlaying.ts](backend/src/spotify/nowPlaying.ts)). Frontend's resync
+effect in [NowPlaying.tsx](frontend/src/components/nowplaying/NowPlaying.tsx)
+now adds `Date.now() - polledAt` (clamped to
+`[0, MAX_POLL_STALENESS_COMPENSATION_MS]` = 5s, to guard against
+backend/frontend clock skew or an unexpectedly old snapshot) to the seeded
+`progressMs`, and clamps the result to the track's `durationMs` the same
+way the existing tick interval already does. Backend + frontend typecheck
+clean, frontend production build clean, backend `vitest run` (417 tests)
+clean — no frontend unit test suite exists per
+[docs/TESTING.md](docs/TESTING.md).

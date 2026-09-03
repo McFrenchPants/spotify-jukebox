@@ -40,6 +40,8 @@ export interface NowPlayingState {
   albumArt?: string | null;
   durationMs?: number;
   progressMs?: number;
+  /** Epoch ms this state was actually observed from Spotify — see emitEvent("now-playing") below. */
+  polledAt?: number;
 }
 
 interface SpotifyCurrentlyPlayingResponse {
@@ -401,6 +403,11 @@ export async function pollNowPlaying(
       // No match (null) means this track was never queued locally, i.e. it's
       // an organic/autoplay continuation Spotify picked on its own.
       const addedBySessionId = dequeueBySpotifyTrackId(nextState.trackId);
+      // The local queue mirror just changed (the started track was dropped
+      // off the front) — let guests' "Up next" lists know to re-fetch,
+      // covering skip/previous/natural-track-end alike, not just guest-add
+      // and admin-remove (the only other emitters of this event).
+      emitEvent("queue-update", { trackId: nextState.trackId });
 
       // This is the actual "a new track started playing" signal — the right
       // place to record play_history/track_stats (see trackStats.ts's
@@ -425,7 +432,11 @@ export async function pollNowPlaying(
         emitEvent("leaderboard-update", { trackId: nextState.trackId });
       }
     }
-    emitEvent("now-playing", nextState);
+    // polledAt lets the frontend account for how long ago this progressMs
+    // was actually true, instead of treating it as captured the instant the
+    // event is received (BACKLOG.md item 33) — previously only the REST
+    // GET /api/now-playing response carried this field.
+    emitEvent("now-playing", { ...nextState, polledAt: lastPolledAt });
   } else {
     lastState = nextState;
     lastPolledAt = Date.now();
